@@ -1,0 +1,119 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 🧠 THEME SETTINGS */
+:root {
+  color-scheme: dark light;
+  --color-bg-light: #ffffff;
+  --color-bg-dark: #0f1116;
+  --color-surface-dark: #1a1b20;
+  --color-accent: #6366f1; /* Indigo-500 */
+  --color-accent-hover: #818cf8;
+  --color-border: #2e3038;
+  --color-text-light: #f9fafb;
+  --color-text-muted: #9ca3af;
+  --transition: all 0.2s ease-in-out;
+}
+
+html, body {
+  @apply min-h-screen overflow-x-hidden antialiased;
+  transition: var(--transition);
+  background-color: var(--color-bg-dark);
+  color: var(--color-text-light);
+}
+
+/* 🌗 LIGHT MODE */
+@media (prefers-color-scheme: light) {
+  html, body {
+    background-color: var(--color-bg-light);
+    color: #111827;
+  }
+}
+
+/* 🧱 CONTAINERS */
+.container {
+  @apply max-w-5xl mx-auto px-4;
+}
+
+/* ⚙️ BASE ELEMENTS */
+a, button, [role="button"] {
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+a:hover, button:hover {
+  filter: brightness(1.1);
+}
+
+/* 🟦 BUTTONS */
+.btn {
+  @apply inline-flex items-center justify-center rounded-md border px-4 py-2 text-sm font-medium transition shadow-sm;
+  @apply focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2;
+}
+
+.btn-primary {
+  @apply bg-indigo-600 border-indigo-600 text-white hover:bg-indigo-700 hover:border-indigo-700;
+}
+
+.btn-secondary {
+  @apply bg-gray-800 border-gray-700 text-gray-100 hover:bg-gray-700;
+}
+
+.btn-outline {
+  @apply border border-gray-600 text-gray-200 hover:bg-gray-800;
+}
+
+/* 🧩 INPUTS & LABELS */
+.label {
+  @apply block text-sm font-medium mb-1 text-gray-300;
+}
+
+.input {
+  @apply w-full rounded-md border border-gray-700 px-3 py-2 bg-gray-900 text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent;
+  transition: var(--transition);
+}
+
+/* 🗂️ CARDS */
+.card {
+  @apply rounded-xl border border-gray-800 bg-gray-900 shadow-sm p-4 transition-all duration-200;
+}
+
+.card:hover {
+  box-shadow: 0 0 15px rgba(99, 102, 241, 0.25);
+  border-color: var(--color-accent);
+}
+
+/* 🧭 NAV / HEADER */
+header {
+  @apply border-b border-gray-800 bg-gray-950/80 backdrop-blur-md sticky top-0 z-50;
+}
+
+/* 💬 CHAT & SCROLLBAR STYLING */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: rgba(99, 102, 241, 0.3);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(99, 102, 241, 0.6);
+}
+
+/* ✨ GLOBAL ANIMATIONS */
+.fade-in {
+  animation: fadeIn 0.3s ease-in-out both;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}

@@ -1,0 +1,343 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /* ================= HELPERS ================= */
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function uid() {
+      return request.auth.uid;
+    }
+
+    function job(jobId) {
+      return get(/databases/$(database)/documents/jobs/$(jobId));
+    }
+
+    function isJobOwner(jobId) {
+      return signedIn() && job(jobId).data.userId == uid();
+    }
+
+    function isClaimedContractor(jobId) {
+      return signedIn()
+        && job(jobId).data.claimedBy != null
+        && job(jobId).data.claimedBy == uid();
+    }
+
+    function isParticipant(jobId) {
+      return isJobOwner(jobId) || isClaimedContractor(jobId);
+    }
+
+    function onlyKeys(allowed) {
+      return request.resource.data.keys().hasOnly(allowed);
+    }
+
+    /* ================= USERS ================= */
+
+    match /users/{userId} {
+      allow read, write: if signedIn() && uid() == userId;
+    }
+
+    /* ================= CONTRACTORS ================= */
+
+    match /contractors/{contractorId} {
+
+      allow read: if signedIn();
+
+      allow create: if signedIn() && uid() == contractorId;
+
+      allow update: if signedIn()
+        && uid() == contractorId
+        && request.resource.data.diff(resource.data).changedKeys()
+          .hasOnly([
+            "name",
+            "email",
+            "phone",
+            "trade",
+            "trades",
+            "city",
+            "zipCode",
+            "serviceZones",
+            "serviceRadiusMiles",
+            "availability",
+            "bio",
+            "photoURL",
+            "website",
+            "rating",
+            "reviewCount",
+            "reputationScore",
+            "jobsCompleted",
+            "jobsAccepted",
+            "responseCount",
+            "invitationAcceptCount",
+            "invitationDeclineCount",
+            "boostActive",
+            "boostLevel",
+            "lastActiveAt",
+            "updatedAt",
+            "createdAt"
+          ])
+        // boostActive must be boolean
+        && (
+          !("boostActive" in request.resource.data)
+          || request.resource.data.boostActive is bool
+        )
+        // boostLevel must be 1–3
+        && (
+          !("boostLevel" in request.resource.data)
+          || (
+            request.resource.data.boostLevel is int
+            && request.resource.data.boostLevel >= 1
+            && request.resource.data.boostLevel <= 3
+          )
+        );
+
+      allow delete: if false;
+
+      /* contractor job inbox — readable/writable only by the contractor */
+      match /jobInbox/{inboxId} {
+        allow read: if signedIn() && uid() == contractorId;
+        allow write: if false; // written by API routes only
+      }
+    }
+
+    /* ================= BUSINESSES ================= */
+
+    match /businesses/{businessId} {
+      allow read: if signedIn();
+
+      // Businesses are seeded via Google Places import (admin SDK).
+      // A signed-in owner can claim and update their own listing.
+      allow create: if signedIn();
+
+      allow update: if signedIn()
+        && (
+          // Owner editing their claimed listing
+          resource.data.ownerId == uid()
+          ||
+          // First-time claim: ownerId not yet set
+          (!("ownerId" in resource.data) && request.resource.data.ownerId == uid())
+        );
+
+      allow delete: if false;
+    }
+
+    /* ================= JOBS ================= */
+
+    match /jobs/{jobId} {
+
+      /* ---------- READ ---------- */
+      // Signed-in users can read jobs (contractors need to browse open jobs)
+      allow read: if signedIn();
+
+      /* ---------- CREATE ---------- */
+      // Normally written by the create-job API route (admin SDK, bypasses rules).
+      // This rule covers any direct client writes.
+      allow create: if signedIn()
+        && request.resource.data.userId == uid()
+        && request.resource.data.claimedBy == null
+        && request.resource.data.status in ["triaged", "open", "matched"]
+        && onlyKeys([
+          "userId",
+          "description",
+          "location",
+          "trade",
+          "claimedBy",
+          "status",
+          "aiSummary",
+          "aiDetectedTrade",
+          "aiSeverity",
+          "createdAt",
+          "updatedAt"
+        ]);
+
+      /* ---------- UPDATE ---------- */
+      allow update: if signedIn() && (
+
+        /* OWNER — safe field edits only */
+        (
+          uid() == resource.data.userId &&
+          request.resource.data.diff(resource.data).changedKeys()
+            .hasOnly([
+              "description",
+              "location",
+              "trade",
+              "aiSummary",
+              "aiDetectedTrade",
+              "aiSeverity",
+              "updatedAt"
+            ])
+        )
+
+        ||
+
+        /* CONTRACTOR ACCEPTS JOB (triaged / matched → accepted) */
+        (
+          resource.data.claimedBy == null &&
+          resource.data.status in ["triaged", "matched", "open"] &&
+          request.resource.data.claimedBy == uid() &&
+          request.resource.data.status == "accepted"
+        )
+
+        ||
+
+        /* CONTRACTOR STARTS JOB (accepted → in_progress) */
+        (
+          resource.data.status == "accepted" &&
+          request.resource.data.status == "in_progress" &&
+          resource.data.claimedBy == uid()
+        )
+
+        ||
+
+        /* CONTRACTOR MARKS COMPLETE (in_progress → completed) */
+        (
+          resource.data.status == "in_progress" &&
+          request.resource.data.status == "completed" &&
+          resource.data.claimedBy == uid()
+        )
+
+        ||
+
+        /* OWNER CONFIRMS COMPLETION (completed → confirmed) */
+        (
+          resource.data.status == "completed" &&
+          request.resource.data.status == "confirmed" &&
+          uid() == resource.data.userId
+        )
+      );
+
+      allow delete: if false;
+
+      /* ================= MESSAGES ================= */
+
+      match /messages/{messageId} {
+        allow read: if isParticipant(jobId);
+
+        allow create: if isParticipant(jobId)
+          && request.resource.data.senderId == uid()
+          && onlyKeys(["text", "senderId", "createdAt", "type", "imageUrl"])
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 4000;
+
+        allow update, delete: if false;
+      }
+
+      /* ================= ATTACHMENTS ================= */
+
+      match /attachments/{attId} {
+        allow read: if isParticipant(jobId);
+        allow create: if isParticipant(jobId);
+        allow update, delete: if false;
+      }
+
+      /* ================= APPOINTMENTS ================= */
+
+      match /appointments/{appointmentId} {
+        allow read: if isParticipant(jobId);
+
+        allow create: if isParticipant(jobId)
+          && request.resource.data.createdBy == uid()
+          && request.resource.data.status == "proposed"
+          && request.resource.data.startAt is timestamp
+          && request.resource.data.endAt is timestamp
+          && request.resource.data.endAt > request.resource.data.startAt
+          && onlyKeys([
+            "startAt",
+            "endAt",
+            "timezone",
+            "status",
+            "createdBy",
+            "createdAt"
+          ]);
+
+        allow update: if isParticipant(jobId)
+          && request.resource.data.startAt == resource.data.startAt
+          && request.resource.data.endAt == resource.data.endAt
+          && request.resource.data.createdBy == resource.data.createdBy
+          && (
+            (
+              resource.data.status == "proposed" &&
+              request.resource.data.status in ["accepted", "declined"] &&
+              uid() != resource.data.createdBy
+            )
+            ||
+            (
+              resource.data.status == "accepted" &&
+              request.resource.data.status == "cancelled"
+            )
+          );
+
+        allow delete: if false;
+      }
+
+      /* ================= REVIEWS ================= */
+
+      match /reviews/{reviewId} {
+        allow read: if isParticipant(jobId);
+
+        // Only after owner confirms completion
+        allow create: if isJobOwner(jobId)
+          && job(jobId).data.status == "confirmed"
+          && request.resource.data.reviewerId == uid()
+          && request.resource.data.contractorId == job(jobId).data.claimedBy
+          && request.resource.data.rating is int
+          && request.resource.data.rating >= 1
+          && request.resource.data.rating <= 5
+          && onlyKeys([
+            "reviewerId",
+            "contractorId",
+            "rating",
+            "comment",
+            "createdAt"
+          ]);
+
+        allow update, delete: if false;
+      }
+
+      /* ================= EVENTS ================= */
+
+      match /events/{eventId} {
+        allow read: if isParticipant(jobId);
+
+        allow create: if isParticipant(jobId)
+          && request.resource.data.actorId == uid()
+          && request.resource.data.type is string
+          && request.resource.data.type.size() > 0
+          && request.resource.data.type.size() <= 80
+          && (
+            !("message" in request.resource.data)
+            || (
+              request.resource.data.message is string
+              && request.resource.data.message.size() <= 500
+            )
+          )
+          && (
+            !("meta" in request.resource.data)
+            || request.resource.data.meta is map
+          )
+          && onlyKeys(["type", "message", "actorId", "meta", "createdAt"]);
+
+        allow update, delete: if false;
+      }
+
+      /* ================= INVITATIONS ================= */
+
+      match /invitations/{invitationId} {
+        // Contractors can read their own invitations
+        allow read: if signedIn();
+        // Written by API routes (admin SDK) only
+        allow write: if false;
+      }
+    }
+
+    /* ================= DEFAULT DENY ================= */
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

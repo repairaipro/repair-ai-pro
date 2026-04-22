@@ -1,0 +1,52 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Helper: user must be signed in
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Helper: file size limit (20 MB)
+    function underSizeLimit() {
+      return request.resource.size <= 20 * 1024 * 1024;
+    }
+
+    // Helper: allowed image/video/audio/document types
+    function isAllowedType() {
+      return request.resource.contentType.matches('image/.*')
+          || request.resource.contentType.matches('video/.*')
+          || request.resource.contentType.matches('audio/.*')
+          || request.resource.contentType == 'application/pdf';
+    }
+
+    /* ================= JOB ATTACHMENTS ================= */
+    // Path: jobs/{jobId}/attachments/{filename}
+    // Only signed-in users can upload; anyone signed-in can read
+    // (access is further controlled at the Firestore attachment document level)
+
+    match /jobs/{jobId}/attachments/{filename} {
+      allow read: if signedIn();
+      allow write: if signedIn()
+        && underSizeLimit()
+        && isAllowedType();
+    }
+
+    /* ================= CONTRACTOR PROFILE PHOTOS ================= */
+    // Path: contractors/{contractorId}/photos/{filename}
+
+    match /contractors/{contractorId}/photos/{filename} {
+      allow read: if signedIn();
+      allow write: if signedIn()
+        && request.auth.uid == contractorId
+        && underSizeLimit()
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    /* ================= DEFAULT DENY ================= */
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

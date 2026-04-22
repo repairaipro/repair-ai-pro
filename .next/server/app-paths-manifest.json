@@ -1,0 +1,7 @@
+{
+  "/contractor-inbox/page": "app/contractor-inbox/page.js",
+  "/chat/page": "app/chat/page.js",
+  "/onboarding/page": "app/onboarding/page.js",
+  "/dashboard/page": "app/dashboard/page.js",
+  "/page": "app/page.js"
+}
