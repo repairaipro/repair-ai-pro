@@ -6,14 +6,12 @@ import { updateDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '@/lib/auth';
 import { db } from '@/lib/db';
 import OnboardingStep from '@/components/OnboardingStep';
-import Link from 'next/link';
 
 export default function HomeownerOnboardingPage() {
   const { user } = useAuth();
   const router = useRouter();
   const [step, setStep] = useState(1);
 
-  // Form state
   const [city, setCity] = useState('');
   const [zipCode, setZipCode] = useState('');
   const [phone, setPhone] = useState('');
@@ -29,9 +27,9 @@ export default function HomeownerOnboardingPage() {
     setError('');
     switch (currentStep) {
       case 1:
-        return true; // Welcome is always valid
+        return true;
       case 2:
-        return true; // Location is optional
+        return true;
       default:
         return false;
     }
@@ -61,7 +59,6 @@ export default function HomeownerOnboardingPage() {
     if (!user) return;
     setLoading(true);
     try {
-      // Mark onboarding as complete and save optional location + phone
       await updateDoc(doc(db, 'users', user.uid), {
         onboardingComplete: true,
         city: city.trim() || undefined,
@@ -69,7 +66,6 @@ export default function HomeownerOnboardingPage() {
         phone: phone.trim() || undefined,
       });
 
-      // Redirect to dashboard
       router.push('/dashboard');
     } catch (err: any) {
       setError(err.message || 'Failed to complete onboarding');
@@ -89,11 +85,13 @@ export default function HomeownerOnboardingPage() {
     <OnboardingStep
       step={step}
       totalSteps={2}
-      title={step === 1 ? 'Welcome to Repair AI Pro' : 'Find nearby contractors'}
+      title={
+        step === 1 ? 'Welcome to Repair AI Pro' : 'Find nearby contractors'
+      }
       subtitle={
         step === 1
           ? 'The easiest way to find skilled contractors for any job'
-          : 'We'll show you available contractors in your area'
+          : 'We\'ll show you available contractors in your area'
       }
       onNext={handleNext}
       onPrev={handlePrev}
@@ -108,15 +106,15 @@ export default function HomeownerOnboardingPage() {
         </div>
       )}
 
-      {/* Step 1: Welcome */}
       {step === 1 && (
         <div className="space-y-8">
-          {/* Feature list */}
           <div className="space-y-4">
             <div className="flex gap-4">
               <div className="text-2xl flex-shrink-0">🔧</div>
               <div>
-                <h3 className="font-semibold text-white mb-1">Any Service, Any Contractor</h3>
+                <h3 className="font-semibold text-white mb-1">
+                  Any Service, Any Contractor
+                </h3>
                 <p className="text-gray-400 text-sm">
                   From plumbing to electrical work, find qualified contractors for any job
                 </p>
@@ -136,7 +134,9 @@ export default function HomeownerOnboardingPage() {
             <div className="flex gap-4">
               <div className="text-2xl flex-shrink-0">⭐</div>
               <div>
-                <h3 className="font-semibold text-white mb-1">Verified Contractors</h3>
+                <h3 className="font-semibold text-white mb-1">
+                  Verified Contractors
+                </h3>
                 <p className="text-gray-400 text-sm">
                   View ratings and reviews from other homeowners to make confident choices
                 </p>
@@ -146,7 +146,9 @@ export default function HomeownerOnboardingPage() {
             <div className="flex gap-4">
               <div className="text-2xl flex-shrink-0">📍</div>
               <div>
-                <h3 className="font-semibold text-white mb-1">Local & Responsive</h3>
+                <h3 className="font-semibold text-white mb-1">
+                  Local & Responsive
+                </h3>
                 <p className="text-gray-400 text-sm">
                   Find contractors near you who are ready to start right away
                 </p>
@@ -154,16 +156,15 @@ export default function HomeownerOnboardingPage() {
             </div>
           </div>
 
-          {/* CTA section */}
           <div className="p-6 bg-indigo-500/10 border border-indigo-500/30 rounded-xl">
             <p className="text-indigo-300 text-sm">
-              <strong>Ready to get started?</strong> Post a job in the next step and get connected with qualified contractors in minutes.
+              <strong>Ready to get started?</strong> Post a job in the next step
+              and get connected with qualified contractors in minutes.
             </p>
           </div>
         </div>
       )}
 
-      {/* Step 2: Location & Phone */}
       {step === 2 && (
         <div className="space-y-6">
           <p className="text-gray-300 text-sm">
@@ -207,13 +208,16 @@ export default function HomeownerOnboardingPage() {
               placeholder="(555) 123-4567"
               className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
             />
-            <p className="text-xs text-gray-500 mt-1">Used to send job updates & messages via SMS.</p>
+            <p className="text-xs text-gray-500 mt-1">
+              Used to send job updates & messages via SMS.
+            </p>
           </div>
 
           <div className="p-4 bg-gray-800/50 rounded-lg border border-gray-700">
             <p className="text-xs text-gray-500 mb-2">💡 Tip:</p>
             <p className="text-sm text-gray-300">
-              You can also specify location when posting a job. Skip all fields if you'd rather set them up later.
+              You can also specify location when posting a job. Skip all fields if
+              you'd rather set them up later.
             </p>
           </div>
         </div>

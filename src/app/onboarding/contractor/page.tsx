@@ -44,9 +44,9 @@ export default function ContractorOnboardingPage() {
       case 2:
         return !!(name && phone);
       case 3:
-        return true; // Optional step
+        return true;
       case 4:
-        return true; // Review step
+        return true;
       default:
         return false;
     }
@@ -69,7 +69,6 @@ export default function ContractorOnboardingPage() {
   };
 
   const handleSkip = () => {
-    // Skip optional step 3
     if (step === 3) {
       setStep(4);
     }
@@ -96,15 +95,12 @@ export default function ContractorOnboardingPage() {
         createdAt: serverTimestamp(),
       };
 
-      // Create contractors doc
       await setDoc(doc(db, 'contractors', user.uid), contractorData);
 
-      // Mark onboarding as complete
       await updateDoc(doc(db, 'users', user.uid), {
         onboardingComplete: true,
       });
 
-      // Redirect to contractor inbox to see available jobs
       router.push('/contractor-inbox');
     } catch (err: any) {
       setError(err.message || 'Failed to complete onboarding');
@@ -125,16 +121,22 @@ export default function ContractorOnboardingPage() {
       step={step}
       totalSteps={4}
       title={
-        step === 1 ? 'What trade are you?'
-        : step === 2 ? 'Contact information'
-        : step === 3 ? 'Business details'
-        : 'Review your profile'
+        step === 1
+          ? 'What trade are you?'
+          : step === 2
+          ? 'Contact information'
+          : step === 3
+          ? 'Business details'
+          : 'Review your profile'
       }
       subtitle={
-        step === 1 ? 'We'll match you with nearby jobs'
-        : step === 2 ? 'Homeowners will see this information'
-        : step === 3 ? 'Add more details about your business (optional)'
-        : 'Make sure everything looks good'
+        step === 1
+          ? "We'll match you with nearby jobs"
+          : step === 2
+          ? 'Homeowners will see this information'
+          : step === 3
+          ? 'Add more details about your business (optional)'
+          : 'Make sure everything looks good'
       }
       onNext={handleNext}
       onPrev={handlePrev}
@@ -149,7 +151,6 @@ export default function ContractorOnboardingPage() {
         </div>
       )}
 
-      {/* Step 1: Trade + Location */}
       {step === 1 && (
         <div className="space-y-6">
           <div>
@@ -214,7 +215,6 @@ export default function ContractorOnboardingPage() {
         </div>
       )}
 
-      {/* Step 2: Contact Info */}
       {step === 2 && (
         <div className="space-y-6">
           <div>
@@ -255,7 +255,6 @@ export default function ContractorOnboardingPage() {
         </div>
       )}
 
-      {/* Step 3: Business Details */}
       {step === 3 && (
         <div className="space-y-6">
           <div>
@@ -302,7 +301,6 @@ export default function ContractorOnboardingPage() {
         </div>
       )}
 
-      {/* Step 4: Review */}
       {step === 4 && (
         <div className="space-y-4">
           <div className="p-4 bg-gray-800/50 rounded-lg">
@@ -313,7 +311,9 @@ export default function ContractorOnboardingPage() {
           <div className="grid grid-cols-2 gap-4">
             <div className="p-4 bg-gray-800/50 rounded-lg">
               <p className="text-xs text-gray-500 mb-1">Location</p>
-              <p className="text-white font-medium">{city}, {zipCode}</p>
+              <p className="text-white font-medium">
+                {city}, {zipCode}
+              </p>
             </div>
             <div className="p-4 bg-gray-800/50 rounded-lg">
               <p className="text-xs text-gray-500 mb-1">Service Radius</p>
