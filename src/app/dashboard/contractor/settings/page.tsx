@@ -125,7 +125,7 @@ export default function ContractorSettingsPage() {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Service Location
             </label>
-            <p className="text-gray-900">{contractor.location || "Not set"}</p>
+            <p className="text-gray-900">{contractor.city || "Not set"}</p>
           </div>
 
           {/* Verification Status */}
