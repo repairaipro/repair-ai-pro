@@ -15,7 +15,7 @@ import type { ContractorProfile } from "@/lib/contractorProfile";
  * - Earning statistics (if available)
  */
 export default function ContractorSettingsPage() {
-  const { user, isContractor } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
   const [contractor, setContractor] = useState<ContractorProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -25,12 +25,12 @@ export default function ContractorSettingsPage() {
     completedJobs: 0,
   });
 
-  // Redirect non-contractors
+  // Redirect if not logged in
   useEffect(() => {
-    if (!loading && !isContractor()) {
-      router.push("/dashboard");
+    if (!loading && !user) {
+      router.push("/auth/signin");
     }
-  }, [loading, isContractor, router]);
+  }, [loading, user, router]);
 
   // Load contractor profile
   useEffect(() => {
