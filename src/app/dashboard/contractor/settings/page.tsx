@@ -134,10 +134,10 @@ export default function ContractorSettingsPage() {
               Account Status
             </label>
             <p className="text-gray-900">
-              {contractor.onboardingComplete ? (
-                <span className="text-green-600">✓ Onboarded</span>
+              {contractor.stripeConnectVerified ? (
+                <span className="text-green-600">✓ Verified</span>
               ) : (
-                <span className="text-yellow-600">Pending onboarding</span>
+                <span className="text-yellow-600">Pending bank verification</span>
               )}
             </p>
           </div>
