@@ -24,7 +24,7 @@ export async function GET(req: Request) {
 
     // Fetch contractor profile
     const contractorSnap = await adminDb.collection("contractors").doc(uid).get();
-    if (!contractorSnap.exists()) {
+    if (!contractorSnap.exists) {
       return NextResponse.json(
         { error: "Contractor profile not found" },
         { status: 404 }
