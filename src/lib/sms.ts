@@ -53,7 +53,7 @@ export async function sendSMS(uid: string, payload: SMSPayload): Promise<void> {
 
     // Try contractor first
     const contractorSnap = await adminDb.collection("contractors").doc(uid).get();
-    if (contractorSnap.exists()) {
+    if (contractorSnap.exists) {
       phone = contractorSnap.data()?.phone;
     }
 
