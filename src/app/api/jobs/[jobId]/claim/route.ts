@@ -18,7 +18,7 @@ export async function POST(
 
     // 🚨 PHASE 3: Check if contractor has verified Stripe Connect account
     const contractorSnap = await adminDb.collection("contractors").doc(contractorId).get();
-    if (!contractorSnap.exists()) {
+    if (!contractorSnap.exists) {
       return NextResponse.json(
         {
           error: "Complete your contractor profile first",
