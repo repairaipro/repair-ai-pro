@@ -23,20 +23,18 @@ export default function HomeownerOnboardingPage() {
     if (!user) router.push('/auth/signin');
   }, [user, router]);
 
-  const validateStep = (currentStep: number): boolean => {
-    setError('');
+  // Pure function — no side effects, safe to call during render
+  const isStepValid = (currentStep: number): boolean => {
     switch (currentStep) {
-      case 1:
-        return true;
-      case 2:
-        return true;
-      default:
-        return false;
+      case 1: return true;
+      case 2: return true;
+      default: return false;
     }
   };
 
   const handleNext = () => {
-    if (!validateStep(step)) {
+    setError('');
+    if (!isStepValid(step)) {
       setError('Please fill in required fields');
       return;
     }
@@ -96,7 +94,7 @@ export default function HomeownerOnboardingPage() {
       onNext={handleNext}
       onPrev={handlePrev}
       onSkip={step === 2 ? handleSkip : undefined}
-      canNext={!loading && validateStep(step)}
+      canNext={!loading && isStepValid(step)}
       nextLabel={step === 2 ? 'Post my first job' : 'Next'}
       showSkip={step === 2}
     >
