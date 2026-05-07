@@ -4,13 +4,9 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { db } from "@/lib/db";
-import {
-  collection, query, where, onSnapshot,
-  orderBy, doc, getDoc, limit,
-} from "firebase/firestore";
+import { collection, query, where, onSnapshot, orderBy, doc, getDoc, limit } from "firebase/firestore";
 import { useAuth, isOnboardingComplete } from "@/lib/auth";
-
-/* ─── Types ─────────────────────────────────────────────────────────────── */
+import { Plus, Inbox, MessageSquare, Briefcase, Users, User, ChevronRight, Zap, TrendingUp, Clock, CheckCircle } from "lucide-react";
 
 type Job = {
   id: string;
@@ -41,8 +37,6 @@ type Contractor = {
   trade?: string;
 };
 
-/* ─── Helpers ────────────────────────────────────────────────────────────── */
-
 const STATUS_LABEL: Record<string, string> = {
   triaged:     "Awaiting Match",
   accepted:    "Contractor Assigned",
@@ -54,19 +48,19 @@ const STATUS_LABEL: Record<string, string> = {
   cancelled:   "Cancelled",
 };
 
-const STATUS_COLOR: Record<string, string> = {
-  triaged:     "bg-yellow-500/10 text-yellow-400 border-yellow-500/30",
-  accepted:    "bg-blue-500/10 text-blue-400 border-blue-500/30",
-  in_progress: "bg-indigo-500/10 text-indigo-400 border-indigo-500/30",
-  completed:   "bg-orange-500/10 text-orange-400 border-orange-500/30",
-  confirmed:   "bg-green-500/10 text-green-400 border-green-500/30",
-  verified:    "bg-green-500/10 text-green-400 border-green-500/30",
-  disputed:    "bg-orange-500/10 text-orange-400 border-orange-500/30",
-  cancelled:   "bg-gray-500/10 text-gray-500 border-gray-600",
+const STATUS_STYLES: Record<string, { bg: string; border: string; color: string }> = {
+  triaged:     { bg: 'rgba(245,158,11,0.08)',  border: 'rgba(245,158,11,0.25)',  color: '#fbbf24' },
+  accepted:    { bg: 'rgba(96,165,250,0.08)',  border: 'rgba(96,165,250,0.25)',  color: '#60a5fa' },
+  in_progress: { bg: 'rgba(99,102,241,0.08)',  border: 'rgba(99,102,241,0.25)', color: '#818cf8' },
+  completed:   { bg: 'rgba(249,115,22,0.08)',  border: 'rgba(249,115,22,0.25)', color: '#fb923c' },
+  confirmed:   { bg: 'rgba(16,185,129,0.08)',  border: 'rgba(16,185,129,0.25)', color: '#34d399' },
+  verified:    { bg: 'rgba(16,185,129,0.08)',  border: 'rgba(16,185,129,0.25)', color: '#34d399' },
+  disputed:    { bg: 'rgba(249,115,22,0.08)',  border: 'rgba(249,115,22,0.25)', color: '#fb923c' },
+  cancelled:   { bg: 'rgba(107,114,128,0.08)', border: 'rgba(107,114,128,0.25)',color: '#9ca3af' },
 };
 
 const ACTIVE_STATUSES = ["accepted", "in_progress", "completed"];
-const OPEN_STATUSES   = ["triaged"];
+const OPEN_STATUSES = ["triaged"];
 
 function timeAgo(ts?: { toDate?: () => Date }) {
   try {
@@ -80,52 +74,69 @@ function timeAgo(ts?: { toDate?: () => Date }) {
   } catch { return ""; }
 }
 
-function Skeleton({ className = "" }: { className?: string }) {
-  return <div className={`animate-pulse bg-gray-800 rounded ${className}`} />;
-}
-
-/* ─── Active Job Hero Card (Uber-style) ──────────────────────────────────── */
-
 function ActiveJobCard({ job }: { job: Job }) {
   const label = STATUS_LABEL[job.status] ?? job.status;
+  const s = STATUS_STYLES[job.status] ?? STATUS_STYLES.triaged;
   const isPulsing = job.status === "in_progress";
+  const progress =
+    job.status === "accepted"    ? 33 :
+    job.status === "in_progress" ? 66 :
+    job.status === "completed"   ? 90 : 10;
 
   return (
     <Link href={`/chat?job=${job.id}`}>
-      <div className="relative overflow-hidden rounded-2xl border border-indigo-500/40 bg-gradient-to-br from-indigo-950/60 to-gray-900 p-5 hover:border-indigo-400 transition group">
-        {/* Live pulse indicator */}
+      <div
+        className="relative overflow-hidden rounded-2xl p-5 transition-all duration-200 group"
+        style={{
+          background: 'rgba(99,102,241,0.06)',
+          border: '1px solid rgba(99,102,241,0.2)',
+        }}
+        onMouseEnter={e => {
+          (e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.4)';
+          (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.1)';
+        }}
+        onMouseLeave={e => {
+          (e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.2)';
+          (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.06)';
+        }}
+      >
         <div className="flex items-center gap-2 mb-3">
-          <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${isPulsing ? "bg-green-400 animate-pulse" : "bg-indigo-400"}`} />
-          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Active Job</span>
-          <span className={`ml-auto text-xs font-medium px-2.5 py-0.5 rounded-full border ${STATUS_COLOR[job.status] ?? "bg-gray-800 text-gray-400 border-gray-700"}`}>
-            {label}
+          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isPulsing ? 'animate-pulse' : ''}`}
+            style={{ background: isPulsing ? '#34d399' : '#818cf8' }} />
+          <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-4)' }}>
+            Active Job
           </span>
+          <div
+            className="ml-auto text-xs font-medium px-2.5 py-0.5 rounded-full"
+            style={{ background: s.bg, border: `1px solid ${s.border}`, color: s.color }}
+          >
+            {label}
+          </div>
         </div>
 
-        <h3 className="text-white font-semibold text-base leading-snug line-clamp-2 group-hover:text-indigo-300 transition">
+        <h3 className="font-semibold text-base leading-snug line-clamp-2 mb-1 transition-colors"
+          style={{ color: 'var(--color-text)' }}>
           {job.description}
         </h3>
 
         {job.trade && (
-          <p className="text-xs text-gray-500 mt-1">{job.trade}</p>
+          <p className="text-xs mb-4" style={{ color: 'var(--color-text-4)' }}>{job.trade}</p>
         )}
 
-        <div className="mt-4 flex items-center justify-between">
-          <span className="text-xs text-gray-600">{timeAgo(job.createdAt as any)}</span>
-          <span className="text-xs text-indigo-400 font-medium group-hover:translate-x-0.5 transition-transform">
-            Open Chat →
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-xs" style={{ color: 'var(--color-text-4)' }}>{timeAgo(job.createdAt as any)}</span>
+          <span className="text-xs font-medium flex items-center gap-1 group-hover:translate-x-0.5 transition-transform"
+            style={{ color: '#818cf8' }}>
+            Open Chat <ChevronRight className="w-3 h-3" />
           </span>
         </div>
 
-        {/* Progress bar */}
-        <div className="mt-3 h-1 bg-gray-800 rounded-full overflow-hidden">
+        <div className="h-1 rounded-full overflow-hidden" style={{ background: 'var(--color-surface-2)' }}>
           <div
-            className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-700"
+            className="h-full rounded-full transition-all duration-700"
             style={{
-              width: job.status === "accepted"    ? "33%"
-                   : job.status === "in_progress" ? "66%"
-                   : job.status === "completed"   ? "90%"
-                   : "10%"
+              width: `${progress}%`,
+              background: 'linear-gradient(90deg, #6366f1, #8b5cf6)',
             }}
           />
         </div>
@@ -134,78 +145,91 @@ function ActiveJobCard({ job }: { job: Job }) {
   );
 }
 
-/* ─── Pending Invitation Card ────────────────────────────────────────────── */
-
 function PendingInviteCard({ count }: { count: number }) {
   return (
     <Link href="/contractor-inbox">
-      <div className="relative rounded-2xl border border-orange-500/40 bg-gradient-to-br from-orange-950/40 to-gray-900 p-5 hover:border-orange-400 transition group">
+      <div
+        className="rounded-2xl p-5 transition-all duration-200 group"
+        style={{
+          background: 'rgba(249,115,22,0.06)',
+          border: '1px solid rgba(249,115,22,0.2)',
+        }}
+        onMouseEnter={e => {
+          (e.currentTarget as HTMLElement).style.borderColor = 'rgba(249,115,22,0.35)';
+          (e.currentTarget as HTMLElement).style.background = 'rgba(249,115,22,0.1)';
+        }}
+        onMouseLeave={e => {
+          (e.currentTarget as HTMLElement).style.borderColor = 'rgba(249,115,22,0.2)';
+          (e.currentTarget as HTMLElement).style.background = 'rgba(249,115,22,0.06)';
+        }}
+      >
         <div className="flex items-center gap-3">
-          <span className="text-3xl">📬</span>
-          <div>
-            <p className="text-white font-semibold">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: 'rgba(249,115,22,0.15)', border: '1px solid rgba(249,115,22,0.2)' }}>
+            <Inbox className="w-5 h-5" style={{ color: '#fb923c' }} />
+          </div>
+          <div className="flex-1">
+            <p className="font-semibold text-sm" style={{ color: 'var(--color-text)' }}>
               {count} Job {count === 1 ? "Invitation" : "Invitations"} Waiting
             </p>
-            <p className="text-xs text-gray-400 mt-0.5">Review and accept to earn</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-4)' }}>Review and accept to earn</p>
           </div>
-          <span className="ml-auto bg-orange-500 text-white text-sm font-bold w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0">
+          <div
+            className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+            style={{ background: '#fb923c', color: '#fff' }}
+          >
             {count > 9 ? "9+" : count}
-          </span>
+          </div>
         </div>
-        <p className="text-xs text-orange-400 font-medium mt-3 group-hover:translate-x-0.5 transition-transform">
-          View Invitations →
+        <p className="text-xs font-medium mt-3 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform"
+          style={{ color: '#fb923c' }}>
+          View Invitations <ChevronRight className="w-3 h-3" />
         </p>
       </div>
     </Link>
   );
 }
 
-/* ─── Contractor Stats ───────────────────────────────────────────────────── */
-
 function ContractorStatsBar({ contractor }: { contractor: Contractor }) {
   const trustScore = contractor.trustScore ?? 0;
   const tier =
-    trustScore >= 80 ? { label: "Elite",     color: "text-yellow-400", bg: "bg-yellow-500/10 border-yellow-500/30" } :
-    trustScore >= 50 ? { label: "Pro",        color: "text-blue-400",   bg: "bg-blue-500/10 border-blue-500/30"   } :
-    trustScore >= 20 ? { label: "Verified",   color: "text-green-400",  bg: "bg-green-500/10 border-green-500/30" } :
-                       { label: "New",        color: "text-gray-400",   bg: "bg-gray-800 border-gray-700"         };
+    trustScore >= 80 ? { label: "Elite",   color: '#fbbf24', bg: 'rgba(245,158,11,0.1)',  border: 'rgba(245,158,11,0.2)' } :
+    trustScore >= 50 ? { label: "Pro",     color: '#60a5fa', bg: 'rgba(96,165,250,0.1)',  border: 'rgba(96,165,250,0.2)' } :
+    trustScore >= 20 ? { label: "Verified",color: '#34d399', bg: 'rgba(16,185,129,0.1)',  border: 'rgba(16,185,129,0.2)' } :
+                       { label: "New",     color: '#9ca3af', bg: 'var(--color-surface-2)', border: 'var(--color-border)' };
 
   const availColor =
-    contractor.availability === "available" ? "text-green-400" :
-    contractor.availability === "busy"      ? "text-orange-400" :
-                                              "text-gray-500";
+    contractor.availability === "available" ? '#34d399' :
+    contractor.availability === "busy"      ? '#fb923c' : 'var(--color-text-4)';
 
   return (
-    <div className="rounded-2xl border border-gray-800 bg-gray-900 p-4">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-white">Contractor Profile</h3>
-        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${tier.bg} ${tier.color}`}>
+    <div className="card p-5">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>Contractor Profile</h3>
+        <span
+          className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+          style={{ background: tier.bg, border: `1px solid ${tier.border}`, color: tier.color }}
+        >
           {tier.label}
         </span>
       </div>
       <div className="grid grid-cols-4 gap-3 text-center">
-        <div>
-          <p className="text-lg font-bold text-white">{contractor.avgRating?.toFixed(1) ?? "—"}</p>
-          <p className="text-[10px] text-gray-500">Rating</p>
-        </div>
-        <div>
-          <p className="text-lg font-bold text-white">{contractor.reviewCount ?? 0}</p>
-          <p className="text-[10px] text-gray-500">Reviews</p>
-        </div>
-        <div>
-          <p className="text-lg font-bold text-white">{contractor.jobsCompleted ?? 0}</p>
-          <p className="text-[10px] text-gray-500">Jobs Done</p>
-        </div>
-        <div>
-          <p className={`text-sm font-semibold capitalize ${availColor}`}>
-            {contractor.availability ?? "—"}
-          </p>
-          <p className="text-[10px] text-gray-500">Status</p>
-        </div>
+        {[
+          { value: contractor.avgRating?.toFixed(1) ?? "—", label: "Rating", color: 'var(--color-text)' },
+          { value: contractor.reviewCount ?? 0,              label: "Reviews", color: 'var(--color-text)' },
+          { value: contractor.jobsCompleted ?? 0,            label: "Jobs Done", color: 'var(--color-text)' },
+          { value: contractor.availability ?? "—",           label: "Status", color: availColor },
+        ].map(({ value, label, color }) => (
+          <div key={label}>
+            <p className="text-base font-bold capitalize" style={{ color }}>{String(value)}</p>
+            <p className="text-[10px] mt-0.5" style={{ color: 'var(--color-text-4)' }}>{label}</p>
+          </div>
+        ))}
       </div>
       <Link
         href="/contractor-profile"
-        className="mt-3 block text-center text-xs text-indigo-400 hover:text-indigo-300 transition"
+        className="mt-4 block text-center text-xs font-medium transition-opacity hover:opacity-70"
+        style={{ color: '#818cf8', borderTop: '1px solid var(--color-border)', paddingTop: '12px' }}
       >
         Edit Profile →
       </Link>
@@ -213,33 +237,47 @@ function ContractorStatsBar({ contractor }: { contractor: Contractor }) {
   );
 }
 
-/* ─── Job Card (list item) ───────────────────────────────────────────────── */
-
 function JobCard({ job }: { job: Job }) {
   const label = STATUS_LABEL[job.status] ?? job.status;
+  const s = STATUS_STYLES[job.status] ?? STATUS_STYLES.cancelled;
   return (
     <Link
       href={`/chat?job=${job.id}`}
-      className="flex items-center gap-3 px-4 py-3 bg-gray-900 hover:bg-gray-800 border border-gray-800 hover:border-gray-700 rounded-xl transition group"
+      className="flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-150 group"
+      style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+      onMouseEnter={e => {
+        (e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.25)';
+        (e.currentTarget as HTMLElement).style.background = 'var(--color-surface-2)';
+      }}
+      onMouseLeave={e => {
+        (e.currentTarget as HTMLElement).style.borderColor = 'var(--color-border)';
+        (e.currentTarget as HTMLElement).style.background = 'var(--color-surface)';
+      }}
     >
-      <span className="text-xl flex-shrink-0">
-        {job.status === "confirmed" || job.status === "verified" ? "✅" :
-         job.status === "in_progress" ? "🔧" :
-         job.status === "accepted"    ? "🎉" :
-         job.status === "completed"   ? "🏁" : "📋"}
-      </span>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm text-white font-medium truncate">{job.description}</p>
-        <p className="text-xs text-gray-500">{job.trade ?? "General"} · {timeAgo(job.createdAt as any)}</p>
+      <div
+        className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+        style={{ background: s.bg, border: `1px solid ${s.border}` }}
+      >
+        <span style={{ color: s.color, fontSize: '14px' }}>
+          {job.status === "confirmed" || job.status === "verified" ? "✅" :
+           job.status === "in_progress" ? "🔧" :
+           job.status === "accepted"    ? "🎉" :
+           job.status === "completed"   ? "🏁" : "📋"}
+        </span>
       </div>
-      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border whitespace-nowrap ${STATUS_COLOR[job.status] ?? "bg-gray-800 text-gray-400 border-gray-700"}`}>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium truncate" style={{ color: 'var(--color-text)' }}>{job.description}</p>
+        <p className="text-xs" style={{ color: 'var(--color-text-4)' }}>{job.trade ?? "General"} · {timeAgo(job.createdAt as any)}</p>
+      </div>
+      <span
+        className="text-[10px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap"
+        style={{ background: s.bg, border: `1px solid ${s.border}`, color: s.color }}
+      >
         {label}
       </span>
     </Link>
   );
 }
-
-/* ─── Page ───────────────────────────────────────────────────────────────── */
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -247,55 +285,32 @@ export default function DashboardPage() {
 
   const [homeownerJobs, setHomeownerJobs] = useState<Job[]>([]);
   const [contractorJobs, setContractorJobs] = useState<Job[]>([]);
-  const [inbox, setInbox]                   = useState<InboxItem[]>([]);
-  const [contractor, setContractor]         = useState<Contractor | null>(null);
-  const [loading, setLoading]               = useState(true);
+  const [inbox, setInbox] = useState<InboxItem[]>([]);
+  const [contractor, setContractor] = useState<Contractor | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Redirect to onboarding if not complete
   useEffect(() => {
-    if (user && !isOnboardingComplete(user)) {
-      router.push('/onboarding');
-    }
+    if (user && !isOnboardingComplete(user)) router.push('/onboarding');
   }, [user, router]);
 
-  /* ── Real-time listeners ───────────────────────────────────────────────── */
   useEffect(() => {
     if (!user) return;
-
-    // Homeowner jobs
-    const q1 = query(
-      collection(db, "jobs"),
-      where("userId", "==", user.uid),
-      orderBy("createdAt", "desc"),
-      limit(20)
-    );
+    const q1 = query(collection(db, "jobs"), where("userId", "==", user.uid), orderBy("createdAt", "desc"), limit(20));
     const u1 = onSnapshot(q1, (snap) => {
       setHomeownerJobs(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })));
       setLoading(false);
     }, () => setLoading(false));
 
-    // Jobs where user is contractor
-    const q2 = query(
-      collection(db, "jobs"),
-      where("claimedBy", "==", user.uid),
-      orderBy("createdAt", "desc"),
-      limit(10)
-    );
+    const q2 = query(collection(db, "jobs"), where("claimedBy", "==", user.uid), orderBy("createdAt", "desc"), limit(10));
     const u2 = onSnapshot(q2, (snap) => {
       setContractorJobs(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })));
     }, () => {});
 
-    // Contractor inbox (pending invites)
-    const q3 = query(
-      collection(db, "contractors", user.uid, "jobInbox"),
-      where("invitationStatus", "==", "pending"),
-      limit(20)
-    );
+    const q3 = query(collection(db, "contractors", user.uid, "jobInbox"), where("invitationStatus", "==", "pending"), limit(20));
     const u3 = onSnapshot(q3, (snap) => {
       setInbox(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })));
     }, () => {});
 
-    // Contractor profile
     getDoc(doc(db, "contractors", user.uid)).then((snap) => {
       if (snap.exists()) setContractor(snap.data() as Contractor);
     }).catch(() => {});
@@ -303,48 +318,41 @@ export default function DashboardPage() {
     return () => { u1(); u2(); u3(); };
   }, [user]);
 
-  /* ── Derived ───────────────────────────────────────────────────────────── */
   const displayName = user?.displayName?.split(" ")[0] || user?.email?.split("@")[0] || "there";
-
   const activeHomeownerJobs    = homeownerJobs.filter((j) => ACTIVE_STATUSES.includes(j.status));
   const openHomeownerJobs      = homeownerJobs.filter((j) => OPEN_STATUSES.includes(j.status));
   const completedHomeownerJobs = homeownerJobs.filter((j) => ["confirmed", "verified"].includes(j.status));
   const activeContractorJobs   = contractorJobs.filter((j) => ACTIVE_STATUSES.includes(j.status));
   const pendingInvites         = inbox.length;
   const isContractor           = contractor !== null || contractorJobs.length > 0 || inbox.length > 0;
-
   const allActiveJobs = [
     ...activeHomeownerJobs,
     ...activeContractorJobs.filter((cj) => !activeHomeownerJobs.find((hj) => hj.id === cj.id)),
   ];
+  const recentNonActive = homeownerJobs.filter((j) => !ACTIVE_STATUSES.includes(j.status)).slice(0, 5);
 
-  const recentNonActive = homeownerJobs
-    .filter((j) => !ACTIVE_STATUSES.includes(j.status))
-    .slice(0, 5);
-
-  /* ── Not signed in ─────────────────────────────────────────────────────── */
   if (!user) {
     return (
-      <div className="h-screen flex flex-col items-center justify-center gap-4 bg-gray-950 text-white">
-        <p className="text-gray-400">Sign in to view your dashboard.</p>
-        <Link href="/auth/signin" className="bg-indigo-600 hover:bg-indigo-700 px-5 py-2.5 rounded-lg text-sm font-medium transition">
-          Sign In
-        </Link>
+      <div className="min-h-screen mesh-bg flex flex-col items-center justify-center gap-4 animate-fade-in">
+        <div className="card p-8 text-center max-w-sm w-full" style={{ boxShadow: '0 25px 80px rgba(0,0,0,0.5)' }}>
+          <p className="text-sm mb-4" style={{ color: 'var(--color-text-3)' }}>Sign in to view your dashboard.</p>
+          <Link href="/auth/signin" className="btn btn-primary btn-full">Sign In</Link>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div className="min-h-screen animate-fade-in" style={{ background: 'var(--color-bg)' }}>
       <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
 
-        {/* ── Greeting ──────────────────────────────────────────────────── */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        {/* Greeting */}
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-white">
-              Hey, {displayName}
+            <h1 className="text-2xl font-bold" style={{ color: 'var(--color-text)' }}>
+              Hey, {displayName} 👋
             </h1>
-            <p className="text-sm text-gray-500 mt-0.5">
+            <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-4)' }}>
               {allActiveJobs.length > 0
                 ? `You have ${allActiveJobs.length} active job${allActiveJobs.length > 1 ? "s" : ""}`
                 : "No active jobs right now"}
@@ -352,20 +360,17 @@ export default function DashboardPage() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Link
-              href="/jobs/new"
-              className="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold px-4 py-2 rounded-xl transition"
-            >
-              + Post Job
+            <Link href="/jobs/new" className="btn btn-primary btn-sm">
+              <Plus className="w-3.5 h-3.5" /> Post Job
             </Link>
             {isContractor && (
-              <Link
-                href="/contractor-inbox"
-                className="relative bg-gray-800 hover:bg-gray-700 border border-gray-700 text-sm px-4 py-2 rounded-xl transition"
-              >
-                My Inbox
+              <Link href="/contractor-inbox" className="btn btn-secondary btn-sm relative">
+                <Inbox className="w-3.5 h-3.5" /> My Inbox
                 {pendingInvites > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 bg-orange-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                  <span
+                    className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full text-[9px] font-bold flex items-center justify-center"
+                    style={{ background: '#fb923c', color: '#fff' }}
+                  >
                     {pendingInvites}
                   </span>
                 )}
@@ -374,74 +379,75 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* ── CONTRACTOR: Pending invitations (top priority) ─────────────── */}
-        {isContractor && pendingInvites > 0 && (
-          <PendingInviteCard count={pendingInvites} />
-        )}
+        {/* Contractor pending invites */}
+        {isContractor && pendingInvites > 0 && <PendingInviteCard count={pendingInvites} />}
 
-        {/* ── Active jobs (Uber-style live cards) ────────────────────────── */}
+        {/* Active jobs */}
         {loading ? (
           <div className="space-y-3">
-            <Skeleton className="h-36 w-full rounded-2xl" />
-            <Skeleton className="h-36 w-full rounded-2xl" />
+            <div className="skeleton h-36 w-full rounded-2xl" />
+            <div className="skeleton h-36 w-full rounded-2xl" />
           </div>
         ) : allActiveJobs.length > 0 ? (
           <section>
-            <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Live Jobs</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--color-text-4)' }}>
+              Live Jobs
+            </h2>
             <div className="space-y-3">
-              {allActiveJobs.map((job) => (
-                <ActiveJobCard key={job.id} job={job} />
-              ))}
+              {allActiveJobs.map((job) => <ActiveJobCard key={job.id} job={job} />)}
             </div>
           </section>
         ) : (
-          /* ── Empty state: no active jobs ──────────────────────────────── */
-          <div className="rounded-2xl border border-dashed border-gray-700 p-8 text-center">
-            <p className="text-3xl mb-3">🏠</p>
-            <p className="text-white font-medium">No active jobs</p>
-            <p className="text-gray-500 text-sm mt-1 mb-4">Post a job to get matched with a contractor</p>
-            <Link
-              href="/jobs/new"
-              className="inline-block bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-5 py-2 rounded-xl transition"
+          <div
+            className="rounded-2xl p-10 text-center"
+            style={{ border: '2px dashed var(--color-border)' }}
+          >
+            <div
+              className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4"
+              style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
             >
-              Post Your First Job
+              <Briefcase className="w-6 h-6" style={{ color: 'var(--color-text-4)' }} />
+            </div>
+            <p className="font-medium mb-1" style={{ color: 'var(--color-text)' }}>No active jobs</p>
+            <p className="text-sm mb-5" style={{ color: 'var(--color-text-4)' }}>Post a job to get matched with a contractor</p>
+            <Link href="/jobs/new" className="btn btn-primary btn-sm">
+              <Plus className="w-3.5 h-3.5" /> Post Your First Job
             </Link>
           </div>
         )}
 
-        {/* ── Stats row ──────────────────────────────────────────────────── */}
+        {/* Stats row */}
         {!loading && (
           <div className="grid grid-cols-3 gap-3">
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 text-center">
-              <p className="text-2xl font-bold text-white">{homeownerJobs.length}</p>
-              <p className="text-xs text-gray-500 mt-1">Total Jobs</p>
-            </div>
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 text-center">
-              <p className="text-2xl font-bold text-indigo-400">{openHomeownerJobs.length}</p>
-              <p className="text-xs text-gray-500 mt-1">Awaiting Match</p>
-            </div>
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 text-center">
-              <p className="text-2xl font-bold text-green-400">{completedHomeownerJobs.length}</p>
-              <p className="text-xs text-gray-500 mt-1">Completed</p>
-            </div>
+            {[
+              { value: homeownerJobs.length,         label: "Total Jobs",    color: 'var(--color-text)',  icon: <Briefcase className="w-4 h-4" /> },
+              { value: openHomeownerJobs.length,      label: "Awaiting Match",color: '#818cf8',            icon: <Clock className="w-4 h-4" /> },
+              { value: completedHomeownerJobs.length, label: "Completed",     color: '#34d399',            icon: <CheckCircle className="w-4 h-4" /> },
+            ].map(({ value, label, color, icon }) => (
+              <div key={label} className="card p-4 text-center">
+                <div className="flex justify-center mb-1" style={{ color }}>{icon}</div>
+                <p className="text-2xl font-bold" style={{ color }}>{value}</p>
+                <p className="text-[10px] mt-0.5" style={{ color: 'var(--color-text-4)' }}>{label}</p>
+              </div>
+            ))}
           </div>
         )}
 
-        {/* ── Contractor profile card ────────────────────────────────────── */}
+        {/* Contractor profile */}
         {contractor && <ContractorStatsBar contractor={contractor} />}
 
-        {/* ── Recent jobs list ───────────────────────────────────────────── */}
+        {/* Recent jobs */}
         {!loading && recentNonActive.length > 0 && (
           <section>
-            <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Recent Jobs</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--color-text-4)' }}>
+              Recent Jobs
+            </h2>
             <div className="space-y-2">
-              {recentNonActive.map((job) => (
-                <JobCard key={job.id} job={job} />
-              ))}
+              {recentNonActive.map((job) => <JobCard key={job.id} job={job} />)}
             </div>
             {homeownerJobs.length > 5 && (
               <div className="mt-3 text-center">
-                <Link href="/jobs" className="text-xs text-indigo-400 hover:text-indigo-300 transition">
+                <Link href="/jobs" className="text-xs transition-opacity hover:opacity-70" style={{ color: '#818cf8' }}>
                   View all jobs →
                 </Link>
               </div>
@@ -449,22 +455,39 @@ export default function DashboardPage() {
           </section>
         )}
 
-        {/* ── Quick links ────────────────────────────────────────────────── */}
+        {/* Quick links */}
         <section>
-          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Quick Links</h2>
+          <h2 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--color-text-4)' }}>
+            Quick Links
+          </h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {[
-              { icon: "💬", label: "Messages",         href: "/chat"              },
-              { icon: "📋", label: "Marketplace",      href: "/jobs"              },
-              { icon: "🔍", label: "Find Contractors", href: "/contractor"        },
-              { icon: "👤", label: "My Profile",       href: "/contractor-profile"},
+              { icon: <MessageSquare className="w-4 h-4" />, label: "Messages",         href: "/chat" },
+              { icon: <Briefcase className="w-4 h-4" />,    label: "Marketplace",      href: "/jobs" },
+              { icon: <Users className="w-4 h-4" />,        label: "Find Contractors", href: "/contractor" },
+              { icon: <User className="w-4 h-4" />,         label: "My Profile",       href: "/contractor-profile" },
             ].map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className="flex items-center gap-2.5 bg-gray-900 border border-gray-800 hover:border-gray-600 rounded-xl px-3 py-3 text-sm text-gray-300 hover:text-white transition"
+                className="flex items-center gap-2.5 px-3 py-3 rounded-xl text-sm font-medium transition-all duration-150"
+                style={{
+                  background: 'var(--color-surface)',
+                  border: '1px solid var(--color-border)',
+                  color: 'var(--color-text-3)',
+                }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLElement).style.color = 'var(--color-text)';
+                  (e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.25)';
+                  (e.currentTarget as HTMLElement).style.background = 'var(--color-surface-2)';
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLElement).style.color = 'var(--color-text-3)';
+                  (e.currentTarget as HTMLElement).style.borderColor = 'var(--color-border)';
+                  (e.currentTarget as HTMLElement).style.background = 'var(--color-surface)';
+                }}
               >
-                <span className="text-base">{item.icon}</span>
+                <span style={{ color: '#818cf8' }}>{item.icon}</span>
                 <span>{item.label}</span>
               </Link>
             ))}

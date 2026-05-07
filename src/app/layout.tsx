@@ -46,7 +46,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="Repair AI Pro" />
       </head>
-      <body className="bg-gray-950 text-white min-h-screen">
+      <body className="min-h-screen antialiased">
         {/* ✅ Provide global authentication context */}
         <AuthProvider>
           <Header />

@@ -26,10 +26,11 @@ export default function OnboardingPage() {
   }, [user, router]);
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-950">
+    <div className="flex items-center justify-center min-h-screen" style={{ background: 'var(--color-bg)' }}>
       <div className="text-center">
-        <div className="w-12 h-12 border-4 border-gray-800 border-t-indigo-500 rounded-full animate-spin mx-auto mb-4" />
-        <p className="text-gray-400">Setting up your account...</p>
+        <div className="w-10 h-10 rounded-full border-2 border-t-transparent animate-spin mx-auto mb-4"
+          style={{ borderColor: '#6366f1', borderTopColor: 'transparent' }} />
+        <p className="text-sm" style={{ color: 'var(--color-text-4)' }}>Setting up your account…</p>
       </div>
     </div>
   );

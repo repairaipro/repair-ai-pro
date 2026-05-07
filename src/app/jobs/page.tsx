@@ -4,24 +4,23 @@ import { useEffect, useState } from "react";
 import { db } from "@/lib/db";
 import { collection, query, onSnapshot, orderBy } from "firebase/firestore";
 import Link from "next/link";
-import Image from "next/image";
-
 import { TRADES } from "@/lib/constants";
+import { Search, Plus, MapPin, Briefcase, X, SlidersHorizontal } from "lucide-react";
 
-const STATUSES = ["open", "triaged", "matched", "accepted", "in_progress", "completed", "confirmed", "disputed", "cancelled", "closed"];
+const STATUSES = ["open","triaged","matched","accepted","in_progress","completed","confirmed","disputed","cancelled","closed"];
 
-const STATUS_COLOR: Record<string, string> = {
-  open:        "bg-gray-700/40 text-gray-300 border-gray-600",
-  triaged:     "bg-amber-900/40 text-amber-300 border-amber-700",
-  matched:     "bg-blue-900/40 text-blue-300 border-blue-700",
-  accepted:    "bg-indigo-900/40 text-indigo-300 border-indigo-700",
-  claimed:     "bg-indigo-900/40 text-indigo-300 border-indigo-700",
-  in_progress: "bg-orange-900/40 text-orange-300 border-orange-700",
-  completed:   "bg-green-900/40 text-green-300 border-green-700",
-  confirmed:   "bg-emerald-900/40 text-emerald-300 border-emerald-700",
-  verified:    "bg-emerald-900/40 text-emerald-300 border-emerald-700",
-  closed:      "bg-gray-700/40 text-gray-400 border-gray-600",
-  cancelled:   "bg-red-900/40 text-red-400 border-red-700",
+const STATUS_STYLES: Record<string, { bg: string; border: string; color: string; label: string }> = {
+  open:        { bg: 'rgba(107,114,128,0.08)', border: 'rgba(107,114,128,0.2)', color: '#9ca3af', label: 'Open' },
+  triaged:     { bg: 'rgba(245,158,11,0.08)',  border: 'rgba(245,158,11,0.2)',  color: '#fbbf24', label: 'Triaged' },
+  matched:     { bg: 'rgba(96,165,250,0.08)',  border: 'rgba(96,165,250,0.2)',  color: '#60a5fa', label: 'Matched' },
+  accepted:    { bg: 'rgba(99,102,241,0.08)',  border: 'rgba(99,102,241,0.2)',  color: '#818cf8', label: 'Accepted' },
+  claimed:     { bg: 'rgba(99,102,241,0.08)',  border: 'rgba(99,102,241,0.2)',  color: '#818cf8', label: 'Claimed' },
+  in_progress: { bg: 'rgba(249,115,22,0.08)', border: 'rgba(249,115,22,0.2)',  color: '#fb923c', label: 'In Progress' },
+  completed:   { bg: 'rgba(16,185,129,0.08)', border: 'rgba(16,185,129,0.2)',  color: '#34d399', label: 'Completed' },
+  confirmed:   { bg: 'rgba(16,185,129,0.08)', border: 'rgba(16,185,129,0.2)',  color: '#34d399', label: 'Confirmed' },
+  verified:    { bg: 'rgba(16,185,129,0.08)', border: 'rgba(16,185,129,0.2)',  color: '#34d399', label: 'Verified' },
+  closed:      { bg: 'rgba(107,114,128,0.08)', border: 'rgba(107,114,128,0.2)', color: '#9ca3af', label: 'Closed' },
+  cancelled:   { bg: 'rgba(239,68,68,0.08)',  border: 'rgba(239,68,68,0.2)',   color: '#f87171', label: 'Cancelled' },
 };
 
 type Job = {
@@ -40,17 +39,13 @@ function getCity(location: Job["location"]): string {
   return (location as any).city ?? "";
 }
 
-function Skeleton({ className = "" }: { className?: string }) {
-  return <div className={`animate-pulse bg-gray-800 rounded ${className}`} />;
-}
-
 function JobCardSkeleton() {
   return (
-    <div className="bg-gray-900 rounded-xl p-4 border border-gray-800 space-y-3">
-      <Skeleton className="h-5 w-1/2" />
-      <Skeleton className="h-3 w-full" />
-      <Skeleton className="h-3 w-2/3" />
-      <Skeleton className="h-5 w-16 rounded-full" />
+    <div className="card p-4 space-y-3">
+      <div className="skeleton h-4 w-1/3 rounded" />
+      <div className="skeleton h-3 w-full rounded" />
+      <div className="skeleton h-3 w-2/3 rounded" />
+      <div className="skeleton h-5 w-20 rounded-full" />
     </div>
   );
 }
@@ -59,16 +54,13 @@ export default function JobMarketplacePage() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
   const [search, setSearch] = useState("");
   const [tradeFilter, setTradeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
 
   useEffect(() => {
     const q = query(collection(db, "jobs"), orderBy("createdAt", "desc"));
-
-    const unsub = onSnapshot(
-      q,
+    const unsub = onSnapshot(q,
       (snap) => {
         setJobs(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })));
         setLoading(false);
@@ -80,7 +72,6 @@ export default function JobMarketplacePage() {
         setLoading(false);
       }
     );
-
     return () => unsub();
   }, []);
 
@@ -90,151 +81,176 @@ export default function JobMarketplacePage() {
       job.description.toLowerCase().includes(search.toLowerCase()) ||
       (job.trade ?? "").toLowerCase().includes(search.toLowerCase()) ||
       getCity(job.location).toLowerCase().includes(search.toLowerCase());
-
     const matchTrade = tradeFilter === "all" || job.trade?.toLowerCase() === tradeFilter.toLowerCase();
     const matchStatus = statusFilter === "all" || job.status === statusFilter;
-
     return matchSearch && matchTrade && matchStatus;
   });
 
   const hasActiveFilters = search.trim() || tradeFilter !== "all" || statusFilter !== "all";
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white p-6 space-y-6">
+    <div className="min-h-screen animate-fade-in" style={{ background: 'var(--color-bg)' }}>
+      <div className="max-w-6xl mx-auto px-4 py-8 space-y-6">
 
-      {/* Header */}
-      <div className="flex flex-wrap justify-between items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-indigo-400">Job Marketplace</h1>
-          {!loading && (
-            <p className="text-gray-500 text-sm mt-1">
-              {filtered.length} of {jobs.length} jobs
-            </p>
+        {/* Header */}
+        <div className="flex flex-wrap justify-between items-start gap-4">
+          <div>
+            <h1 className="text-2xl font-bold" style={{ color: 'var(--color-text)' }}>Job Marketplace</h1>
+            {!loading && (
+              <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-4)' }}>
+                {filtered.length} of {jobs.length} jobs
+              </p>
+            )}
+          </div>
+          <Link href="/jobs/new" className="btn btn-primary btn-sm">
+            <Plus className="w-3.5 h-3.5" /> Post a Job
+          </Link>
+        </div>
+
+        {/* Error */}
+        {error && (
+          <div
+            className="rounded-xl px-4 py-3 text-sm flex justify-between items-center"
+            style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171' }}
+          >
+            <span>{error}</span>
+            <button onClick={() => setError(null)}><X className="w-4 h-4" /></button>
+          </div>
+        )}
+
+        {/* Filter bar */}
+        <div
+          className="card p-4 flex flex-wrap gap-3 items-center"
+        >
+          <div className="relative flex-1 min-w-[180px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--color-text-4)' }} />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by description, trade, or city…"
+              className="input pl-9"
+            />
+          </div>
+          <select
+            value={tradeFilter}
+            onChange={(e) => setTradeFilter(e.target.value)}
+            className="input"
+            style={{ width: 'auto', minWidth: '140px' }}
+          >
+            <option value="all">All Trades</option>
+            {TRADES.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="input"
+            style={{ width: 'auto', minWidth: '140px' }}
+          >
+            <option value="all">All Statuses</option>
+            {STATUSES.map((s) => (
+              <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
+            ))}
+          </select>
+          {hasActiveFilters && (
+            <button
+              onClick={() => { setSearch(""); setTradeFilter("all"); setStatusFilter("all"); }}
+              className="btn btn-ghost btn-sm"
+            >
+              <X className="w-3.5 h-3.5" /> Clear
+            </button>
           )}
         </div>
-        <Link
-          href="/jobs/new"
-          className="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-full text-sm font-medium transition"
-        >
-          + Post a Job
-        </Link>
-      </div>
 
-      {/* Error */}
-      {error && (
-        <div className="bg-red-950 border border-red-800 text-red-300 rounded-xl px-4 py-3 text-sm flex justify-between items-center">
-          <span>{error}</span>
-          <button onClick={() => setError(null)} className="ml-4 text-red-400 hover:text-white">✕</button>
-        </div>
-      )}
+        {/* Grid */}
+        {loading ? (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Array.from({ length: 6 }).map((_, i) => <JobCardSkeleton key={i} />)}
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
+            <div
+              className="w-16 h-16 rounded-2xl flex items-center justify-center"
+              style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+            >
+              <Briefcase className="w-8 h-8" style={{ color: 'var(--color-text-4)' }} />
+            </div>
+            {hasActiveFilters ? (
+              <>
+                <h3 className="text-lg font-semibold" style={{ color: 'var(--color-text)' }}>No jobs match your filters</h3>
+                <p className="text-sm" style={{ color: 'var(--color-text-4)' }}>Try adjusting or clearing the filters above.</p>
+                <button
+                  onClick={() => { setSearch(""); setTradeFilter("all"); setStatusFilter("all"); }}
+                  className="btn btn-secondary btn-sm"
+                >
+                  Clear all filters
+                </button>
+              </>
+            ) : (
+              <>
+                <h3 className="text-lg font-semibold" style={{ color: 'var(--color-text)' }}>No jobs posted yet</h3>
+                <p className="text-sm" style={{ color: 'var(--color-text-4)' }}>Be the first to post a job and get matched with a contractor.</p>
+                <Link href="/jobs/new" className="btn btn-primary btn-sm">
+                  <Plus className="w-3.5 h-3.5" /> Post a Job
+                </Link>
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filtered.map((job) => {
+              const s = STATUS_STYLES[job.status] ?? STATUS_STYLES.open;
+              const city = getCity(job.location);
+              return (
+                <Link
+                  key={job.id}
+                  href={`/chat?job=${job.id}`}
+                  className="card p-4 flex flex-col gap-3 transition-all duration-200 group"
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.3)';
+                    (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLElement).style.borderColor = 'var(--color-border)';
+                    (e.currentTarget as HTMLElement).style.transform = 'translateY(0)';
+                  }}
+                >
+                  {Array.isArray(job.images) && job.images[0] && (
+                    <img
+                      src={job.images[0]}
+                      alt="Job preview"
+                      className="w-full h-36 object-cover rounded-xl"
+                      style={{ border: '1px solid var(--color-border)' }}
+                    />
+                  )}
 
-      {/* Filter bar */}
-      <div className="bg-gray-900 p-4 rounded-xl border border-gray-800 flex flex-wrap gap-3">
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by description, trade, or city…"
-          className="flex-1 min-w-[180px] bg-gray-800 border border-gray-700 px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
-        />
-        <select
-          value={tradeFilter}
-          onChange={(e) => setTradeFilter(e.target.value)}
-          className="bg-gray-800 border border-gray-700 px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
-        >
-          <option value="all">All Trades</option>
-          {TRADES.map((t) => <option key={t} value={t}>{t}</option>)}
-        </select>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="bg-gray-800 border border-gray-700 px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
-        >
-          <option value="all">All Statuses</option>
-          {STATUSES.map((s) => (
-            <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
-          ))}
-        </select>
-        {hasActiveFilters && (
-          <button
-            onClick={() => { setSearch(""); setTradeFilter("all"); setStatusFilter("all"); }}
-            className="text-xs text-gray-400 hover:text-white border border-gray-700 hover:border-gray-500 px-3 py-2 rounded-lg transition"
-          >
-            Clear filters
-          </button>
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="font-semibold text-sm" style={{ color: 'var(--color-text)' }}>
+                      {job.trade ?? "General"} Repair
+                    </h3>
+                    <span
+                      className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
+                      style={{ background: s.bg, border: `1px solid ${s.border}`, color: s.color }}
+                    >
+                      {s.label}
+                    </span>
+                  </div>
+
+                  <p className="text-sm line-clamp-2 flex-1" style={{ color: 'var(--color-text-4)' }}>
+                    {job.description}
+                  </p>
+
+                  {city && (
+                    <div className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-text-4)' }}>
+                      <MapPin className="w-3 h-3" />
+                      {city}
+                    </div>
+                  )}
+                </Link>
+              );
+            })}
+          </div>
         )}
       </div>
-
-      {/* Grid */}
-      {loading ? (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {Array.from({ length: 6 }).map((_, i) => <JobCardSkeleton key={i} />)}
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
-          <span className="text-5xl">🔧</span>
-          {hasActiveFilters ? (
-            <>
-              <h3 className="text-lg font-semibold text-white">No jobs match your filters</h3>
-              <p className="text-sm text-gray-500">Try adjusting or clearing the filters above.</p>
-              <button
-                onClick={() => { setSearch(""); setTradeFilter("all"); setStatusFilter("all"); }}
-                className="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-sm px-4 py-2 rounded-lg transition"
-              >
-                Clear all filters
-              </button>
-            </>
-          ) : (
-            <>
-              <h3 className="text-lg font-semibold text-white">No jobs posted yet</h3>
-              <p className="text-sm text-gray-500">Be the first to post a job and get matched with a contractor.</p>
-              <Link
-                href="/jobs/new"
-                className="bg-indigo-600 hover:bg-indigo-700 text-sm px-5 py-2.5 rounded-lg font-medium transition"
-              >
-                + Post a Job
-              </Link>
-            </>
-          )}
-        </div>
-      ) : (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map((job) => {
-            const statusCls = STATUS_COLOR[job.status] ?? "bg-gray-700/40 text-gray-300 border-gray-600";
-            const city = getCity(job.location);
-            return (
-              <Link
-                key={job.id}
-                href={`/chat?job=${job.id}`}
-                className="bg-gray-900 rounded-xl p-4 border border-gray-800 hover:border-indigo-500 transition flex flex-col gap-2"
-              >
-                {Array.isArray(job.images) && job.images[0] && (
-                  <img
-                    src={job.images[0]}
-                    alt="Job preview"
-                    className="w-full h-36 object-cover rounded-lg border border-gray-800"
-                  />
-                )}
-
-                <h3 className="font-semibold text-white">
-                  {job.trade ?? "General"} Repair
-                </h3>
-
-                <p className="text-gray-400 text-sm line-clamp-2 flex-1">
-                  {job.description}
-                </p>
-
-                {city && (
-                  <p className="text-xs text-gray-600">📍 {city}</p>
-                )}
-
-                <span className={`self-start mt-1 inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${statusCls}`}>
-                  {job.status.replace(/_/g, " ").toUpperCase()}
-                </span>
-              </Link>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }
