@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import Link from "next/link";
+import { Briefcase, HardHat, Users, AlertTriangle, DollarSign } from "lucide-react";
 
 type Stats = {
   totalJobs:        number;
@@ -13,35 +14,24 @@ type Stats = {
   statusCounts:     Record<string, number>;
 };
 
-function StatCard({
-  icon, label, value, sub, href, alert,
-}: {
-  icon: string; label: string; value: string | number;
-  sub?: string; href?: string; alert?: boolean;
-}) {
-  const inner = (
-    <div className={`bg-gray-900 border rounded-2xl p-5 transition ${
-      alert ? "border-orange-700/60 hover:border-orange-500" : "border-gray-800 hover:border-gray-700"
-    }`}>
-      <div className="flex items-start justify-between mb-3">
-        <span className="text-2xl">{icon}</span>
-        {alert && (
-          <span className="text-[10px] bg-orange-500 text-white font-bold px-2 py-0.5 rounded-full">Action needed</span>
-        )}
-      </div>
-      <p className={`text-3xl font-bold ${alert ? "text-orange-400" : "text-white"}`}>{value}</p>
-      <p className="text-sm text-gray-500 mt-1">{label}</p>
-      {sub && <p className="text-xs text-gray-600 mt-0.5">{sub}</p>}
-    </div>
-  );
-  return href ? <Link href={href}>{inner}</Link> : inner;
-}
+const STATUS_ORDER = ["triaged","accepted","in_progress","completed","confirmed","disputed","cancelled","verified"];
+
+const STATUS_STYLES: Record<string, { color: string; bar: string; label: string }> = {
+  triaged:     { color: '#fbbf24', bar: '#f59e0b', label: 'Triaged' },
+  accepted:    { color: '#60a5fa', bar: '#3b82f6', label: 'Accepted' },
+  in_progress: { color: '#818cf8', bar: '#6366f1', label: 'In Progress' },
+  completed:   { color: '#fb923c', bar: '#f97316', label: 'Completed' },
+  confirmed:   { color: '#34d399', bar: '#10b981', label: 'Confirmed' },
+  verified:    { color: '#34d399', bar: '#10b981', label: 'Verified' },
+  disputed:    { color: '#fb923c', bar: '#f97316', label: 'Disputed' },
+  cancelled:   { color: '#6b7280', bar: '#4b5563', label: 'Cancelled' },
+};
 
 export default function AdminOverviewPage() {
-  const { user }               = useAuth();
-  const [stats,  setStats]     = useState<Stats | null>(null);
-  const [loading, setLoading]  = useState(true);
-  const [error,   setError]    = useState<string | null>(null);
+  const { user }             = useAuth();
+  const [stats,  setStats]   = useState<Stats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]  = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -53,80 +43,77 @@ export default function AdminOverviewPage() {
     );
   }, [user]);
 
-  const STATUS_ORDER = [
-    "triaged", "accepted", "in_progress", "completed", "confirmed", "disputed", "cancelled", "verified",
-  ];
-
-  const STATUS_COLOR: Record<string, string> = {
-    triaged:     "bg-yellow-500",
-    accepted:    "bg-blue-500",
-    in_progress: "bg-indigo-500",
-    completed:   "bg-orange-500",
-    confirmed:   "bg-green-500",
-    verified:    "bg-emerald-500",
-    disputed:    "bg-orange-600",
-    cancelled:   "bg-gray-600",
-  };
-
   return (
-    <div className="p-6 space-y-6 max-w-5xl">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">Overview</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Real-time platform snapshot</p>
+        <h1 className="text-2xl font-bold" style={{ color: 'var(--color-text)' }}>Overview</h1>
+        <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-4)' }}>Real-time platform snapshot</p>
       </div>
 
       {error && (
-        <div className="bg-red-950 border border-red-800 text-red-300 rounded-xl px-4 py-3 text-sm">{error}</div>
+        <div className="rounded-xl px-4 py-3 text-sm"
+          style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171' }}>
+          {error}
+        </div>
       )}
 
+      {/* Stat cards */}
       {loading ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="bg-gray-900 border border-gray-800 rounded-2xl p-5 animate-pulse h-32" />
+            <div key={i} className="skeleton rounded-2xl h-32" />
           ))}
         </div>
       ) : stats ? (
         <>
-          {/* Stat cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard icon="📋" label="Total Jobs"        value={stats.totalJobs}        href="/admin/jobs" />
-            <StatCard icon="👷" label="Contractors"       value={stats.totalContractors} href="/admin/contractors" />
-            <StatCard icon="👥" label="Users"             value={stats.totalUsers}       href="/admin/users" />
-            <StatCard
-              icon="⚠️"
-              label="Open Disputes"
-              value={stats.openDisputes}
-              href="/admin/disputes"
-              alert={stats.openDisputes > 0}
-            />
-          </div>
-
-          {/* Revenue */}
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
-            <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Total Revenue Processed</p>
-            <p className="text-4xl font-bold text-green-400">
-              ${stats.totalRevenue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </p>
-            <p className="text-xs text-gray-600 mt-1">From confirmed + released payments</p>
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            {[
+              { icon: Briefcase,    label: "Total Jobs",    value: stats.totalJobs,        color: '#818cf8', bg: 'rgba(99,102,241,0.1)',  border: 'rgba(99,102,241,0.2)',  href: "/admin/jobs" },
+              { icon: HardHat,      label: "Contractors",   value: stats.totalContractors, color: '#60a5fa', bg: 'rgba(96,165,250,0.1)',  border: 'rgba(96,165,250,0.2)',  href: "/admin/contractors" },
+              { icon: Users,        label: "Users",         value: stats.totalUsers,       color: '#a78bfa', bg: 'rgba(167,139,250,0.1)', border: 'rgba(167,139,250,0.2)', href: "/admin/users" },
+              { icon: AlertTriangle,label: "Open Disputes", value: stats.openDisputes,     color: stats.openDisputes > 0 ? '#fb923c' : '#34d399', bg: stats.openDisputes > 0 ? 'rgba(249,115,22,0.1)' : 'rgba(16,185,129,0.1)', border: stats.openDisputes > 0 ? 'rgba(249,115,22,0.2)' : 'rgba(16,185,129,0.2)', href: "/admin/disputes" },
+              { icon: DollarSign,   label: "Revenue",       value: `$${stats.totalRevenue.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}`, color: '#34d399', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.2)', href: undefined },
+            ].map(({ icon: Icon, label, value, color, bg, border, href }) => {
+              const inner = (
+                <div
+                  className="card p-5 transition-all duration-200 h-full"
+                  style={{ background: bg, borderColor: border }}
+                  onMouseEnter={e => href && ((e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)')}
+                  onMouseLeave={e => href && ((e.currentTarget as HTMLElement).style.transform = 'translateY(0)')}
+                >
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3" style={{ background: bg, border: `1px solid ${border}` }}>
+                    <Icon className="w-4 h-4" style={{ color }} />
+                  </div>
+                  <p className="text-2xl font-bold" style={{ color }}>{value}</p>
+                  <p className="text-xs mt-1" style={{ color: 'var(--color-text-4)' }}>{label}</p>
+                </div>
+              );
+              return href
+                ? <Link key={label} href={href}>{inner}</Link>
+                : <div key={label}>{inner}</div>;
+            })}
           </div>
 
           {/* Job status breakdown */}
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
-            <p className="text-sm font-semibold text-white mb-4">Job Status Breakdown</p>
-            <div className="space-y-2.5">
+          <div className="card p-6">
+            <h2 className="text-sm font-semibold mb-5" style={{ color: 'var(--color-text)' }}>Job Status Breakdown</h2>
+            <div className="space-y-3">
               {STATUS_ORDER.map((status) => {
                 const count = stats.statusCounts[status] ?? 0;
                 const pct   = stats.totalJobs > 0 ? (count / stats.totalJobs) * 100 : 0;
+                const s = STATUS_STYLES[status];
                 return (
-                  <div key={status} className="flex items-center gap-3">
-                    <span className="text-xs text-gray-400 w-24 capitalize">{status.replace("_", " ")}</span>
-                    <div className="flex-1 bg-gray-800 rounded-full h-2">
+                  <div key={status} className="flex items-center gap-4">
+                    <span className="text-xs w-24 capitalize flex-shrink-0" style={{ color: 'var(--color-text-4)' }}>
+                      {s?.label ?? status.replace("_"," ")}
+                    </span>
+                    <div className="flex-1 rounded-full h-1.5" style={{ background: 'var(--color-surface-2)' }}>
                       <div
-                        className={`h-2 rounded-full transition-all ${STATUS_COLOR[status] ?? "bg-gray-500"}`}
-                        style={{ width: `${pct}%` }}
+                        className="h-1.5 rounded-full transition-all duration-700"
+                        style={{ width: `${pct}%`, background: s?.bar ?? '#6b7280' }}
                       />
                     </div>
-                    <span className="text-xs text-gray-400 w-8 text-right">{count}</span>
+                    <span className="text-xs w-6 text-right flex-shrink-0" style={{ color: 'var(--color-text-4)' }}>{count}</span>
                   </div>
                 );
               })}
@@ -144,7 +131,22 @@ export default function AdminOverviewPage() {
               <Link
                 key={item.href}
                 href={item.href}
-                className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl px-3 py-3 text-sm text-gray-300 hover:text-white transition"
+                className="flex items-center gap-2 px-3 py-3 rounded-xl text-sm font-medium transition-all duration-150"
+                style={{
+                  background: 'var(--color-surface)',
+                  border: '1px solid var(--color-border)',
+                  color: 'var(--color-text-3)',
+                }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.3)';
+                  (e.currentTarget as HTMLElement).style.background = 'var(--color-surface-2)';
+                  (e.currentTarget as HTMLElement).style.color = 'var(--color-text)';
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLElement).style.borderColor = 'var(--color-border)';
+                  (e.currentTarget as HTMLElement).style.background = 'var(--color-surface)';
+                  (e.currentTarget as HTMLElement).style.color = 'var(--color-text-3)';
+                }}
               >
                 <span>{item.icon}</span>{item.label}
               </Link>

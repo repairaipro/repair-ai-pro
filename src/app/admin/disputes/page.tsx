@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collectionGroup, onSnapshot, query, where } from "firebase/firestore";
+import { collectionGroup, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/db";
 import { useAuth } from "@/lib/auth";
+import { AlertTriangle, CheckCircle, Clock } from "lucide-react";
 
 type Dispute = {
   id:           string;
@@ -20,19 +21,19 @@ type Dispute = {
 };
 
 const CATEGORY_LABEL: Record<string, string> = {
-  work_not_completed:   "Work not completed",
-  work_done_incorrectly:"Work done incorrectly",
-  contractor_no_show:   "Contractor no-show",
-  safety_concern:       "Safety concern",
-  overcharged:          "Price dispute",
-  other:                "Other",
+  work_not_completed:    "Work not completed",
+  work_done_incorrectly: "Work done incorrectly",
+  contractor_no_show:    "Contractor no-show",
+  safety_concern:        "Safety concern",
+  overcharged:           "Price dispute",
+  other:                 "Other",
 };
 
 const RESOLUTION_OPTIONS = [
-  { value: "contractor_fault", label: "Contractor Fault",  desc: "Refund homeowner",          color: "bg-red-600 hover:bg-red-500" },
-  { value: "owner_fault",      label: "Owner Fault",       desc: "Release to contractor",      color: "bg-blue-600 hover:bg-blue-500" },
-  { value: "mutual",           label: "Mutual",            desc: "Manual resolution",          color: "bg-yellow-600 hover:bg-yellow-500" },
-  { value: "invalid",          label: "Invalid / Dismiss", desc: "Restore job to in_progress", color: "bg-gray-600 hover:bg-gray-500" },
+  { value: "contractor_fault", label: "Contractor Fault",  desc: "Refund homeowner",           bg: 'rgba(239,68,68,0.1)',   border: 'rgba(239,68,68,0.3)',   color: '#f87171',  hoverBg: 'rgba(239,68,68,0.2)' },
+  { value: "owner_fault",      label: "Owner Fault",       desc: "Release to contractor",       bg: 'rgba(96,165,250,0.1)',  border: 'rgba(96,165,250,0.3)',  color: '#60a5fa',  hoverBg: 'rgba(96,165,250,0.2)' },
+  { value: "mutual",           label: "Mutual",            desc: "Manual resolution",           bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.3)', color: '#fbbf24',  hoverBg: 'rgba(245,158,11,0.2)' },
+  { value: "invalid",          label: "Dismiss / Invalid", desc: "Restore job to in_progress",  bg: 'var(--color-surface-2)', border: 'var(--color-border)', color: 'var(--color-text-3)', hoverBg: 'var(--color-surface)' },
 ];
 
 function timeAgo(ts: any): string {
@@ -48,24 +49,21 @@ function timeAgo(ts: any): string {
 }
 
 export default function AdminDisputesPage() {
-  const { user }                = useAuth();
-  const [disputes, setDisputes] = useState<Dispute[]>([]);
-  const [filter,   setFilter]   = useState<"open" | "resolved" | "all">("open");
-  const [resolving, setResolving] = useState<string | null>(null); // dispute id being resolved
-  const [adminNote,  setAdminNote] = useState("");
-  const [loading,   setLoading]  = useState<string | null>(null);
-  const [error,     setError]    = useState<string | null>(null);
+  const { user }                        = useAuth();
+  const [disputes,  setDisputes]        = useState<Dispute[]>([]);
+  const [filter,    setFilter]          = useState<"open" | "resolved" | "all">("open");
+  const [resolving, setResolving]       = useState<string | null>(null);
+  const [adminNote, setAdminNote]       = useState("");
+  const [loading,   setLoading]         = useState<string | null>(null);
+  const [error,     setError]           = useState<string | null>(null);
 
   useEffect(() => {
-    const q = collectionGroup(db, "disputes");
-    const unsub = onSnapshot(q, (snap) => {
-      setDisputes(
-        snap.docs.map((d) => ({
-          id:         d.id,
-          jobId:      d.ref.parent.parent?.id ?? "",
-          ...(d.data() as any),
-        }))
-      );
+    const unsub = onSnapshot(collectionGroup(db, "disputes"), (snap) => {
+      setDisputes(snap.docs.map((d) => ({
+        id:    d.id,
+        jobId: d.ref.parent.parent?.id ?? "",
+        ...(d.data() as any),
+      })));
     });
     return () => unsub();
   }, []);
@@ -93,31 +91,35 @@ export default function AdminDisputesPage() {
   }
 
   const filtered = disputes.filter((d) =>
-    filter === "all" ? true : filter === "open" ? d.status !== "resolved" : d.status === "resolved"
+    filter === "all"      ? true :
+    filter === "open"     ? d.status !== "resolved" :
+                            d.status === "resolved"
   );
 
   const openCount = disputes.filter((d) => d.status !== "resolved").length;
 
   return (
-    <div className="p-6 max-w-4xl space-y-5">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-white">Disputes</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <h1 className="text-xl font-bold" style={{ color: 'var(--color-text)' }}>Disputes</h1>
+          <p className="text-sm mt-0.5" style={{ color: openCount > 0 ? '#fb923c' : 'var(--color-text-4)' }}>
             {openCount > 0
               ? `${openCount} open dispute${openCount > 1 ? "s" : ""} need attention`
-              : "No open disputes"}
+              : "No open disputes ✓"}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-1.5">
           {(["open", "resolved", "all"] as const).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition ${
-                filter === f ? "bg-indigo-600 text-white" : "bg-gray-800 text-gray-400 hover:text-white"
-              }`}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-all duration-150"
+              style={{
+                background: filter === f ? 'rgba(99,102,241,0.15)' : 'var(--color-surface)',
+                border: filter === f ? '1px solid rgba(99,102,241,0.4)' : '1px solid var(--color-border)',
+                color: filter === f ? '#a5b4fc' : 'var(--color-text-4)',
+              }}
             >
               {f}
             </button>
@@ -126,107 +128,141 @@ export default function AdminDisputesPage() {
       </div>
 
       {error && (
-        <div className="bg-red-950 border border-red-800 text-red-300 rounded-xl px-4 py-3 text-sm">{error}</div>
+        <div className="rounded-xl px-4 py-3 text-sm"
+          style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171' }}>
+          {error}
+        </div>
       )}
 
       {filtered.length === 0 && (
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-10 text-center">
-          <p className="text-3xl mb-3">✅</p>
-          <p className="text-gray-400 text-sm">No {filter === "all" ? "" : filter} disputes</p>
+        <div
+          className="card p-12 text-center"
+          style={{ border: '2px dashed var(--color-border)' }}
+        >
+          <CheckCircle className="w-10 h-10 mx-auto mb-3" style={{ color: '#34d399' }} />
+          <p className="font-medium mb-1" style={{ color: 'var(--color-text)' }}>No disputes</p>
+          <p className="text-sm" style={{ color: 'var(--color-text-4)' }}>No {filter === "all" ? "" : filter} disputes found</p>
         </div>
       )}
 
       <div className="space-y-4">
-        {filtered.map((d) => (
-          <div
-            key={d.id}
-            className={`rounded-2xl border p-5 space-y-4 ${
-              d.status === "resolved"
-                ? "border-gray-800 bg-gray-900/50"
-                : "border-orange-700/40 bg-orange-950/10"
-            }`}
-          >
-            {/* Top row */}
-            <div className="flex items-start justify-between gap-3 flex-wrap">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                    d.status === "resolved" ? "bg-gray-700 text-gray-300" : "bg-orange-500/20 text-orange-400"
-                  }`}>
-                    {d.status === "resolved" ? "Resolved" : "Open"}
-                  </span>
-                  <span className="text-xs text-gray-500">{timeAgo(d.createdAt)}</span>
-                </div>
-                <p className="text-xs text-gray-400">
-                  Job: <span className="text-indigo-400 font-mono text-[11px]">{d.jobId}</span>
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-gray-500">Reported by</p>
-                <p className="text-xs font-medium text-white capitalize">{d.reporterRole}</p>
-              </div>
-            </div>
-
-            {/* Category + description */}
-            <div className="bg-gray-900 rounded-xl px-4 py-3 space-y-1.5">
-              <p className="text-xs font-semibold text-orange-400">
-                {CATEGORY_LABEL[d.category] ?? d.category}
-              </p>
-              <p className="text-sm text-gray-300 leading-relaxed">{d.description}</p>
-            </div>
-
-            {/* Resolved state */}
-            {d.status === "resolved" && (
-              <div className="bg-green-950/20 border border-green-800/30 rounded-xl px-4 py-3 space-y-1">
-                <p className="text-xs font-semibold text-green-400">
-                  Resolution: <span className="capitalize">{d.resolution?.replace(/_/g, " ")}</span>
-                </p>
-                {d.adminNote && <p className="text-xs text-gray-400">Note: {d.adminNote}</p>}
-              </div>
-            )}
-
-            {/* Resolution panel */}
-            {d.status !== "resolved" && (
-              resolving === d.id ? (
-                <div className="space-y-3">
-                  <textarea
-                    value={adminNote}
-                    onChange={(e) => setAdminNote(e.target.value)}
-                    placeholder="Admin note (optional — shown to both parties)…"
-                    rows={2}
-                    className="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 resize-none"
-                  />
-                  <div className="grid grid-cols-2 gap-2">
-                    {RESOLUTION_OPTIONS.map((opt) => (
-                      <button
-                        key={opt.value}
-                        onClick={() => resolve(d, opt.value)}
-                        disabled={loading === d.id}
-                        className={`${opt.color} disabled:opacity-50 text-white rounded-xl px-3 py-2.5 text-xs font-semibold transition text-left`}
-                      >
-                        <p>{opt.label}</p>
-                        <p className="text-[10px] opacity-70 font-normal mt-0.5">{opt.desc}</p>
-                      </button>
-                    ))}
+        {filtered.map((d) => {
+          const isOpen = d.status !== "resolved";
+          return (
+            <div
+              key={d.id}
+              className="card p-5 space-y-4"
+              style={isOpen ? {
+                border: '1px solid rgba(249,115,22,0.25)',
+                background: 'rgba(249,115,22,0.03)',
+              } : {}}
+            >
+              {/* Top row */}
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full"
+                      style={isOpen
+                        ? { background: 'rgba(249,115,22,0.1)', border: '1px solid rgba(249,115,22,0.3)', color: '#fb923c' }
+                        : { background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', color: '#34d399' }
+                      }
+                    >
+                      {isOpen
+                        ? <><AlertTriangle className="w-3 h-3" /> Open</>
+                        : <><CheckCircle className="w-3 h-3" /> Resolved</>
+                      }
+                    </span>
+                    <span className="text-xs flex items-center gap-1" style={{ color: 'var(--color-text-4)' }}>
+                      <Clock className="w-3 h-3" />{timeAgo(d.createdAt)}
+                    </span>
                   </div>
-                  <button
-                    onClick={() => { setResolving(null); setAdminNote(""); setError(null); }}
-                    className="text-xs text-gray-500 hover:text-gray-300 transition"
-                  >
-                    Cancel
-                  </button>
+                  <p className="text-xs" style={{ color: 'var(--color-text-4)' }}>
+                    Job: <span className="font-mono" style={{ color: '#818cf8' }}>{d.jobId}</span>
+                  </p>
                 </div>
-              ) : (
-                <button
-                  onClick={() => setResolving(d.id)}
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-4 py-2 rounded-xl transition"
+                <div className="text-right">
+                  <p className="text-xs" style={{ color: 'var(--color-text-4)' }}>Reported by</p>
+                  <p className="text-xs font-semibold capitalize" style={{ color: 'var(--color-text-2)' }}>{d.reporterRole}</p>
+                </div>
+              </div>
+
+              {/* Category + description */}
+              <div
+                className="rounded-xl px-4 py-3 space-y-2"
+                style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border)' }}
+              >
+                <p className="text-xs font-semibold" style={{ color: '#fb923c' }}>
+                  {CATEGORY_LABEL[d.category] ?? d.category}
+                </p>
+                <p className="text-sm leading-relaxed" style={{ color: 'var(--color-text-2)' }}>{d.description}</p>
+              </div>
+
+              {/* Resolved state */}
+              {d.status === "resolved" && (
+                <div
+                  className="rounded-xl px-4 py-3 space-y-1"
+                  style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.2)' }}
                 >
-                  Resolve Dispute →
-                </button>
-              )
-            )}
-          </div>
-        ))}
+                  <p className="text-xs font-semibold" style={{ color: '#34d399' }}>
+                    Resolution: <span className="capitalize">{d.resolution?.replace(/_/g, " ")}</span>
+                  </p>
+                  {d.adminNote && <p className="text-xs" style={{ color: 'var(--color-text-4)' }}>Note: {d.adminNote}</p>}
+                </div>
+              )}
+
+              {/* Resolution panel */}
+              {isOpen && (
+                resolving === d.id ? (
+                  <div className="space-y-3">
+                    <textarea
+                      value={adminNote}
+                      onChange={(e) => setAdminNote(e.target.value)}
+                      placeholder="Admin note (optional — shown to both parties)…"
+                      rows={2}
+                      className="input resize-none text-sm"
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      {RESOLUTION_OPTIONS.map((opt) => (
+                        <button
+                          key={opt.value}
+                          onClick={() => resolve(d, opt.value)}
+                          disabled={loading === d.id}
+                          className="text-left px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 disabled:opacity-50"
+                          style={{ background: opt.bg, border: `1px solid ${opt.border}`, color: opt.color }}
+                          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = opt.hoverBg}
+                          onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = opt.bg}
+                        >
+                          <p>{opt.label}</p>
+                          <p className="text-[10px] opacity-70 font-normal mt-0.5">{opt.desc}</p>
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => { setResolving(null); setAdminNote(""); setError(null); }}
+                      className="text-xs transition-opacity hover:opacity-70"
+                      style={{ color: 'var(--color-text-4)' }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setResolving(d.id)}
+                    className="btn btn-sm"
+                    style={{
+                      background: 'rgba(249,115,22,0.1)',
+                      border: '1px solid rgba(249,115,22,0.3)',
+                      color: '#fb923c',
+                    }}
+                  >
+                    <AlertTriangle className="w-3.5 h-3.5" /> Resolve Dispute
+                  </button>
+                )
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
