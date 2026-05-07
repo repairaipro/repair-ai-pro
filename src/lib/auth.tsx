@@ -36,6 +36,14 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
         return;
       }
 
+      // Explicitly bind prototype methods that are lost when spreading a class instance
+      const boundMethods = {
+        getIdToken:              firebaseUser.getIdToken.bind(firebaseUser),
+        getIdTokenResult:        firebaseUser.getIdTokenResult.bind(firebaseUser),
+        reload:                  firebaseUser.reload.bind(firebaseUser),
+        delete:                  firebaseUser.delete.bind(firebaseUser),
+      };
+
       const ref = doc(db, 'users', firebaseUser.uid);
       const snap = await getDoc(ref);
 
@@ -46,9 +54,9 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
           role: 'guest',
           createdAt: new Date(),
         });
-        setUser({ ...firebaseUser, role: 'guest' });
+        setUser({ ...firebaseUser, ...boundMethods, role: 'guest' });
       } else {
-        setUser({ ...firebaseUser, ...snap.data() });
+        setUser({ ...firebaseUser, ...boundMethods, ...snap.data() });
       }
     });
 
