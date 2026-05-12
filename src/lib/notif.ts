@@ -21,7 +21,8 @@ export type NotifType =
   | "job_completed"
   | "job_confirmed"
   | "new_message"
-  | "review_received";
+  | "review_received"
+  | "payout_failed";
 
 export type NotifPayload = {
   recipientId: string;
@@ -35,11 +36,22 @@ export type NotifPayload = {
 };
 
 export async function createNotification(payload: NotifPayload): Promise<void> {
-  await adminDb.collection("notifications").add({
-    ...payload,
-    read:      false,
-    createdAt: FieldValue.serverTimestamp(),
-  });
+  // Write to notifications/{uid}/items/{docId} so client-side listeners work
+  await adminDb
+    .collection("notifications")
+    .doc(payload.recipientId)
+    .collection("items")
+    .add({
+      type:      payload.type,
+      title:     payload.title,
+      body:      payload.body,
+      jobId:     payload.jobId    ?? null,
+      href:      payload.href     ?? null,
+      actorId:   payload.actorId  ?? null,
+      actorName: payload.actorName ?? null,
+      read:      false,
+      createdAt: FieldValue.serverTimestamp(),
+    });
 }
 
 /* ── Typed convenience helpers ─────────────────────────────────────────── */
@@ -70,8 +82,8 @@ export function notifyJobAccepted(
 ) {
   const title = "Contractor accepted your job!";
   const body  = `${contractorName} is on the way. Open the job chat to coordinate.`;
-  const href  = `/chat?job=${jobId}`;
-  const smsBody = `✅ ${contractorName} accepted! Chat: ${process.env.NEXT_PUBLIC_APP_URL || 'https://repair-ai-pro.vercel.app'}/chat?job=${jobId}`;
+  const href  = `/chat/${jobId}`;
+  const smsBody = `✅ ${contractorName} accepted! Chat: ${process.env.NEXT_PUBLIC_APP_URL || 'https://repair-ai-pro.vercel.app'}/chat/${jobId}`;
   return Promise.all([
     createNotification({ recipientId: homeownerId, type: "job_accepted", title, body, jobId, href }),
     sendEmail(homeownerId, { type: "job_accepted", contractorName, jobId }),
@@ -83,8 +95,8 @@ export function notifyJobAccepted(
 export function notifyJobStarted(homeownerId: string, jobId: string, jobDescription = "") {
   const title = "Work has started";
   const body  = "Your contractor has begun work on your job.";
-  const href  = `/chat?job=${jobId}`;
-  const smsBody = `🚀 Work starting now. Open chat: ${process.env.NEXT_PUBLIC_APP_URL || 'https://repair-ai-pro.vercel.app'}/chat?job=${jobId}`;
+  const href  = `/chat/${jobId}`;
+  const smsBody = `🚀 Work starting now. Open chat: ${process.env.NEXT_PUBLIC_APP_URL || 'https://repair-ai-pro.vercel.app'}/chat/${jobId}`;
   return Promise.all([
     createNotification({ recipientId: homeownerId, type: "job_started", title, body, jobId, href }),
     sendEmail(homeownerId, { type: "job_started", jobDescription, jobId }),
@@ -96,8 +108,8 @@ export function notifyJobStarted(homeownerId: string, jobId: string, jobDescript
 export function notifyJobCompleted(homeownerId: string, jobId: string) {
   const title = "Work is done — please confirm";
   const body  = "Your contractor marked the job complete. Confirm to release payment and leave a review.";
-  const href  = `/chat?job=${jobId}`;
-  const smsBody = `✓ Work done! Confirm & release payment: ${process.env.NEXT_PUBLIC_APP_URL || 'https://repair-ai-pro.vercel.app'}/chat?job=${jobId}`;
+  const href  = `/chat/${jobId}`;
+  const smsBody = `✓ Work done! Confirm & release payment: ${process.env.NEXT_PUBLIC_APP_URL || 'https://repair-ai-pro.vercel.app'}/chat/${jobId}`;
   return Promise.all([
     createNotification({ recipientId: homeownerId, type: "job_completed", title, body, jobId, href }),
     sendEmail(homeownerId, { type: "job_completed", jobId }),
@@ -109,7 +121,7 @@ export function notifyJobCompleted(homeownerId: string, jobId: string) {
 export function notifyJobConfirmed(contractorId: string, jobId: string) {
   const title = "Job confirmed!";
   const body  = "The homeowner confirmed your work. A review may follow — great job!";
-  const href  = `/chat?job=${jobId}`;
+  const href  = `/chat/${jobId}`;
   return Promise.all([
     createNotification({ recipientId: contractorId, type: "job_confirmed", title, body, jobId, href }),
     sendEmail(contractorId, { type: "job_confirmed", jobId }),
@@ -124,8 +136,8 @@ export function notifyNewMessage(
 ) {
   const title = `New message from ${senderName}`;
   const body  = "Tap to open the conversation.";
-  const href  = `/chat?job=${jobId}`;
-  const smsBody = `💬 ${senderName} sent a message: ${process.env.NEXT_PUBLIC_APP_URL || 'https://repair-ai-pro.vercel.app'}/chat?job=${jobId}`;
+  const href  = `/chat/${jobId}`;
+  const smsBody = `💬 ${senderName} sent a message: ${process.env.NEXT_PUBLIC_APP_URL || 'https://repair-ai-pro.vercel.app'}/chat/${jobId}`;
   return Promise.all([
     createNotification({ recipientId, type: "new_message", title, body, jobId, href }),
     sendEmail(recipientId, { type: "new_message", senderName, jobId }),
@@ -152,8 +164,8 @@ export async function notifyDisputeOpened(
   // Notify everyone involved
   const disputeTitle = "A dispute has been opened";
   const disputeBody  = `Category: ${category}. Payment is frozen until resolved.`;
-  const disputeHref  = `/chat?job=${jobId}`;
-  const disputeSMS = `⚠️ Dispute filed. Payment frozen. Category: ${category}. ${process.env.NEXT_PUBLIC_APP_URL || 'https://repair-ai-pro.vercel.app'}/chat?job=${jobId}`;
+  const disputeHref  = `/chat/${jobId}`;
+  const disputeSMS = `⚠️ Dispute filed. Payment frozen. Category: ${category}. ${process.env.NEXT_PUBLIC_APP_URL || 'https://repair-ai-pro.vercel.app'}/chat/${jobId}`;
   const tasks = recipients.map((recipientId) =>
     Promise.all([
       createNotification({
@@ -180,8 +192,8 @@ export function notifyJobCancelled(
 ) {
   const title = "Job was cancelled";
   const body  = `The ${cancelledByRole} cancelled this job. Any held payment will be refunded.`;
-  const href  = `/chat?job=${jobId}`;
-  const smsBody = `❌ Job cancelled by ${cancelledByRole}. Refund processing. ${process.env.NEXT_PUBLIC_APP_URL || 'https://repair-ai-pro.vercel.app'}/chat?job=${jobId}`;
+  const href  = `/chat/${jobId}`;
+  const smsBody = `❌ Job cancelled by ${cancelledByRole}. Refund processing. ${process.env.NEXT_PUBLIC_APP_URL || 'https://repair-ai-pro.vercel.app'}/chat/${jobId}`;
   return Promise.all([
     createNotification({ recipientId, type: "job_cancelled" as any, title, body, jobId, href }),
     sendEmail(recipientId, { type: "job_cancelled", cancelledByRole, jobId }),
@@ -202,5 +214,24 @@ export function notifyReviewReceived(
     createNotification({ recipientId: contractorId, type: "review_received", title, body, jobId, href }),
     sendEmail(contractorId, { type: "review_received", rating, jobId }),
     sendPush(contractorId, { title, body, href, jobId, type: "review_received" }),
+  ]).then(() => undefined);
+}
+
+export function notifyPayoutFailed(
+  contractorId: string,
+  jobId: string,
+  failureReason?: string
+) {
+  const title = "Payout failed";
+  const body = failureReason
+    ? `Payout for this job failed: ${failureReason}. Contact support for help.`
+    : "Payout for this job couldn't go through. Check your payment method in settings.";
+  const href = `/dashboard/contractor/earnings`;
+  const smsBody = `⚠️ Payout failed. ${failureReason || "Check your payment method."} ${process.env.NEXT_PUBLIC_APP_URL || 'https://repair-ai-pro.vercel.app'}/dashboard/contractor/earnings`;
+  return Promise.all([
+    createNotification({ recipientId: contractorId, type: "payout_failed", title, body, jobId, href }),
+    sendEmail(contractorId, { type: "payout_failed", failureReason, jobId }),
+    sendPush(contractorId, { title, body, href, jobId, type: "payout_failed", requireInteraction: true }),
+    sendSMS(contractorId, { title, body: smsBody, link: href }),
   ]).then(() => undefined);
 }

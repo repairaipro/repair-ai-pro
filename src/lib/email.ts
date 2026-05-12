@@ -25,6 +25,10 @@ function getResend(): Resend | null {
 const FROM = process.env.RESEND_FROM ?? "Repair AI Pro <noreply@resend.dev>";
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
 
+/** Exported constant used by direct-send helpers below. */
+export const APP_URL =
+  process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXT_PUBLIC_BASE_URL ?? "https://repair-ai-pro.com";
+
 /* ── HTML template shell ─────────────────────────────────────────────────── */
 
 function emailShell(content: string): string {
@@ -109,7 +113,8 @@ export type EmailTemplate =
   | { type: "new_message"; senderName: string; jobId: string }
   | { type: "review_received"; rating: number; jobId: string }
   | { type: "dispute_opened"; category: string; reporterRole: string; jobId: string }
-  | { type: "job_cancelled"; cancelledByRole: string; jobId: string };
+  | { type: "job_cancelled"; cancelledByRole: string; jobId: string }
+  | { type: "payout_failed"; failureReason?: string; jobId: string };
 
 function buildEmail(tpl: EmailTemplate): { subject: string; html: string } {
   const chatUrl = (jobId: string) => `${BASE_URL}/chat?job=${jobId}`;
@@ -220,10 +225,23 @@ function buildEmail(tpl: EmailTemplate): { subject: string; html: string } {
         ),
       };
     }
+
+    case "payout_failed": {
+      return {
+        subject: "Payout failed for your completed job",
+        html: emailShell(
+          heading("Your payout couldn't go through") +
+          para("The payment for your recently completed job couldn't be transferred to your bank account.") +
+          (tpl.failureReason ? infoBox("Reason", tpl.failureReason) : para("This may be due to a temporary issue with your bank or account.")) +
+          ctaButton("Check Payment Settings →", `${BASE_URL}/dashboard/contractor/settings`) +
+          para(`<span style="color:#9ca3af;font-size:13px;">If the issue persists, please verify your bank details in your payment settings or contact support.</span>`)
+        ),
+      };
+    }
   }
 }
 
-/* ── Main send function ──────────────────────────────────────────────────── */
+/* ── Main send function (uid-based) ─────────────────────────────────────── */
 
 export async function sendEmail(
   recipientId: string,
@@ -256,4 +274,254 @@ export async function sendEmail(
     // Non-fatal — log but never throw
     console.error("Email send error:", err);
   }
+}
+
+/* ── Direct-address send helper ─────────────────────────────────────────── */
+
+/**
+ * Low-level helper: send to a known email address with arbitrary subject/html.
+ * Used by the specific typed helpers below and by the Stripe release route.
+ */
+export async function sendEmailDirect({
+  to,
+  subject,
+  html,
+}: {
+  to: string;
+  subject: string;
+  html: string;
+}): Promise<void> {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn("RESEND_API_KEY not set — skipping email send");
+    return;
+  }
+  const resend = getResend()!;
+  try {
+    await resend.emails.send({ from: FROM, to, subject, html });
+  } catch (err) {
+    console.error("Email send failed:", err);
+  }
+}
+
+/* ── Shared layout for direct-send helpers ───────────────────────────────── */
+
+function directLayout(content: string): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RepairAI Pro</title>
+</head>
+<body style="margin:0;padding:0;background-color:#0f1117;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0f1117;padding:40px 16px;">
+    <tr>
+      <td align="center">
+        <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
+          <tr>
+            <td align="center" style="padding-bottom:24px;">
+              <span style="font-size:22px;font-weight:700;color:#6366f1;letter-spacing:-0.5px;">RepairAI Pro</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color:#ffffff;border-radius:16px;padding:32px;">
+              ${content}
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding-top:24px;">
+              <p style="margin:0;font-size:12px;color:#6b7280;">
+                RepairAI Pro &nbsp;&middot;&nbsp;
+                <a href="${APP_URL}/unsubscribe" style="color:#6b7280;text-decoration:underline;">Unsubscribe</a>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+function directBtn(href: string, label: string): string {
+  return `<div style="text-align:center;margin-top:28px;">
+  <a href="${href}"
+     style="display:inline-block;background-color:#6366f1;color:#ffffff;font-size:15px;font-weight:600;
+            text-decoration:none;border-radius:8px;padding:12px 24px;">
+    ${label}
+  </a>
+</div>`;
+}
+
+/* ── Typed convenience senders (accept email address directly) ───────────── */
+
+/** Sent to homeowner when a contractor accepts their job. */
+export async function sendJobMatchedEmail(
+  to: string,
+  {
+    jobDescription,
+    tradeType,
+    contractorName,
+    jobId,
+  }: {
+    jobDescription: string;
+    tradeType: string;
+    contractorName: string;
+    jobId: string;
+  }
+): Promise<void> {
+  const chatUrl = `${APP_URL}/chat?job=${jobId}`;
+  const content = `
+    <h2 style="margin:0 0 8px;font-size:20px;color:#111827;">A contractor has been assigned!</h2>
+    <p style="margin:0 0 16px;font-size:15px;color:#374151;line-height:1.6;">
+      Great news! <strong>${contractorName}</strong> has accepted your <strong>${tradeType}</strong> job.
+    </p>
+    <p style="margin:0;font-size:14px;color:#6b7280;line-height:1.6;background:#f9fafb;border-radius:8px;padding:12px 16px;">
+      ${jobDescription}
+    </p>
+    <p style="margin:16px 0 0;font-size:15px;color:#374151;line-height:1.6;">
+      Click below to chat with them and track progress.
+    </p>
+    ${directBtn(chatUrl, "Open Job Chat")}
+  `;
+  await sendEmailDirect({
+    to,
+    subject: "✅ A contractor has been assigned to your job",
+    html: directLayout(content),
+  });
+}
+
+/** Sent to contractor when a new matching job is posted. */
+export async function sendNewJobInvitationEmail(
+  to: string,
+  {
+    jobDescription,
+    tradeType,
+    estimatedValue,
+    jobId,
+  }: {
+    jobDescription: string;
+    tradeType: string;
+    estimatedValue: string | number;
+    jobId: string;
+  }
+): Promise<void> {
+  const chatUrl = `${APP_URL}/chat?job=${jobId}`;
+  const content = `
+    <h2 style="margin:0 0 8px;font-size:20px;color:#111827;">New job invitation — ${tradeType}</h2>
+    <p style="margin:0 0 16px;font-size:15px;color:#374151;line-height:1.6;">
+      You've been matched with a new <strong>${tradeType}</strong> job worth
+      <strong>~$${estimatedValue}</strong>. Accept before another contractor does!
+    </p>
+    <p style="margin:0;font-size:14px;color:#6b7280;line-height:1.6;background:#f9fafb;border-radius:8px;padding:12px 16px;">
+      ${jobDescription}
+    </p>
+    ${directBtn(chatUrl, "View & Accept Job")}
+  `;
+  await sendEmailDirect({
+    to,
+    subject: `🔔 New job invitation — ${tradeType}`,
+    html: directLayout(content),
+  });
+}
+
+/** Sent to homeowner when contractor marks a job complete. */
+export async function sendJobCompletedEmail(
+  to: string,
+  {
+    contractorName,
+    jobDescription,
+    jobId,
+  }: {
+    contractorName: string;
+    jobDescription: string;
+    jobId: string;
+  }
+): Promise<void> {
+  const chatUrl = `${APP_URL}/chat?job=${jobId}`;
+  const content = `
+    <h2 style="margin:0 0 8px;font-size:20px;color:#111827;">Job marked complete</h2>
+    <p style="margin:0 0 16px;font-size:15px;color:#374151;line-height:1.6;">
+      <strong>${contractorName}</strong> has marked your job complete. Confirm completion to
+      release their payment and leave a review.
+    </p>
+    <p style="margin:0;font-size:14px;color:#6b7280;line-height:1.6;background:#f9fafb;border-radius:8px;padding:12px 16px;">
+      ${jobDescription}
+    </p>
+    ${directBtn(chatUrl, "Confirm & Review")}
+  `;
+  await sendEmailDirect({
+    to,
+    subject: "🏁 Job complete — please confirm and leave a review",
+    html: directLayout(content),
+  });
+}
+
+/** Sent to contractor after a Stripe transfer succeeds. */
+export async function sendPayoutSentEmail(
+  to: string,
+  {
+    amount,
+    jobDescription,
+    jobId,
+  }: {
+    amount: string | number;
+    jobDescription: string;
+    jobId: string;
+  }
+): Promise<void> {
+  const earningsUrl = `${APP_URL}/dashboard/contractor/settings`;
+  const content = `
+    <h2 style="margin:0 0 8px;font-size:20px;color:#111827;">Payout sent — $${amount}</h2>
+    <p style="margin:0 0 16px;font-size:15px;color:#374151;line-height:1.6;">
+      Your payout of <strong>$${amount}</strong> for
+      <em>&ldquo;${jobDescription}&rdquo;</em> is on its way to your bank account.
+      Expect funds in 1&ndash;5 business days.
+    </p>
+    <p style="margin:0;font-size:13px;color:#6b7280;">Job ID: ${jobId}</p>
+    ${directBtn(earningsUrl, "View Earnings")}
+  `;
+  await sendEmailDirect({
+    to,
+    subject: `💸 Payout sent — $${amount}`,
+    html: directLayout(content),
+  });
+}
+
+/** Sent to a new user immediately after registration. */
+export async function sendWelcomeEmail(
+  to: string,
+  {
+    name,
+    role,
+  }: {
+    name: string;
+    role: "homeowner" | "contractor";
+  }
+): Promise<void> {
+  const isContractor = role === "contractor";
+  const bodyText = isContractor
+    ? "Complete your profile and bank verification to start claiming jobs on RepairAI Pro."
+    : "Post your first job and get matched with a verified contractor in minutes.";
+  const ctaHref = isContractor
+    ? `${APP_URL}/contractor-profile`
+    : `${APP_URL}/jobs/new`;
+  const ctaLabel = isContractor ? "Set Up Profile" : "Post Your First Job";
+
+  const content = `
+    <h2 style="margin:0 0 8px;font-size:20px;color:#111827;">Welcome to RepairAI Pro, ${name}! 🎉</h2>
+    <p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.6;">
+      ${bodyText}
+    </p>
+    ${directBtn(ctaHref, ctaLabel)}
+    <p style="margin:28px 0 0;font-size:13px;color:#9ca3af;text-align:center;">
+      If you have any questions, reply to this email — we&rsquo;re happy to help.
+    </p>
+  `;
+  await sendEmailDirect({
+    to,
+    subject: "Welcome to RepairAI Pro 🎉",
+    html: directLayout(content),
+  });
 }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
+import { notifyPayoutFailed } from "@/lib/notif";
 
 /**
  * Stripe webhook handler.
@@ -25,6 +26,12 @@ import { FieldValue } from "firebase-admin/firestore";
  *      - transfer.created (payout to contractor processed)
  *      - transfer.failed (payout to contractor failed)
  *
+ *    SUBSCRIPTION EVENTS:
+ *      - checkout.session.completed (contractor subscribed to Pro/Elite)
+ *      - customer.subscription.created (new subscription)
+ *      - customer.subscription.updated (renewal, plan change, trial ended)
+ *      - customer.subscription.deleted (cancellation → downgrade to Starter)
+ *
  * 5. Copy your signing secret (Signing secret field)
  * 6. Paste it into your .env.local as STRIPE_WEBHOOK_SECRET
  *
@@ -45,8 +52,24 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
-  const obj = event.data?.object as any;
-  const jobId  = obj?.metadata?.jobId;
+  const obj   = event.data?.object as any;
+  const jobId = obj?.metadata?.jobId;
+  const uid   = obj?.metadata?.uid;
+
+  /* ── Subscription events (no jobId required) ── */
+  if (
+    event.type === "checkout.session.completed" ||
+    event.type === "customer.subscription.created" ||
+    event.type === "customer.subscription.updated" ||
+    event.type === "customer.subscription.deleted"
+  ) {
+    try {
+      await handleSubscriptionEvent(event.type, obj);
+    } catch (err) {
+      console.error("Subscription webhook error:", err);
+    }
+    return NextResponse.json({ ok: true });
+  }
 
   if (!jobId) return NextResponse.json({ ok: true }); // unrelated event
 
@@ -158,11 +181,13 @@ export async function POST(req: Request) {
       case "transfer.failed": {
         const transferId = obj.id;
         const transferJobId = obj.metadata?.jobId;
+        const contractorUid = obj.metadata?.contractorUid;
         const failureCode = obj.failure_code;
         const failureMessage = obj.failure_message;
 
         if (transferJobId) {
-          await adminDb.collection("jobs").doc(transferJobId).update({
+          const jobRef = adminDb.collection("jobs").doc(transferJobId);
+          await jobRef.update({
             payoutStatus: "failed",
             payoutFailureCode: failureCode,
             payoutFailureMessage: failureMessage,
@@ -173,7 +198,12 @@ export async function POST(req: Request) {
             `❌ Transfer ${transferId} failed for job ${transferJobId}: ${failureCode} - ${failureMessage}`
           );
 
-          // TODO: Notify contractor via email/push that payout failed
+          // Notify contractor about failed payout
+          if (contractorUid) {
+            notifyPayoutFailed(contractorUid, transferJobId, failureMessage).catch(
+              (err) => console.error(`Failed to notify contractor ${contractorUid}:`, err)
+            );
+          }
           // Retry logic could be implemented here (e.g., retry after 24h if temporary failure)
         }
         break;
@@ -185,4 +215,88 @@ export async function POST(req: Request) {
   }
 
   return NextResponse.json({ ok: true });
+}
+
+/* ────────────────────────────────────────────────────────────────
+   Subscription helpers
+──────────────────────────────────────────────────────────────── */
+async function handleSubscriptionEvent(type: string, obj: any) {
+  switch (type) {
+    /* Checkout completed — user finished paying for a subscription */
+    case "checkout.session.completed": {
+      if (obj.mode !== "subscription") return;
+      const uid  = obj.metadata?.uid;
+      const plan = obj.metadata?.plan;
+      const role = obj.metadata?.role; // "homeowner" | "contractor"
+      if (!uid || !plan) return;
+
+      if (role === "homeowner") {
+        await adminDb.collection("homeowners").doc(uid).set({
+          subscriptionPlan:        plan,
+          subscriptionStatus:      "active",
+          stripeSubscriptionId:    obj.subscription,
+          stripeCustomerId:        obj.customer,
+          subscriptionActivatedAt: FieldValue.serverTimestamp(),
+          updatedAt:               FieldValue.serverTimestamp(),
+        }, { merge: true });
+        console.log(`✅ Homeowner ${uid} subscribed to ${plan}`);
+      } else {
+        // Default: contractor
+        await adminDb.collection("contractors").doc(uid).set({
+          subscriptionPlan:        plan,
+          subscriptionStatus:      "active",
+          stripeSubscriptionId:    obj.subscription,
+          stripeCustomerId:        obj.customer,
+          subscriptionActivatedAt: FieldValue.serverTimestamp(),
+          updatedAt:               FieldValue.serverTimestamp(),
+        }, { merge: true });
+        console.log(`✅ Contractor ${uid} subscribed to ${plan}`);
+      }
+      break;
+    }
+
+    /* Subscription updated (renewal, plan change, trial ended) */
+    case "customer.subscription.updated": {
+      const uid    = obj.metadata?.uid;
+      const plan   = obj.metadata?.plan;
+      const role   = obj.metadata?.role;
+      const status = obj.status; // "active" | "past_due" | "canceled" | "trialing" etc.
+      if (!uid) return;
+
+      const collection = role === "homeowner" ? "homeowners" : "contractors";
+      await adminDb.collection(collection).doc(uid).set({
+        subscriptionStatus: status,
+        subscriptionPlan:   plan ?? undefined,
+        updatedAt:          FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+      console.log(`✅ ${role === "homeowner" ? "Homeowner" : "Contractor"} ${uid} subscription ${status}`);
+      break;
+    }
+
+    /* Subscription cancelled */
+    case "customer.subscription.deleted": {
+      const uid  = obj.metadata?.uid;
+      const role = obj.metadata?.role;
+      if (!uid) return;
+
+      if (role === "homeowner") {
+        await adminDb.collection("homeowners").doc(uid).set({
+          subscriptionPlan:   "free",
+          subscriptionStatus: "canceled",
+          updatedAt:          FieldValue.serverTimestamp(),
+        }, { merge: true });
+        console.log(`⚠️ Homeowner ${uid} subscription cancelled — downgraded to free`);
+      } else {
+        // Default: contractor
+        await adminDb.collection("contractors").doc(uid).set({
+          subscriptionPlan:   "starter",
+          subscriptionStatus: "canceled",
+          updatedAt:          FieldValue.serverTimestamp(),
+        }, { merge: true });
+        console.log(`⚠️ Contractor ${uid} subscription cancelled — downgraded to starter`);
+      }
+      break;
+    }
+  }
 }
