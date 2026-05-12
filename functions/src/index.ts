@@ -2,6 +2,9 @@ import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 
+// Import cleanup functions
+export { cleanupLocationData, cleanupLocationDataManual, monitorLocationData } from "./cleanupLocationData";
+
 initializeApp();
 const db = getFirestore();
 
