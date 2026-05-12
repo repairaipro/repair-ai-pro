@@ -16,7 +16,7 @@ const db = admin.firestore();
 export const cleanupLocationData = functions.pubsub
   .schedule('*/10 * * * *') // Every 10 minutes
   .timeZone('UTC')
-  .onRun(async (context) => {
+  .onRun(async (context: any) => {
     const now = new Date();
     const expiryTime = new Date(now.getTime() - 60 * 60 * 1000); // 60 minutes ago
 
@@ -148,7 +148,7 @@ export const cleanupLocationDataManual = functions.https.onRequest(
 export const monitorLocationData = functions.pubsub
   .schedule('0 * * * *') // Every hour
   .timeZone('UTC')
-  .onRun(async (context) => {
+  .onRun(async (context: any) => {
     try {
       const allLocations = await db.collectionGroup('liveLocation').get();
 

@@ -16,6 +16,7 @@
     "paths": {
       "@/*": ["*"]
     },
+    "ignoreDeprecations": "5.0",
     "plugins": [{ "name": "next" }],
     "incremental": true
   },

@@ -29,11 +29,11 @@ export default function ContractorInboxPage() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Link href="/contractor-profile" className="btn btn-secondary btn-sm">
-              <Edit className="w-3.5 h-3.5" /> Edit Profile
+            <Link href="/contractor-inbox/bids" className="btn btn-secondary btn-sm">
+              <Trophy className="w-3.5 h-3.5" /> My Bids
             </Link>
-            <Link href="/jobs" className="btn btn-primary btn-sm">
-              <Briefcase className="w-3.5 h-3.5" /> Browse Jobs
+            <Link href="/contractor-profile" className="btn btn-secondary btn-sm">
+              <Edit className="w-3.5 h-3.5" /> Profile
             </Link>
           </div>
         </div>
@@ -50,9 +50,9 @@ export default function ContractorInboxPage() {
           <div className="grid sm:grid-cols-2 gap-3">
             {[
               { icon: <Brain className="w-4 h-4" />, color: '#818cf8', bg: 'rgba(99,102,241,0.1)', text: "Homeowners post a job — our AI detects the trade and location" },
-              { icon: <Inbox className="w-4 h-4" />, color: '#fb923c', bg: 'rgba(249,115,22,0.1)', text: "You get invited based on your trade, city, rating, and history" },
-              { icon: <CheckCircle className="w-4 h-4" />, color: '#34d399', bg: 'rgba(16,185,129,0.1)', text: "Accept to claim the job and start chatting with the homeowner" },
-              { icon: <Star className="w-4 h-4" />, color: '#fbbf24', bg: 'rgba(245,158,11,0.1)', text: "Complete the job and collect a 5-star review to boost your ranking" },
+              { icon: <Inbox className="w-4 h-4" />, color: '#fb923c', bg: 'rgba(249,115,22,0.1)', text: "You receive an invitation based on your trade, city, rating, and availability" },
+              { icon: <Trophy className="w-4 h-4" />, color: '#34d399', bg: 'rgba(16,185,129,0.1)', text: "Submit a competitive bid with your price, ETA, and a personal message" },
+              { icon: <Star className="w-4 h-4" />, color: '#fbbf24', bg: 'rgba(245,158,11,0.1)', text: "Win the bid, complete the job, and collect a 5-star review to rank higher" },
             ].map(({ icon, color, bg, text }, i) => (
               <div key={i} className="flex gap-3 items-start">
                 <div

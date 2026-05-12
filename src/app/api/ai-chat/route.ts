@@ -1,54 +1,83 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
 type ExplainMode = "beginner" | "homeowner" | "pro";
+type HistoryItem = { role: "user" | "assistant"; content: string };
 
-function buildSystemPrompt(mode?: ExplainMode) {
-  const base = `You are RepairGPT — a friendly, highly skilled home repair AI.
-You analyze images, diagnose problems, and guide customers with clear instructions.
-Always give clear next steps and safety considerations.
-If no repair issue is found, suggest relevant maintenance advice.`;
+function buildSystemPrompt(mode?: ExplainMode): string {
+  const base = `You are RepairGPT — a world-class home repair and maintenance AI.
+You analyze images, diagnose problems, and give clear, actionable guidance.
+Always include: what the problem is, urgency level, estimated cost range, and whether to DIY or hire a pro.
+Use markdown formatting: **bold** for key points, bullet lists for steps.
+Be concise but complete. Never leave the user without a clear next step.`;
 
   if (mode === "beginner") {
-    return `${base}\nExplain like the user is a total beginner DIY homeowner. Avoid jargon, use plain language, and give step-by-step guidance.`;
+    return `${base}
+Audience: Total beginner. No prior knowledge assumed.
+Style: Plain English only. No jargon whatsoever. Use numbered steps. Short sentences.
+Always reassure and encourage.`;
   }
   if (mode === "pro") {
-    return `${base}\nExplain for a professional technician. Use technical language, mention likely failure modes, tools, and relevant standards where appropriate.`;
+    return `${base}
+Audience: Licensed professional or experienced tradesperson.
+Style: Technical language encouraged. Include part numbers, specs, failure modes, relevant codes (NEC, UPC, etc.).`;
   }
-  // default: "homeowner"
-  return `${base}\nExplain for a typical homeowner with some common-sense understanding. Use simple technical terms but always define them.`;
+  return `${base}
+Audience: Typical homeowner — capable, smart, but not a specialist.
+Style: Clear and practical. Brief technical terms are fine but always define them.`;
 }
 
 export async function POST(req: Request) {
   try {
-    const { message, imageUrl, jobId, mode } = await req.json();
+    const { message, imageUrl, history, mode } = await req.json();
 
-    const content: { type: string; text?: string; image_url?: string; detail?: string }[] = [];
+    const messages: OpenAI.ChatCompletionMessageParam[] = [
+      { role: "system", content: buildSystemPrompt(mode as ExplainMode) },
+    ];
 
-    if (message && String(message).trim().length > 0) {
-      content.push({ type: "input_text", text: String(message) });
+    // Include recent conversation history for context (last 8 turns)
+    if (Array.isArray(history)) {
+      for (const h of (history as HistoryItem[]).slice(-8)) {
+        messages.push({ role: h.role, content: h.content });
+      }
+    }
+
+    // Build current user message
+    const userContent: OpenAI.ChatCompletionContentPart[] = [];
+
+    if (message?.trim()) {
+      userContent.push({ type: "text", text: message.trim() });
     }
 
     if (imageUrl) {
-      content.push({ type: "input_image", image_url: imageUrl, detail: "high" });
+      userContent.push({
+        type: "image_url",
+        image_url: { url: imageUrl, detail: "high" },
+      });
+      if (!message?.trim()) {
+        userContent.push({
+          type: "text",
+          text: "Analyze this image. What do you see? What's the problem and how do I fix it?",
+        });
+      }
     }
 
-    if (content.length === 0) {
+    if (userContent.length === 0) {
       return NextResponse.json({ error: "No message or image provided" }, { status: 400 });
     }
 
-    const response = await client.responses.create({
-      model: "gpt-4o-mini",
-      input: [
-        { role: "system", content: buildSystemPrompt(mode as ExplainMode) },
-        { role: "user", content: content as any },
-      ],
+    messages.push({ role: "user", content: userContent });
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages,
+      max_tokens: 1200,
+      temperature: 0.4,
     });
 
-    const reply = response.output_text || "Something went wrong — no output received.";
-
+    const reply = completion.choices[0]?.message?.content ?? "Sorry, I couldn't generate a response. Please try again.";
     return NextResponse.json({ reply });
   } catch (error: any) {
     console.error("AI Chat Error:", error.message);

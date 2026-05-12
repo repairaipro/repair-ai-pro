@@ -19,6 +19,7 @@ export type JobEventType =
   | "message_sent"
   | "attachment_added"
   | "ai_analysis_generated"
+  | "ai_diagnosis"
   | "job_broadcasted"
   | "providers_invited"
   | "invitation_accepted"

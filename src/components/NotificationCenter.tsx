@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  collection, query, where, orderBy, limit,
+  collection, query, orderBy, limit,
   onSnapshot, updateDoc, doc, writeBatch,
 } from "firebase/firestore";
 import { db } from "@/lib/db";
@@ -22,12 +22,18 @@ type Notif = {
 
 const TYPE_ICON: Record<string, string> = {
   contractor_invited: "📬",
+  new_bid:            "🎯",
   job_accepted:       "🎉",
   job_started:        "🔧",
   job_completed:      "✅",
   job_confirmed:      "🌟",
+  payment_released:   "💸",
   new_message:        "💬",
   review_received:    "⭐",
+  bid_selected:       "🏆",
+  bid_declined:       "❌",
+  dispute_opened:     "⚠️",
+  job_cancelled:      "❌",
 };
 
 function timeAgo(ts: Notif["createdAt"]): string {
@@ -51,22 +57,21 @@ export default function NotificationCenter() {
   const [open,     setOpen]     = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  // Load real-time notifications
+  /* ── Real-time notifications from notifications/{uid}/items ── */
   useEffect(() => {
     if (!user) return;
     const q = query(
-      collection(db, "notifications"),
-      where("recipientId", "==", user.uid),
+      collection(db, "notifications", user.uid, "items"),
       orderBy("createdAt", "desc"),
-      limit(25)
+      limit(30)
     );
     const unsub = onSnapshot(q, (snap) => {
       setNotifs(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })));
-    });
+    }, () => {});
     return () => unsub();
   }, [user]);
 
-  // Close on outside click
+  /* ── Close on outside click ── */
   useEffect(() => {
     if (!open) return;
     function handle(e: MouseEvent) {
@@ -80,16 +85,21 @@ export default function NotificationCenter() {
 
   const unread = notifs.filter((n) => !n.read).length;
 
-  // Sync unread count to localStorage for PWA badge
+  /* ── Sync unread count for PWA badge ── */
   useEffect(() => {
-    localStorage.setItem('notif:unread', String(unread));
-    // Dispatch custom event for other listeners
-    window.dispatchEvent(new CustomEvent('notif:updated', { detail: { unread } }));
+    try {
+      localStorage.setItem("notif:unread", String(unread));
+      window.dispatchEvent(new CustomEvent("notif:updated", { detail: { unread } }));
+    } catch { /* ignore */ }
   }, [unread]);
 
   async function markRead(notif: Notif) {
+    if (!user) return;
     if (!notif.read) {
-      await updateDoc(doc(db, "notifications", notif.id), { read: true });
+      await updateDoc(
+        doc(db, "notifications", user.uid, "items", notif.id),
+        { read: true }
+      ).catch(() => {});
     }
     setOpen(false);
     if (notif.href) router.push(notif.href);
@@ -100,26 +110,47 @@ export default function NotificationCenter() {
     const unreadItems = notifs.filter((n) => !n.read);
     if (!unreadItems.length) return;
     const batch = writeBatch(db);
-    unreadItems.forEach((n) => batch.update(doc(db, "notifications", n.id), { read: true }));
-    await batch.commit();
+    unreadItems.forEach((n) =>
+      batch.update(doc(db, "notifications", user.uid, "items", n.id), { read: true })
+    );
+    await batch.commit().catch(() => {});
   }
 
   if (!user) return null;
 
   return (
-    <div ref={panelRef} className="relative">
+    <div ref={panelRef} style={{ position: "relative" }}>
       {/* Bell button */}
       <button
         onClick={() => setOpen((o) => !o)}
-        className="relative p-2 rounded-lg hover:bg-gray-800 transition text-gray-400 hover:text-white"
-        aria-label="Notifications"
+        style={{
+          position: "relative",
+          padding: "7px 8px",
+          borderRadius: 8,
+          background: open ? "var(--color-surface)" : "transparent",
+          border: "1px solid",
+          borderColor: open ? "var(--color-border)" : "transparent",
+          color: unread > 0 ? "var(--color-brand)" : "var(--color-text-4)",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          transition: "all 0.15s",
+        }}
+        aria-label={`Notifications${unread > 0 ? ` (${unread} unread)` : ""}`}
       >
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
           <path strokeLinecap="round" strokeLinejoin="round"
             d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
         </svg>
         {unread > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+          <span style={{
+            position: "absolute", top: -4, right: -4,
+            background: "#ef4444", color: "#fff",
+            fontSize: 9, fontWeight: 800,
+            width: 16, height: 16, borderRadius: "50%",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            border: "1.5px solid var(--color-bg)",
+          }}>
             {unread > 9 ? "9+" : unread}
           </span>
         )}
@@ -127,21 +158,45 @@ export default function NotificationCenter() {
 
       {/* Dropdown panel */}
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-80 bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl shadow-black/50 z-50 overflow-hidden">
+        <div style={{
+          position: "absolute",
+          right: 0, top: "calc(100% + 8px)",
+          width: 320,
+          background: "var(--color-surface)",
+          border: "1px solid var(--color-border)",
+          borderRadius: 18,
+          boxShadow: "0 16px 64px rgba(0,0,0,0.5)",
+          zIndex: 1000,
+          overflow: "hidden",
+        }}>
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800">
-            <h3 className="text-sm font-semibold text-white">
-              Notifications
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            padding: "14px 16px 12px",
+            borderBottom: "1px solid var(--color-border)",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text)", margin: 0 }}>
+                Notifications
+              </h3>
               {unread > 0 && (
-                <span className="ml-2 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">
+                <span style={{
+                  background: "#ef4444", color: "#fff",
+                  fontSize: 9, fontWeight: 800,
+                  padding: "2px 6px", borderRadius: 9999,
+                }}>
                   {unread} new
                 </span>
               )}
-            </h3>
+            </div>
             {unread > 0 && (
               <button
                 onClick={markAllRead}
-                className="text-xs text-indigo-400 hover:text-indigo-300 transition"
+                style={{
+                  fontSize: 11, color: "var(--color-brand)",
+                  background: "none", border: "none",
+                  cursor: "pointer", fontWeight: 500,
+                }}
               >
                 Mark all read
               </button>
@@ -149,40 +204,74 @@ export default function NotificationCenter() {
           </div>
 
           {/* List */}
-          <div className="max-h-96 overflow-y-auto divide-y divide-gray-800">
+          <div style={{ maxHeight: 380, overflowY: "auto" }}>
             {notifs.length === 0 ? (
-              <div className="py-10 text-center text-gray-600 text-sm">
-                <div className="text-3xl mb-2">🔔</div>
-                No notifications yet
+              <div style={{ padding: "40px 16px", textAlign: "center" }}>
+                <div style={{ fontSize: 32, marginBottom: 10 }}>🔔</div>
+                <p style={{ fontSize: 13, color: "var(--color-text-4)" }}>No notifications yet</p>
+                <p style={{ fontSize: 11, color: "var(--color-text-4)", marginTop: 4 }}>
+                  We'll let you know when something happens
+                </p>
               </div>
             ) : (
               notifs.map((n) => (
                 <button
                   key={n.id}
                   onClick={() => markRead(n)}
-                  className={`w-full text-left px-4 py-3 flex gap-3 hover:bg-gray-800 transition ${
-                    !n.read ? "bg-indigo-950/30" : ""
-                  }`}
+                  style={{
+                    width: "100%",
+                    textAlign: "left",
+                    padding: "12px 16px",
+                    display: "flex",
+                    gap: 12,
+                    background: !n.read ? "rgba(99,102,241,0.06)" : "transparent",
+                    border: "none",
+                    borderBottom: "1px solid var(--color-border)",
+                    cursor: "pointer",
+                    transition: "background 0.15s",
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.background = "var(--color-surface-2)")}
+                  onMouseLeave={e => (e.currentTarget.style.background = !n.read ? "rgba(99,102,241,0.06)" : "transparent")}
                 >
                   {/* Icon */}
-                  <span className="text-xl flex-shrink-0 mt-0.5">
+                  <span style={{ fontSize: 20, flexShrink: 0, marginTop: 1 }}>
                     {TYPE_ICON[n.type] ?? "🔔"}
                   </span>
 
                   {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm leading-tight ${!n.read ? "text-white font-semibold" : "text-gray-300"}`}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{
+                      fontSize: 13, lineHeight: 1.4,
+                      fontWeight: !n.read ? 600 : 400,
+                      color: !n.read ? "var(--color-text)" : "var(--color-text-3)",
+                      marginBottom: 2,
+                    }}>
                       {n.title}
                     </p>
-                    <p className="text-xs text-gray-500 mt-0.5 leading-snug line-clamp-2">
-                      {n.body}
+                    {n.body && (
+                      <p style={{
+                        fontSize: 11, color: "var(--color-text-4)",
+                        lineHeight: 1.4,
+                        overflow: "hidden",
+                        display: "-webkit-box",
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: "vertical",
+                      }}>
+                        {n.body}
+                      </p>
+                    )}
+                    <p style={{ fontSize: 10, color: "var(--color-text-4)", marginTop: 4 }}>
+                      {timeAgo(n.createdAt)}
                     </p>
-                    <p className="text-[10px] text-gray-700 mt-1">{timeAgo(n.createdAt)}</p>
                   </div>
 
                   {/* Unread dot */}
                   {!n.read && (
-                    <span className="w-2 h-2 rounded-full bg-indigo-500 flex-shrink-0 mt-1.5" />
+                    <span style={{
+                      width: 7, height: 7, borderRadius: "50%",
+                      background: "var(--color-brand)",
+                      flexShrink: 0, marginTop: 5,
+                    }} />
                   )}
                 </button>
               ))
@@ -190,16 +279,31 @@ export default function NotificationCenter() {
           </div>
 
           {/* Footer */}
-          {notifs.length > 0 && (
-            <div className="border-t border-gray-800 px-4 py-2.5 text-center">
-              <button
-                onClick={() => setOpen(false)}
-                className="text-xs text-gray-500 hover:text-gray-400 transition"
-              >
-                Close
-              </button>
-            </div>
-          )}
+          <div style={{
+            borderTop: "1px solid var(--color-border)",
+            padding: "10px 16px",
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+          }}>
+            <button
+              onClick={() => { setOpen(false); router.push('/notifications'); }}
+              style={{
+                fontSize: 12, color: "var(--color-brand)",
+                background: "none", border: "none", cursor: "pointer",
+                fontWeight: 600,
+              }}
+            >
+              View all notifications →
+            </button>
+            <button
+              onClick={() => setOpen(false)}
+              style={{
+                fontSize: 12, color: "var(--color-text-4)",
+                background: "none", border: "none", cursor: "pointer",
+              }}
+            >
+              Close
+            </button>
+          </div>
         </div>
       )}
     </div>

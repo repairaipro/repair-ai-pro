@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getAuth } from "firebase-admin/auth";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
+import { sendJobMatchedEmail } from "@/lib/email";
+import { sendSMS } from "@/lib/sms";
 
 /**
  * STEP B1 — Job Acceptance Enforcement
@@ -109,6 +111,30 @@ export async function POST(
       verificationTier,
       riskScore,
     });
+
+    /* ---------------- EMAIL HOMEOWNER ---------------- */
+    try {
+      const homeownerAuth = await getAuth().getUser(job.userId);
+      if (homeownerAuth.email) {
+        await sendJobMatchedEmail(homeownerAuth.email, {
+          jobDescription:  (job.description ?? "").slice(0, 80),
+          tradeType:       job.aiDetectedTrade ?? job.trade ?? "General",
+          contractorName:  contractor.name ?? "Your contractor",
+          jobId:           params.jobId,
+        });
+      }
+    } catch { /* non-blocking */ }
+
+    /* ---------------- SMS HOMEOWNER ---------------- */
+    try {
+      const contractorName = contractor.name ?? "Your contractor";
+      const trade = job.aiDetectedTrade ?? job.trade ?? "repair";
+      await sendSMS(job.userId, {
+        title: "🎉 Contractor matched!",
+        body:  `${contractorName} accepted your ${trade} job. Tap to chat.`,
+        link:  `/chat?job=${params.jobId}`,
+      });
+    } catch { /* non-blocking */ }
 
     return NextResponse.json({
       success: true,

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
+import { CheckCircle2, Clock, AlertTriangle, Banknote, Loader2, ExternalLink } from "lucide-react";
 
 type OnboardingStatus = "not-connected" | "pending" | "connected" | "loading" | "error";
 
@@ -9,240 +10,264 @@ interface StripeConnectOnboardingProps {
   compact?: boolean;
 }
 
-/**
- * StripeConnectOnboarding Component
- *
- * Shows contractor's Stripe Connect onboarding status and provides:
- * - Status badge (Not Connected → Pending Verification → Connected)
- * - "Connect Bank Account" button to start onboarding
- * - Verification progress and requirements
- *
- * Usage:
- *   <StripeConnectOnboarding />
- *   <StripeConnectOnboarding compact={true} />
- */
-export function StripeConnectOnboarding({
-  compact = false,
-}: StripeConnectOnboardingProps) {
-  const { user } = useAuth();
-  const [status, setStatus] = useState<OnboardingStatus>("loading");
-  const [onboardingUrl, setOnboardingUrl] = useState<string | null>(null);
-  const [requirements, setRequirements] = useState<any>(null);
-  const [isRedirecting, setIsRedirecting] = useState(false);
+function StatusBadge({ status }: { status: OnboardingStatus }) {
+  const configs: Record<OnboardingStatus, { label: string; dotColor: string; bg: string; color: string }> = {
+    connected:     { label: "Verified",       dotColor: "var(--color-success)", bg: "rgba(34,197,94,0.12)",  color: "var(--color-success)" },
+    pending:       { label: "Pending",         dotColor: "var(--color-warning)", bg: "rgba(245,158,11,0.12)", color: "var(--color-warning)" },
+    "not-connected":{ label: "Not connected",  dotColor: "var(--color-text-4)",  bg: "rgba(100,116,139,0.12)", color: "var(--color-text-4)" },
+    loading:       { label: "Checking…",       dotColor: "var(--color-brand)",   bg: "rgba(99,102,241,0.12)", color: "var(--color-brand)" },
+    error:         { label: "Error",           dotColor: "var(--color-error)",   bg: "rgba(239,68,68,0.12)",  color: "var(--color-error)" },
+  };
+  const c = configs[status];
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
+      style={{ background: c.bg, color: c.color }}
+    >
+      <span
+        className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+        style={{
+          background: c.dotColor,
+          animation: status === "pending" || status === "loading" ? "pulse 1.5s infinite" : undefined,
+        }}
+      />
+      {c.label}
+    </span>
+  );
+}
 
-  // Fetch current Stripe Connect status on mount and when user changes
+export function StripeConnectOnboarding({ compact = false }: StripeConnectOnboardingProps) {
+  const { user } = useAuth();
+  const [status,       setStatus]       = useState<OnboardingStatus>("loading");
+  const [requirements, setRequirements] = useState<string[]>([]);
+  const [redirecting,  setRedirecting]  = useState(false);
+
   useEffect(() => {
     if (!user) return;
-
-    const checkStatus = async () => {
-      try {
-        setStatus("loading");
-        const idToken = await user.getIdToken();
-
-        const res = await fetch("/api/stripe/connect/status", {
-          headers: { Authorization: `Bearer ${idToken}` },
-        });
-
-        const data = await res.json();
-
-        if (data.verified) {
-          setStatus("connected");
-        } else if (data.onboardingComplete) {
-          setStatus("pending");
-        } else {
-          setStatus("not-connected");
-        }
-
-        // If pending, fetch full verification details to show requirements
-        if (!data.verified) {
-          const verifyRes = await fetch("/api/stripe/connect/verify", {
-            headers: { Authorization: `Bearer ${idToken}` },
-          });
-          const verifyData = await verifyRes.json();
-          setRequirements(verifyData.requirements);
-        }
-      } catch (err) {
-        console.error("Failed to check Stripe Connect status:", err);
-        setStatus("error");
-      }
-    };
-
     checkStatus();
   }, [user]);
 
-  const handleConnectClick = async () => {
+  async function checkStatus() {
     if (!user) return;
-
     try {
-      setIsRedirecting(true);
-      const idToken = await user.getIdToken();
+      setStatus("loading");
+      const token = await user.getIdToken();
+      const res   = await fetch("/api/stripe/connect/status", { headers: { Authorization: `Bearer ${token}` } });
+      const data  = await res.json();
 
-      const res = await fetch("/api/stripe/connect/create-account", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${idToken}` },
-      });
-
-      const data = await res.json();
-
-      if (data.onboarding_url) {
-        setOnboardingUrl(data.onboarding_url);
-        // Redirect to Stripe's hosted onboarding form
-        window.location.href = data.onboarding_url;
+      if (data.verified) {
+        setStatus("connected");
+      } else if (data.onboardingComplete) {
+        setStatus("pending");
+        // Fetch requirements if pending
+        const vRes  = await fetch("/api/stripe/connect/verify", { headers: { Authorization: `Bearer ${token}` } });
+        const vData = await vRes.json();
+        setRequirements(vData.requirements?.currently_due ?? []);
       } else {
-        console.error("Failed to get onboarding URL:", data);
-        setStatus("error");
+        setStatus("not-connected");
       }
-    } catch (err) {
-      console.error("Failed to start onboarding:", err);
+    } catch {
       setStatus("error");
-    } finally {
-      setIsRedirecting(false);
     }
-  };
+  }
 
-  // Compact mode: just show status badge + button
+  async function handleConnect() {
+    if (!user) return;
+    setRedirecting(true);
+    try {
+      const token = await user.getIdToken();
+      const res   = await fetch("/api/stripe/connect/create-account", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data  = await res.json();
+      if (data.onboarding_url) window.location.href = data.onboarding_url;
+      else setStatus("error");
+    } catch {
+      setStatus("error");
+    }
+    setRedirecting(false);
+  }
+
+  /* ── Compact mode ── */
   if (compact) {
     return (
       <div className="flex items-center gap-2">
         <StatusBadge status={status} />
         {status !== "connected" && (
           <button
-            onClick={handleConnectClick}
-            disabled={isRedirecting || status === "loading"}
-            className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+            onClick={handleConnect}
+            disabled={redirecting || status === "loading"}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+            style={{ background: "var(--color-brand)", color: "#fff", opacity: (redirecting || status === "loading") ? 0.6 : 1 }}
           >
-            {isRedirecting ? "Redirecting..." : "Connect Bank"}
+            {redirecting ? <Loader2 size={11} className="animate-spin" /> : <Banknote size={11} />}
+            {redirecting ? "Redirecting…" : "Connect Bank"}
           </button>
         )}
       </div>
     );
   }
 
-  // Full mode: detailed card with requirements
+  /* ── Full card mode ── */
   return (
-    <div className="border rounded-lg p-6 bg-gray-50">
-      <div className="flex items-start justify-between">
-        <div>
-          <h3 className="text-lg font-semibold mb-1">Bank Account Verification</h3>
-          <p className="text-gray-600 text-sm mb-4">
-            {status === "connected"
-              ? "Your bank account is connected and verified. You'll receive payouts after jobs are confirmed."
-              : status === "pending"
-              ? "Verification in progress. Complete the KYC requirements to start accepting jobs."
-              : status === "loading"
-              ? "Loading verification status..."
-              : status === "error"
-              ? "Failed to load verification status. Please try again."
-              : "Connect your bank account to accept jobs and receive payouts."}
-          </p>
-
-          {/* Show requirements if pending */}
-          {status === "pending" && requirements?.currently_due?.length > 0 && (
-            <div className="mb-4">
-              <p className="text-sm font-medium text-yellow-700 mb-2">
-                Complete these requirements:
-              </p>
-              <ul className="text-sm text-gray-600 list-disc list-inside">
-                {requirements.currently_due.map((req: string) => (
-                  <li key={req}>{req.replace(/_/g, " ")}</li>
-                ))}
-              </ul>
-            </div>
-          )}
+    <div
+      className="rounded-2xl overflow-hidden"
+      style={{ border: "1px solid var(--color-border)" }}
+    >
+      {/* Header */}
+      <div
+        className="px-5 py-4 flex items-center justify-between"
+        style={{ background: "var(--color-bg-2)", borderBottom: "1px solid var(--color-border)" }}
+      >
+        <div className="flex items-center gap-2">
+          <Banknote size={15} style={{ color: "var(--color-brand)" }} />
+          <span className="font-semibold text-sm" style={{ color: "var(--color-text)" }}>
+            Bank Account &amp; Payouts
+          </span>
         </div>
-
         <StatusBadge status={status} />
       </div>
 
-      {/* Action button */}
-      <button
-        onClick={handleConnectClick}
-        disabled={
-          isRedirecting ||
-          status === "loading" ||
-          status === "connected" ||
-          status === "error"
-        }
-        className={`mt-4 px-4 py-2 rounded font-medium transition ${
-          status === "connected"
-            ? "bg-green-100 text-green-700 cursor-default"
-            : isRedirecting || status === "loading"
-            ? "bg-gray-300 text-gray-500 cursor-wait"
-            : status === "error"
-            ? "bg-red-100 text-red-700 hover:bg-red-200"
-            : "bg-blue-600 text-white hover:bg-blue-700"
-        }`}
-      >
-        {status === "connected"
-          ? "✓ Connected"
-          : isRedirecting
-          ? "Redirecting to Stripe..."
-          : status === "loading"
-          ? "Loading..."
-          : status === "error"
-          ? "Try Again"
-          : "Connect Bank Account"}
-      </button>
+      {/* Body */}
+      <div className="p-5 space-y-4" style={{ background: "var(--color-surface)" }}>
 
-      {/* Info text */}
-      <p className="text-xs text-gray-500 mt-4">
-        We use Stripe to securely handle payments and payouts. Your banking information is
-        never stored on our servers.
-      </p>
+        {/* Loading */}
+        {status === "loading" && (
+          <div className="flex items-center gap-3">
+            <Loader2 size={16} className="animate-spin" style={{ color: "var(--color-brand)" }} />
+            <span className="text-sm" style={{ color: "var(--color-text-3)" }}>Checking verification status…</span>
+          </div>
+        )}
+
+        {/* Connected */}
+        {status === "connected" && (
+          <>
+            <div className="flex items-start gap-3">
+              <CheckCircle2 size={18} style={{ color: "var(--color-success)", flexShrink: 0, marginTop: 1 }} />
+              <div>
+                <p className="text-sm font-semibold" style={{ color: "var(--color-text)" }}>
+                  Bank account connected
+                </p>
+                <p className="text-xs mt-0.5" style={{ color: "var(--color-text-4)", lineHeight: 1.6 }}>
+                  Payouts are sent automatically when homeowners confirm job completion.
+                  Funds arrive in 1–5 business days.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={handleConnect}
+              disabled={redirecting}
+              className="btn btn-sm btn-secondary flex items-center gap-1.5"
+            >
+              {redirecting
+                ? <><Loader2 size={13} className="animate-spin" /> Redirecting…</>
+                : <><ExternalLink size={13} /> Manage on Stripe</>}
+            </button>
+          </>
+        )}
+
+        {/* Pending */}
+        {status === "pending" && (
+          <>
+            <div className="flex items-start gap-3">
+              <Clock size={18} style={{ color: "var(--color-warning)", flexShrink: 0, marginTop: 1 }} />
+              <div>
+                <p className="text-sm font-semibold" style={{ color: "var(--color-text)" }}>
+                  Verification in progress
+                </p>
+                <p className="text-xs mt-0.5" style={{ color: "var(--color-text-4)", lineHeight: 1.6 }}>
+                  Stripe needs a bit more information. Takes ~2 minutes to complete.
+                </p>
+              </div>
+            </div>
+            {requirements.length > 0 && (
+              <div
+                className="rounded-xl px-4 py-3 space-y-1.5"
+                style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.15)" }}
+              >
+                <p className="text-xs font-bold uppercase tracking-widest" style={{ color: "var(--color-warning)" }}>
+                  Still needed
+                </p>
+                {requirements.map((r) => (
+                  <div key={r} className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "var(--color-warning)" }} />
+                    <span className="text-xs capitalize" style={{ color: "var(--color-text-3)" }}>
+                      {r.replace(/_/g, " ")}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button
+              onClick={handleConnect}
+              disabled={redirecting}
+              className="btn btn-primary btn-full"
+              style={{ justifyContent: "center" }}
+            >
+              {redirecting
+                ? <><Loader2 size={14} className="animate-spin" /> Redirecting…</>
+                : <><ExternalLink size={14} /> Complete Verification on Stripe</>}
+            </button>
+          </>
+        )}
+
+        {/* Not connected */}
+        {status === "not-connected" && (
+          <>
+            <div className="flex items-start gap-3">
+              <AlertTriangle size={18} style={{ color: "var(--color-warning)", flexShrink: 0, marginTop: 1 }} />
+              <div>
+                <p className="text-sm font-semibold" style={{ color: "var(--color-text)" }}>
+                  Bank account required
+                </p>
+                <p className="text-xs mt-0.5" style={{ color: "var(--color-text-4)", lineHeight: 1.6 }}>
+                  Connect your bank to receive payouts. Takes ~2 minutes — your info is stored
+                  securely by Stripe, never on our servers.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={handleConnect}
+              disabled={redirecting}
+              className="btn btn-primary btn-full"
+              style={{ justifyContent: "center" }}
+            >
+              {redirecting
+                ? <><Loader2 size={15} className="animate-spin" /> Opening Stripe…</>
+                : <><Banknote size={15} /> Connect Bank Account</>}
+            </button>
+            <p className="text-center text-xs" style={{ color: "var(--color-text-4)" }}>
+              Powered by Stripe — 256-bit encryption, bank-level security
+            </p>
+          </>
+        )}
+
+        {/* Error */}
+        {status === "error" && (
+          <>
+            <div className="flex items-start gap-3">
+              <AlertTriangle size={18} style={{ color: "var(--color-error)", flexShrink: 0, marginTop: 1 }} />
+              <div>
+                <p className="text-sm font-semibold" style={{ color: "var(--color-text)" }}>
+                  Couldn't load status
+                </p>
+                <p className="text-xs mt-0.5" style={{ color: "var(--color-text-4)" }}>
+                  We couldn't verify your Stripe account. Please try again.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={checkStatus}
+              className="btn btn-secondary btn-sm"
+            >
+              Try Again
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 }
 
-/**
- * Status badge component
- */
-function StatusBadge({ status }: { status: OnboardingStatus }) {
-  const badges = {
-    "not-connected": {
-      bg: "bg-gray-100",
-      text: "text-gray-700",
-      label: "Not Connected",
-    },
-    pending: {
-      bg: "bg-yellow-100",
-      text: "text-yellow-700",
-      label: "Pending",
-    },
-    connected: {
-      bg: "bg-green-100",
-      text: "text-green-700",
-      label: "Connected",
-    },
-    loading: {
-      bg: "bg-blue-100",
-      text: "text-blue-700",
-      label: "Loading...",
-    },
-    error: {
-      bg: "bg-red-100",
-      text: "text-red-700",
-      label: "Error",
-    },
-  };
-
-  const badge = badges[status];
-
-  return (
-    <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium ${badge.bg} ${badge.text}`}>
-      <span
-        className={`w-2 h-2 rounded-full ${
-          status === "connected"
-            ? "bg-green-500"
-            : status === "pending"
-            ? "bg-yellow-500 animate-pulse"
-            : status === "loading"
-            ? "bg-blue-500 animate-pulse"
-            : status === "error"
-            ? "bg-red-500"
-            : "bg-gray-400"
-        }`}
-      />
-      {badge.label}
-    </span>
-  );
-}
+export default StripeConnectOnboarding;

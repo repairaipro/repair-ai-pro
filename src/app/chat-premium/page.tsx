@@ -41,7 +41,7 @@ const demoMessages = [
   {
     id: '4',
     photoUrl: 'https://images.unsplash.com/photo-1585771724684-38269d6639fd?w=300&h=300&fit=crop',
-    content: 'Here's a photo of the issue',
+    content: "Here's a photo of the issue",
     senderName: 'Sarah (You)',
     senderType: 'homeowner' as const,
     isOwn: true,
@@ -60,20 +60,32 @@ const demoMessages = [
   },
 ]
 
+type ChatMessage = {
+  id: string;
+  content: string;
+  senderName: string;
+  senderType: 'homeowner' | 'contractor';
+  isOwn: boolean;
+  timestamp: Date;
+  status: 'read' | 'sent' | 'sending';
+  senderPhoto?: string;
+  photoUrl?: string;
+}
+
 export default function ChatPremiumPage() {
-  const [messages, setMessages] = useState(demoMessages)
+  const [messages, setMessages] = useState<ChatMessage[]>(demoMessages)
   const [input, setInput] = useState('')
 
   const handleSend = () => {
     if (input.trim()) {
-      const newMessage = {
+      const newMessage: ChatMessage = {
         id: String(messages.length + 1),
         content: input,
         senderName: 'Sarah (You)',
-        senderType: 'homeowner' as const,
+        senderType: 'homeowner',
         isOwn: true,
         timestamp: new Date(),
-        status: 'sending' as const,
+        status: 'sending',
       }
       setMessages([...messages, newMessage])
       setInput('')

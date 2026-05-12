@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { adminDb, adminAuth } from "@/lib/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
+import { sendPayoutSentEmail } from "@/lib/email";
+import { sendSMS } from "@/lib/sms";
 
 /**
  * Homeowner confirms the job is done.
@@ -67,6 +69,30 @@ export async function POST(
         createdAt: now,
       });
     });
+
+    /* ---------------- SMS CONTRACTOR ---------------- */
+    if (job.claimedBy) {
+      try {
+        const jobDescription = (job.description ?? "this job").slice(0, 60);
+        await sendSMS(job.claimedBy, {
+          title: "💸 Payment released!",
+          body:  `Your payment for '${jobDescription}' has been sent. Check your Stripe dashboard.`,
+          link:  `/dashboard/contractor/settings`,
+        });
+      } catch { /* non-blocking */ }
+    }
+
+    // Trigger payment release (async — don't block the response)
+    if (job.paymentIntentId) {
+      try {
+        const origin = req.headers.get("origin") ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+        fetch(`${origin}/api/stripe/release`, {
+          method:  "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body:    JSON.stringify({ jobId }),
+        }).catch((err) => console.error("Release trigger failed:", err));
+      } catch { /* non-blocking */ }
+    }
 
     return NextResponse.json({ success: true });
   } catch (e: any) {

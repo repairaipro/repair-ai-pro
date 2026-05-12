@@ -1,8 +1,6 @@
 import OpenAI from "openai";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
-});
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
 type AnalyzeInput = {
   imageUrl?: string;
@@ -12,77 +10,66 @@ type AnalyzeInput = {
 };
 
 export async function analyzeJobInput(input: AnalyzeInput) {
-  const content: any[] = [];
+  const userContent: OpenAI.ChatCompletionContentPart[] = [];
 
-  if (input.text) {
-    content.push({
-      type: "input_text",
-      text: `User description: ${input.text}`,
-    });
+  const systemPrompt = `You are a home repair and maintenance expert AI.
+Analyze the provided description and/or image and return a JSON object with these exact fields:
+{
+  "issue": "brief description of the problem",
+  "trade": "one of: Plumbing|Electrical|HVAC|Carpentry|Roofing|Painting|Appliance Repair|General|Auto Mechanic|IT Support|Landscaping|Locksmith|Other",
+  "severity": "low|moderate|high|emergency",
+  "estimatedCostLow": number (USD, no dollar sign),
+  "estimatedCostHigh": number (USD, no dollar sign),
+  "estimatedTimeMinutes": number,
+  "summary": "2-3 sentence plain English explanation of the problem and recommended action"
+}
+Return only valid JSON. No markdown, no code fences.`;
+
+  // Build user content with text + image
+  const textParts: string[] = [];
+  if (input.text) textParts.push(`User description: ${input.text}`);
+  if (input.videoUrl) textParts.push(`A video was uploaded showing the issue: ${input.videoUrl}`);
+  if (input.audioUrl) textParts.push(`Audio note about the issue: ${input.audioUrl}`);
+
+  if (textParts.length > 0) {
+    userContent.push({ type: "text", text: textParts.join("\n") });
   }
 
   if (input.imageUrl) {
-    content.push({
-      type: "input_image",
-      image_url: input.imageUrl,
-      detail: "auto",
+    userContent.push({
+      type: "image_url",
+      image_url: { url: input.imageUrl, detail: "high" },
     });
   }
 
-  if (input.videoUrl) {
-    content.push({
-      type: "input_text",
-      text: `A video was uploaded showing the problem: ${input.videoUrl}`,
-    });
+  if (userContent.length === 0) {
+    userContent.push({ type: "text", text: "Analyze this maintenance request." });
   }
-
-  if (input.audioUrl) {
-    content.push({
-      type: "input_text",
-      text: `Audio description of the problem: ${input.audioUrl}`,
-    });
-  }
-
-  const response = await openai.responses.create({
-    model: "gpt-4.1",
-    input: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "input_text",
-            text: `
-Analyze the maintenance issue.
-
-Return a JSON response with:
-
-issue
-trade
-severity
-estimatedCostLow
-estimatedCostHigh
-estimatedTimeMinutes
-summary
-
-Only return JSON.
-`,
-          },
-          ...content,
-        ],
-      },
-    ],
-  });
-
-  const text = response.output_text ?? "{}";
 
   try {
-    return JSON.parse(text);
-  } catch {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userContent },
+      ],
+      max_tokens: 600,
+      temperature: 0.2,
+      response_format: { type: "json_object" },
+    });
+
+    const raw = completion.choices[0]?.message?.content ?? "{}";
+    return JSON.parse(raw);
+  } catch (err: any) {
+    console.error("analyzeJobInput error:", err.message);
     return {
-      issue: "Unknown",
-      trade: "general",
-      severity: "unknown",
-      summary: text,
+      issue: "Analysis failed",
+      trade: "General",
+      severity: "moderate",
+      estimatedCostLow: 0,
+      estimatedCostHigh: 0,
+      estimatedTimeMinutes: 60,
+      summary: "Could not analyze automatically. Please review manually.",
     };
   }
 }

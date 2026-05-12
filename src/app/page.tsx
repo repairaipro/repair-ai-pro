@@ -439,6 +439,194 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ══════════════ PRICING ══════════════ */}
+      <section className="py-24 px-6" style={{ borderBottom: '1px solid var(--color-border)' }}>
+        <div className="max-w-5xl mx-auto">
+
+          <div className="text-center mb-14">
+            <div
+              className="inline-flex items-center gap-2 text-xs font-medium px-3.5 py-1.5 rounded-full mb-4"
+              style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text-4)' }}
+            >
+              Transparent pricing
+            </div>
+            <h2 className="text-3xl md:text-4xl font-bold mb-3" style={{ color: 'var(--color-text)' }}>
+              Free to start. Upgrade when you're ready.
+            </h2>
+            <p className="text-base max-w-lg mx-auto" style={{ color: 'var(--color-text-3)' }}>
+              Homeowners post jobs free. Contractors receive jobs free. Premium plans unlock priority matching, AI tools, and advanced analytics.
+            </p>
+          </div>
+
+          {/* Tab: Homeowners / Contractors */}
+          <div className="grid lg:grid-cols-2 gap-12">
+
+            {/* Homeowner plans */}
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest mb-5" style={{ color: 'var(--color-text-4)' }}>
+                For Homeowners
+              </p>
+              <div className="space-y-4">
+                {/* Free */}
+                <div className="card p-6">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h3 className="font-bold text-lg" style={{ color: 'var(--color-text)' }}>Free</h3>
+                      <p className="text-sm" style={{ color: 'var(--color-text-4)' }}>Post jobs, get matched, pay when done</p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-3xl font-extrabold" style={{ color: 'var(--color-text)' }}>$0</span>
+                      <p className="text-xs" style={{ color: 'var(--color-text-4)' }}>forever</p>
+                    </div>
+                  </div>
+                  <ul className="space-y-2 mb-5">
+                    {["Post unlimited jobs", "AI-powered diagnosis", "Contractor bidding", "In-app chat + scheduling", "Escrow payment protection"].map(item => (
+                      <li key={item} className="flex items-center gap-2 text-sm" style={{ color: 'var(--color-text-3)' }}>
+                        <CheckCircle className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--color-success)' }} />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                  <Link href="/auth/signup" className="btn btn-secondary w-full text-center">Get Started Free</Link>
+                </div>
+
+                {/* Pro */}
+                <div
+                  className="card p-6 relative overflow-hidden"
+                  style={{ border: '1px solid rgba(99,102,241,0.4)', background: 'rgba(99,102,241,0.04)' }}
+                >
+                  <div
+                    className="absolute top-0 right-0 text-[10px] font-bold px-3 py-1 rounded-bl-xl"
+                    style={{ background: 'var(--color-brand)', color: '#fff' }}
+                  >
+                    MOST POPULAR
+                  </div>
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h3 className="font-bold text-lg" style={{ color: 'var(--color-text)' }}>Homeowner Pro</h3>
+                      <p className="text-sm" style={{ color: 'var(--color-text-4)' }}>For the serious home manager</p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-3xl font-extrabold" style={{ color: 'var(--color-text)' }}>$19</span>
+                      <p className="text-xs" style={{ color: 'var(--color-text-4)' }}>/month</p>
+                    </div>
+                  </div>
+                  <ul className="space-y-2 mb-5">
+                    {[
+                      "Everything in Free",
+                      "AI Insurance Report ($49 value) included",
+                      "Home Health Score dashboard",
+                      "Priority contractor matching",
+                      "Spending analytics + trends",
+                      "14-day free trial",
+                    ].map(item => (
+                      <li key={item} className="flex items-center gap-2 text-sm" style={{ color: 'var(--color-text-3)' }}>
+                        <CheckCircle className="w-4 h-4 flex-shrink-0" style={{ color: '#818cf8' }} />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                  <Link
+                    href="/auth/signup?plan=homeowner_pro"
+                    className="btn btn-primary w-full text-center"
+                  >
+                    Start 14-Day Free Trial
+                  </Link>
+                </div>
+              </div>
+            </div>
+
+            {/* Contractor plans */}
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest mb-5" style={{ color: 'var(--color-text-4)' }}>
+                For Service Professionals
+              </p>
+              <div className="space-y-4">
+                {/* Free */}
+                <div className="card p-6">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h3 className="font-bold text-lg" style={{ color: 'var(--color-text)' }}>Free</h3>
+                      <p className="text-sm" style={{ color: 'var(--color-text-4)' }}>Build your reputation</p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-3xl font-extrabold" style={{ color: 'var(--color-text)' }}>$0</span>
+                      <p className="text-xs" style={{ color: 'var(--color-text-4)' }}>+ 12% per job</p>
+                    </div>
+                  </div>
+                  <ul className="space-y-2 mb-5">
+                    {["Receive job invitations", "Submit competitive bids", "In-app messaging", "Star rating & review system", "Direct bank payouts via Stripe"].map(item => (
+                      <li key={item} className="flex items-center gap-2 text-sm" style={{ color: 'var(--color-text-3)' }}>
+                        <CheckCircle className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--color-success)' }} />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                  <Link href="/contractor-profile" className="btn btn-secondary w-full text-center">Join as a Pro</Link>
+                </div>
+
+                {/* Pro */}
+                <div
+                  className="card p-6"
+                  style={{ border: '1px solid rgba(99,102,241,0.3)', background: 'rgba(99,102,241,0.03)' }}
+                >
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <h3 className="font-bold text-lg" style={{ color: 'var(--color-text)' }}>Pro</h3>
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 700,
+                            padding: '2px 8px',
+                            borderRadius: 9999,
+                            background: 'rgba(99,102,241,0.15)',
+                            color: '#818cf8',
+                            border: '1px solid rgba(99,102,241,0.3)',
+                          }}
+                        >
+                          ✓ VERIFIED
+                        </span>
+                      </div>
+                      <p className="text-sm" style={{ color: 'var(--color-text-4)' }}>Win more jobs</p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-3xl font-extrabold" style={{ color: 'var(--color-text)' }}>$49</span>
+                      <p className="text-xs" style={{ color: 'var(--color-text-4)' }}>/month · 7-day trial</p>
+                    </div>
+                  </div>
+                  <ul className="space-y-2 mb-5">
+                    {[
+                      "Everything in Free",
+                      "Verified badge on profile",
+                      "Priority ranking in job matches",
+                      "Reduced platform fee (10%)",
+                      "Earnings analytics dashboard",
+                      "7-day free trial",
+                    ].map(item => (
+                      <li key={item} className="flex items-center gap-2 text-sm" style={{ color: 'var(--color-text-3)' }}>
+                        <CheckCircle className="w-4 h-4 flex-shrink-0" style={{ color: '#818cf8' }} />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                  <Link href="/contractor/pro" className="btn btn-primary w-full text-center">
+                    Start 7-Day Free Trial
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Platform fee note */}
+          <p className="text-center text-xs mt-8" style={{ color: 'var(--color-text-4)' }}>
+            Platform fee of 12% applies per completed job. Fee reduces to 10% on Pro plan.
+            No monthly fee for homeowners on the free plan. &nbsp;·&nbsp;
+            <Link href="/pricing" style={{ color: '#818cf8', textDecoration: 'underline' }}>Full pricing details →</Link>
+          </p>
+        </div>
+      </section>
+
       {/* ══════════════ BOTTOM CTA ══════════════ */}
       <section className="py-24 px-6 text-center mesh-bg">
         <div className="max-w-2xl mx-auto">

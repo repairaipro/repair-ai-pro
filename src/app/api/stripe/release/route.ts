@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { adminDb, adminAuth } from "@/lib/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
+import { sendPayoutSentEmail } from "@/lib/email";
 
 /**
  * POST /api/stripe/release
@@ -78,6 +79,18 @@ export async function POST(req: Request) {
           payoutTransferId = transfer.id;
           payoutStatus = "transferred";
           console.log(`✅ Transferred $${payoutAmount / 100} to contractor ${job.claimedBy}`);
+
+          // Send payout confirmation email to contractor
+          try {
+            const contractorAuth = await adminAuth.getUser(job.claimedBy);
+            if (contractorAuth.email) {
+              await sendPayoutSentEmail(contractorAuth.email, {
+                amount: (payoutAmount / 100).toFixed(2),
+                jobDescription: (job.description ?? "").slice(0, 60),
+                jobId,
+              });
+            }
+          } catch { /* ignore — email failure must not block payout */ }
         } catch (transferErr: any) {
           console.error(`❌ Transfer failed for job ${jobId}:`, transferErr);
           payoutStatus = "failed";

@@ -9,7 +9,19 @@
       "Bash(npm install:*)",
       "Bash(node -e \"const s = require\\('stripe'\\); console.log\\(Object.keys\\(s.Stripe?.ApiVersion ?? {}\\).slice\\(-3\\)\\)\")",
       "Bash(node -e \"const s = require\\('stripe'\\); const pkg = require\\('./node_modules/stripe/package.json'\\); console.log\\(pkg.version\\)\")",
-      "Bash(grep -l \"dahlia\\\\|LatestApiVersion\" \"C:\\\\Projects\\\\Maintenance Artificial Intelligence App\\\\repair-ai-pro\\\\node_modules\\\\stripe\"/**/*.d.ts)"
+      "Bash(grep -l \"dahlia\\\\|LatestApiVersion\" \"C:\\\\Projects\\\\Maintenance Artificial Intelligence App\\\\repair-ai-pro\\\\node_modules\\\\stripe\"/**/*.d.ts)",
+      "Bash(find src *)",
+      "Bash(findstr \"react-markdown\\\\|remark\\\\|rehype\\\\|react-speech\")",
+      "Bash(grep \"ai/page\\\\|ai\\\\\\\\\\\\\\\\page\\\\|VoiceRecorder\\\\|analyzeJob\")",
+      "Bash(grep -v \"^$\")",
+      "Bash(node -e \"const fs=require\\('fs'\\); ['src/app/jobs/new/page.tsx','src/app/api/parts-finder/route.ts','src/app/contractor/pro/page.tsx','src/components/EmergencyBanner.tsx'].forEach\\(f => { try { fs.accessSync\\(f\\); console.log\\('OK:', f\\); } catch\\(e\\) { console.log\\('MISSING:', f\\); } }\\)\")",
+      "Bash(xargs grep *)",
+      "Bash(EMAIL)",
+      "Bash(TWILIO)",
+      "Bash(NEXT_PUBLIC_APP\" | head -10)",
+      "Bash(cat next.config.js)",
+      "Bash(cat next.config.ts)",
+      "Bash(cat next.config.mjs)"
     ]
   }
 }

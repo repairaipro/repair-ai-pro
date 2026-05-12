@@ -12,7 +12,7 @@ export async function POST(req: Request) {
 
     const body = await req.json();
 
-    const { description, location, aiDetectedTrade, aiSummary } = body;
+    const { description, location, aiDetectedTrade, aiSummary, urgency, isEmergency, emergencyFeeUsd, trade } = body;
 
     // userId always comes from the verified token — never from the request body
     const userId = decoded.uid;
@@ -34,6 +34,11 @@ export async function POST(req: Request) {
 
       aiDetectedTrade: aiDetectedTrade ?? null,
       aiSummary: aiSummary ?? null,
+
+      urgency: urgency ?? "flexible",
+      isEmergency: isEmergency ?? false,
+      emergencyFeeUsd: emergencyFeeUsd ?? 0,
+      trade: trade ?? aiDetectedTrade ?? null,
 
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),

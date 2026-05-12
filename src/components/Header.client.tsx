@@ -52,11 +52,11 @@ export default function Header() {
   }, [user]);
 
   const navLinks = user ? [
-    { href: '/jobs/new',          label: 'Post Job',    icon: Plus,            highlight: true },
-    { href: '/jobs',              label: 'Marketplace', icon: Briefcase,       highlight: false },
-    { href: '/contractor',        label: 'Contractors', icon: Users,           highlight: false },
-    { href: '/contractor-inbox',  label: 'Inbox',       icon: Bell,            highlight: false },
-    { href: '/dashboard',         label: 'Dashboard',   icon: LayoutDashboard, highlight: false },
+    { href: '/jobs/new',                    label: 'Post Job',    icon: Plus,            highlight: true },
+    { href: '/jobs',                        label: 'Marketplace', icon: Briefcase,       highlight: false },
+    { href: '/contractor',                  label: 'Contractors', icon: Users,           highlight: false },
+    { href: '/contractor-inbox',            label: 'Inbox',       icon: Bell,            highlight: false },
+    { href: '/dashboard',                   label: 'Dashboard',   icon: LayoutDashboard, highlight: false },
   ] : [
     { href: '/jobs',              label: 'Marketplace', icon: Briefcase,       highlight: false },
     { href: '/contractor',        label: 'Contractors', icon: Users,           highlight: false },
@@ -156,7 +156,7 @@ export default function Header() {
                       src={user.photoURL}
                       alt={user.displayName || 'User'}
                       className="w-7 h-7 rounded-full ring-1"
-                      style={{ ringColor: 'var(--color-border)' }}
+                      style={{ outline: '1px solid var(--color-border)' }}
                     />
                   )}
                   <button

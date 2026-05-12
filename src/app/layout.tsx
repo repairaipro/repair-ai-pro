@@ -14,6 +14,19 @@ const PWASetup = dynamic(() => import('@/components/PWASetup'), {
   ssr: false,
 });
 
+// ✅ Mobile bottom navigation
+const MobileBottomNav = dynamic(() => import('@/components/MobileBottomNav'), {
+  ssr: false,
+});
+
+// ✅ Toast notification system
+import { ToastProvider } from '@/components/ToastProvider';
+
+// ✅ Background notification → toast watcher
+const NotificationToastWatcher = dynamic(() => import('@/components/NotificationToastWatcher'), {
+  ssr: false,
+});
+
 export const metadata: Metadata = {
   title: 'Repair AI Pro',
   description: 'AI-assisted service marketplace platform',
@@ -49,10 +62,15 @@ export default function RootLayout({
       <body className="min-h-screen antialiased">
         {/* ✅ Provide global authentication context */}
         <AuthProvider>
-          <Header />
-          <main className="p-6">{children}</main>
-          {/* ✅ PWA: Register service worker, update badge, listen for install prompt */}
-          <PWASetup />
+          <ToastProvider>
+            <NotificationToastWatcher />
+            <Header />
+            <main className="p-6">{children}</main>
+            {/* ✅ PWA: Register service worker, update badge, listen for install prompt */}
+            <PWASetup />
+            {/* ✅ Mobile sticky bottom navigation */}
+            <MobileBottomNav />
+          </ToastProvider>
         </AuthProvider>
       </body>
     </html>

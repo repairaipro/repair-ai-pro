@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collectionGroup, onSnapshot } from "firebase/firestore";
+import { collectionGroup, onSnapshot, doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/db";
 import { useAuth } from "@/lib/auth";
-import { AlertTriangle, CheckCircle, Clock } from "lucide-react";
+import { AlertTriangle, CheckCircle, Clock, User, Wrench, DollarSign, ExternalLink, ChevronDown, ChevronUp } from "lucide-react";
 
 type Dispute = {
   id:           string;
@@ -19,6 +19,130 @@ type Dispute = {
   createdAt?:   any;
   resolvedAt?:  any;
 };
+
+type JobContext = {
+  description: string;
+  trade: string;
+  amount: number;
+  homeownerName: string;
+  contractorName: string;
+  homeownerId: string;
+  contractorId: string;
+};
+
+function JobContextPanel({ jobId }: { jobId: string }) {
+  const [ctx,      setCtx]      = useState<JobContext | null>(null);
+  const [loading,  setLoading]  = useState(true);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    if (!jobId) { setLoading(false); return; }
+    (async () => {
+      try {
+        const jobSnap = await getDoc(doc(db, "jobs", jobId));
+        if (!jobSnap.exists()) { setLoading(false); return; }
+        const job = jobSnap.data() as any;
+
+        const [hwSnap, ctSnap] = await Promise.all([
+          job.userId    ? getDoc(doc(db, "homeowners",  job.userId))    : Promise.resolve(null),
+          job.claimedBy ? getDoc(doc(db, "contractors", job.claimedBy)) : Promise.resolve(null),
+        ]);
+
+        setCtx({
+          description:    job.description       ?? "No description",
+          trade:          job.aiDetectedTrade    ?? job.trade ?? "General",
+          amount:         Number(job.paymentAmountUsd ?? 0),
+          homeownerName:  hwSnap?.data()?.name   ?? "Homeowner",
+          contractorName: ctSnap?.data()?.name   ?? "Contractor",
+          homeownerId:    job.userId             ?? "",
+          contractorId:   job.claimedBy          ?? "",
+        });
+      } catch { /* ignore */ }
+      setLoading(false);
+    })();
+  }, [jobId]);
+
+  if (loading) {
+    return (
+      <div className="h-8 rounded-xl animate-pulse" style={{ background: 'var(--color-surface-2)' }} />
+    );
+  }
+  if (!ctx) return null;
+
+  return (
+    <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--color-border)' }}>
+      <button
+        onClick={() => setExpanded(e => !e)}
+        className="w-full flex items-center justify-between px-4 py-2.5 text-xs font-semibold transition-all"
+        style={{ background: 'var(--color-surface-2)', color: 'var(--color-text-3)' }}
+      >
+        <span className="flex items-center gap-1.5">
+          <Wrench className="w-3 h-3" /> Job Context
+        </span>
+        {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+      </button>
+
+      {expanded && (
+        <div className="px-4 py-3 space-y-3" style={{ background: 'var(--color-surface)' }}>
+          {/* Job description */}
+          <p className="text-sm leading-relaxed" style={{ color: 'var(--color-text-2)' }}>
+            {ctx.description}
+          </p>
+
+          {/* Trade + amount */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full"
+              style={{ background: 'var(--color-brand-dim)', color: 'var(--color-brand)', border: '1px solid rgba(99,102,241,0.2)' }}>
+              <Wrench className="w-2.5 h-2.5" /> {ctx.trade}
+            </span>
+            {ctx.amount > 0 && (
+              <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-success)' }}>
+                <DollarSign className="w-2.5 h-2.5" /> ${ctx.amount} escrowed
+              </span>
+            )}
+          </div>
+
+          {/* Both parties */}
+          <div className="grid grid-cols-2 gap-2">
+            <div
+              className="rounded-lg px-3 py-2 space-y-0.5"
+              style={{ background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.2)' }}
+            >
+              <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: '#60a5fa' }}>Homeowner</p>
+              <p className="text-xs font-semibold flex items-center gap-1" style={{ color: 'var(--color-text)' }}>
+                <User className="w-3 h-3" /> {ctx.homeownerName}
+              </p>
+              <p className="text-[10px] font-mono" style={{ color: 'var(--color-text-4)' }}>{ctx.homeownerId.slice(0, 12)}…</p>
+            </div>
+            <div
+              className="rounded-lg px-3 py-2 space-y-0.5"
+              style={{ background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.2)' }}
+            >
+              <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: '#a78bfa' }}>Contractor</p>
+              <p className="text-xs font-semibold flex items-center gap-1" style={{ color: 'var(--color-text)' }}>
+                <User className="w-3 h-3" /> {ctx.contractorName || "Not assigned"}
+              </p>
+              {ctx.contractorId && (
+                <p className="text-[10px] font-mono" style={{ color: 'var(--color-text-4)' }}>{ctx.contractorId.slice(0, 12)}…</p>
+              )}
+            </div>
+          </div>
+
+          {/* View job link */}
+          <a
+            href={`/jobs/${jobId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-xs font-medium transition-opacity hover:opacity-70"
+            style={{ color: 'var(--color-brand)' }}
+          >
+            <ExternalLink className="w-3 h-3" /> View full job
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const CATEGORY_LABEL: Record<string, string> = {
   work_not_completed:    "Work not completed",
@@ -197,6 +321,9 @@ export default function AdminDisputesPage() {
                 </p>
                 <p className="text-sm leading-relaxed" style={{ color: 'var(--color-text-2)' }}>{d.description}</p>
               </div>
+
+              {/* Job context */}
+              <JobContextPanel jobId={d.jobId} />
 
               {/* Resolved state */}
               {d.status === "resolved" && (
