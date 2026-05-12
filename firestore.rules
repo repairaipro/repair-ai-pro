@@ -324,6 +324,25 @@ service cloud.firestore {
         allow update, delete: if false;
       }
 
+      /* ================= LIVE LOCATION (Real-time tracking) ================= */
+
+      match /liveLocation/{locationId} {
+        // WRITE: Only the contractor claiming this job can write location
+        allow write: if signedIn()
+          && resource.data.claimedBy == uid()
+          && job(jobId).data.claimedBy == uid()
+          && job(jobId).data.status in ["accepted", "in_progress"];
+
+        // READ: Only the homeowner can read contractor's location (during active job)
+        allow read: if signedIn()
+          && uid() == job(jobId).data.userId
+          && job(jobId).data.claimedBy != null
+          && job(jobId).data.status in ["accepted", "in_progress"];
+
+        // DELETE: Not allowed (handled by TTL/Cloud Function)
+        allow delete: if false;
+      }
+
       /* ================= INVITATIONS ================= */
 
       match /invitations/{invitationId} {
