@@ -6,9 +6,18 @@ import { db } from "@/lib/db";
 import { useAuth } from "@/lib/auth";
 import { getTrustScore, getTrustTier } from "@/lib/matching";
 import BusinessImportWidget, { type ImportedBusiness } from "@/components/BusinessImportWidget";
+import { PortfolioManager } from "@/components/PortfolioManager";
+import { CertificationBadges, type Certification } from "@/components/CertificationBadges";
 import Link from "next/link";
 import { TRADES } from "@/lib/constants";
 import { Camera, Save, CheckCircle, AlertTriangle, ChevronLeft, Star, Briefcase, Trophy, TrendingUp, X } from "lucide-react";
+
+interface PortfolioImage {
+  url: string;
+  serviceType: string;
+  caption?: string;
+  beforeAfter?: 'before' | 'after';
+}
 
 type AvailabilityStatus = "available" | "busy" | "offline";
 
@@ -26,12 +35,13 @@ type ProfileForm = {
   city: string; zipCode: string; serviceRadiusMiles: number; bio: string;
   photoUrl: string; hourly: string; experience: string;
   availability: AvailabilityStatus; googlePlaceId: string;
+  images: PortfolioImage[]; certifications: Certification[];
 };
 
 const DEFAULT_FORM: ProfileForm = {
   name: "", email: "", phone: "", trade: "", trades: [], city: "", zipCode: "",
   serviceRadiusMiles: 25, bio: "", photoUrl: "", hourly: "", experience: "",
-  availability: "available", googlePlaceId: "",
+  availability: "available", googlePlaceId: "", images: [], certifications: [],
 };
 
 const COMPLETENESS_FIELDS = [
@@ -123,6 +133,8 @@ export default function ContractorProfilePage() {
           hourly: d.hourly != null ? String(d.hourly) : "",
           experience: d.experience != null ? String(d.experience) : "",
           availability: d.availability ?? "available", googlePlaceId: d.googlePlaceId ?? "",
+          images: Array.isArray(d.images) ? d.images : [],
+          certifications: Array.isArray(d.certifications) ? d.certifications : [],
         });
         setStats({
           rating: d.rating ?? 0, reviewCount: d.reviewCount ?? 0,
@@ -190,6 +202,7 @@ export default function ContractorProfilePage() {
         hourly: form.hourly ? Number(form.hourly) : null,
         experience: form.experience ? Number(form.experience) : null,
         availability: form.availability, googlePlaceId: form.googlePlaceId || null,
+        images: form.images, certifications: form.certifications,
         updatedAt: serverTimestamp(), lastActiveAt: serverTimestamp(),
       }, { merge: true });
       setSaveStatus("saved");
@@ -439,6 +452,68 @@ export default function ContractorProfilePage() {
                   placeholder="e.g. 8" inputMode="numeric" className="input" />
               </Field>
             </div>
+          </SectionCard>
+
+          {/* Portfolio Images */}
+          <SectionCard title="Portfolio Gallery" desc="Add before/after photos organized by service type.">
+            <PortfolioManager
+              images={form.images}
+              onImagesChange={(newImages) => set("images", newImages)}
+              maxImages={20}
+            />
+          </SectionCard>
+
+          {/* Certifications */}
+          <SectionCard title="Credentials & Certifications" desc="Add licenses, insurance, certifications, and training to build trust.">
+            <div className="space-y-3">
+              {form.certifications.length === 0 ? (
+                <p className="text-sm text-center py-4" style={{ color: 'var(--color-text-4)' }}>
+                  No certifications yet. Add your licenses, insurance, and training credentials.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {form.certifications.map((cert, idx) => (
+                    <div key={cert.id || idx} className="flex items-start justify-between p-3 rounded-lg"
+                      style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border)' }}>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm" style={{ color: 'var(--color-text)' }}>
+                          {cert.name}
+                          {cert.verified && <span className="ml-2 text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(16,185,129,0.1)', color: '#34d399' }}>✓ Verified</span>}
+                        </div>
+                        {cert.issuer && <p className="text-xs" style={{ color: 'var(--color-text-4)' }}>{cert.issuer}</p>}
+                        {cert.expirationDate && (
+                          <p className="text-xs" style={{ color: new Date(cert.expirationDate) < new Date() ? '#f87171' : 'var(--color-text-4)' }}>
+                            {new Date(cert.expirationDate) < new Date() ? '⚠ Expired' : 'Expires'}: {new Date(cert.expirationDate).toLocaleDateString()}
+                          </p>
+                        )}
+                      </div>
+                      <button type="button" onClick={() => set("certifications", form.certifications.filter((_, i) => i !== idx))}
+                        className="ml-2 text-red-500 hover:text-red-700 text-xs">
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button type="button" onClick={() => {
+                const newCert: Certification = {
+                  id: `${Date.now()}`,
+                  type: 'license',
+                  name: '',
+                  issuer: '',
+                  expirationDate: '',
+                  verified: false,
+                };
+                set("certifications", [...form.certifications, newCert]);
+              }}
+                className="w-full py-2 px-3 rounded-lg text-sm font-medium transition-all"
+                style={{ background: 'var(--color-brand-dim)', border: '1px solid rgba(99,102,241,0.2)', color: 'var(--color-brand)' }}>
+                + Add Certification
+              </button>
+            </div>
+            <p className="text-xs mt-4" style={{ color: 'var(--color-text-4)' }}>
+              For quick additions, use the /api/contractors/certifications endpoint to add certifications directly. Verify your credentials through documentation.
+            </p>
           </SectionCard>
 
           {/* Stats (read-only) */}

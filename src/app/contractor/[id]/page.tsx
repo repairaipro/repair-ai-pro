@@ -11,6 +11,10 @@ import {
   Share2, ChevronLeft, Brain, Loader2, MessageSquare,
   Shield, Zap, ChevronRight, Copy, Check,
 } from "lucide-react";
+import { ProfileGallery } from "@/components/ProfileGallery";
+import { ServiceAreaMap } from "@/components/ServiceAreaMap";
+import { CertificationBadges, type Certification } from "@/components/CertificationBadges";
+import { ResponseTimeBadge } from "@/components/ResponseTimeBadge";
 
 /* ── Types ── */
 type Review = {
@@ -20,6 +24,13 @@ type Review = {
   text:        string;
   createdAt?:  any;
 };
+interface PortfolioImage {
+  url: string;
+  serviceType: string;
+  caption?: string;
+  beforeAfter?: 'before' | 'after';
+}
+
 type ContractorProfile = {
   name?:                    string;
   trade?:                   string;
@@ -30,6 +41,8 @@ type ContractorProfile = {
   state?:                   string;
   photoUrl?:                string;
   portfolio?:               string[];
+  images?:                  PortfolioImage[];
+  certifications?:          Certification[];
   avgRating?:               number;
   reviewCount?:             number;
   jobsCompleted?:           number;
@@ -37,7 +50,11 @@ type ContractorProfile = {
   availability?:            string;
   stripeConnectVerified?:   boolean;
   subscriptionPlan?:        string;
-  responseTime?:            string;
+  responseTime?:            number;
+  responseTimeMinutes?:     number;
+  averageResponseMinutes?:  number;
+  serviceRadiusMiles?:      number;
+  zipCode?:                 string;
 };
 
 /* ── Star renderer ── */
@@ -317,6 +334,13 @@ Reviews: ${reviews.slice(0, 5).map((r) => `${r.rating}★ — "${r.text}"`).join
             </div>
           </div>
 
+          {/* Response Time Badge */}
+          {(profile.averageResponseMinutes ?? 0) > 0 && (
+            <div className="mt-4">
+              <ResponseTimeBadge averageResponseMinutes={profile.averageResponseMinutes ?? 0} />
+            </div>
+          )}
+
           {/* CTA buttons */}
           <div className="flex gap-3 mt-5">
             <Link
@@ -349,8 +373,19 @@ Reviews: ${reviews.slice(0, 5).map((r) => `${r.rating}★ — "${r.text}"`).join
           </div>
         )}
 
-        {/* ── Portfolio ── */}
-        {Array.isArray(profile.portfolio) && profile.portfolio.length > 0 && (
+        {/* ── Portfolio Gallery ── */}
+        {Array.isArray(profile.images) && profile.images.length > 0 && (
+          <div
+            className="rounded-2xl p-5"
+            style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+          >
+            <h2 className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: 'var(--color-text-4)' }}>Portfolio</h2>
+            <ProfileGallery images={profile.images} contractorName={profile.name ?? "Contractor"} />
+          </div>
+        )}
+
+        {/* ── Legacy Portfolio (backward compat) ── */}
+        {(!Array.isArray(profile.images) || profile.images.length === 0) && Array.isArray(profile.portfolio) && profile.portfolio.length > 0 && (
           <div
             className="rounded-2xl p-5"
             style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
@@ -364,6 +399,33 @@ Reviews: ${reviews.slice(0, 5).map((r) => `${r.rating}★ — "${r.text}"`).join
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* ── Certifications ── */}
+        {Array.isArray(profile.certifications) && profile.certifications.length > 0 && (
+          <div
+            className="rounded-2xl p-5"
+            style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+          >
+            <h2 className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: 'var(--color-text-4)' }}>Credentials</h2>
+            <CertificationBadges certifications={profile.certifications} />
+          </div>
+        )}
+
+        {/* ── Service Area Map ── */}
+        {profile.zipCode && profile.serviceRadiusMiles && (
+          <div
+            className="rounded-2xl p-5"
+            style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+          >
+            <h2 className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: 'var(--color-text-4)' }}>Service Area</h2>
+            <ServiceAreaMap
+              zipCode={profile.zipCode}
+              radiusMiles={profile.serviceRadiusMiles}
+              city={profile.city}
+              state={profile.state}
+            />
           </div>
         )}
 

@@ -75,6 +75,8 @@ service cloud.firestore {
             "invitationDeclineCount",
             "boostActive",
             "boostLevel",
+            "certifications",
+            "images",
             "lastActiveAt",
             "updatedAt",
             "createdAt"
