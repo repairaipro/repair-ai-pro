@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { Button } from './ui/button';
+import { Button } from './ui/Button';
 
 interface PortfolioImage {
   url: string;
@@ -90,7 +90,7 @@ export function ProfileGallery({ images, contractorName }: ProfileGalleryProps) 
           <>
             <Button
               variant="ghost"
-              size="icon"
+              size="sm"
               className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-black/20 hover:bg-black/40 text-white"
               onClick={goToPrevious}
             >
@@ -98,7 +98,7 @@ export function ProfileGallery({ images, contractorName }: ProfileGalleryProps) 
             </Button>
             <Button
               variant="ghost"
-              size="icon"
+              size="sm"
               className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-black/20 hover:bg-black/40 text-white"
               onClick={goToNext}
             >

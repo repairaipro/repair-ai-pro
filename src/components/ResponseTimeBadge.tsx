@@ -41,7 +41,7 @@ export function ResponseTimeBadge({
       </div>
 
       {trend === 'improving' && (
-        <Badge variant="outline" className="text-xs text-green-700">
+        <Badge variant="success" className="text-xs">
           <TrendingUp className="mr-1 h-3 w-3" />
           Improving
         </Badge>

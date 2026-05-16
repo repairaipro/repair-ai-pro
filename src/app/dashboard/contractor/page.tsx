@@ -507,7 +507,7 @@ export default function ContractorDashboard() {
               Full report →
             </Link>
           </div>
-          <EarningsChart payouts={payouts} />
+          <EarningsChart data={[]} />
         </section>
 
         {/* ── Quick actions ── */}

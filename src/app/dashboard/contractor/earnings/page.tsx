@@ -11,6 +11,8 @@ import {
 import { EarningsChart } from '@/components/EarningsChart';
 import { TradePerformance } from '@/components/TradePerformance';
 import { PeerBenchmark } from '@/components/PeerBenchmark';
+import { ResponseTimeTrend } from '@/components/ResponseTimeTrend';
+import { RatingTrend } from '@/components/RatingTrend';
 
 /* ─── Types ── */
 type Payout = {
@@ -47,6 +49,7 @@ type EarningsSummary = {
   responseTime: number;
   percentile: number;
   payouts:       Payout[];
+  reviewCount?: number;
 };
 
 /* ─── Helpers ── */
@@ -224,20 +227,34 @@ export default function EarningsPage() {
             </div>
 
             {/* Performance metrics */}
-            <div className="grid grid-cols-2 gap-3">
-              <StatCard
-                icon={<CheckCircle2 className="w-5 h-5" />}
-                label="Completion rate"
-                value={`${data.completionRate}%`}
-                accent="#22c55e"
-              />
-              <StatCard
-                icon={<TrendingUp className="w-5 h-5" />}
-                label="Avg rating"
-                value={data.rating > 0 ? data.rating.toFixed(1) : '—'}
-                sub={data.rating > 0 ? '⭐ from reviews' : 'No reviews yet'}
-                accent="#fbbf24"
-              />
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <StatCard
+                  icon={<CheckCircle2 className="w-5 h-5" />}
+                  label="Completion rate"
+                  value={`${data.completionRate}%`}
+                  accent="#22c55e"
+                />
+                <StatCard
+                  icon={<TrendingUp className="w-5 h-5" />}
+                  label="Pending payout"
+                  value={fmtCurrency(data.pendingAmount)}
+                  sub={data.pendingAmount > 0 ? 'Releases on confirm' : 'Nothing pending'}
+                  accent="#fb923c"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <ResponseTimeTrend
+                  currentAverage={data.responseTime}
+                  trend="stable"
+                />
+                <RatingTrend
+                  currentRating={data.rating}
+                  reviewCount={data.reviewCount || 0}
+                  trend="stable"
+                />
+              </div>
             </div>
 
             {/* Peer benchmark */}

@@ -105,6 +105,14 @@ export async function GET(req: Request) {
     const rating = Math.round((contractor.rating || 0) * 10) / 10;
     const responseTime = contractor.averageResponseMinutes || 0;
 
+    // Count reviews for this contractor
+    let reviewCount = 0;
+    const reviewsSnapshot = await adminDb
+      .collection("reviews")
+      .where("contractorId", "==", uid)
+      .get();
+    reviewCount = reviewsSnapshot.size;
+
     // Calculate peer percentile
     let percentile = 0;
     if (completedJobs > 0 && contractor.trade && contractor.city) {
@@ -163,6 +171,7 @@ export async function GET(req: Request) {
       rating,
       responseTime,
       percentile,
+      reviewCount,
       payouts: payouts.slice(0, 20), // last 20
     });
   } catch (err: any) {

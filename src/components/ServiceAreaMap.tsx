@@ -3,6 +3,21 @@
 import { useEffect, useRef, useState } from 'react';
 import { Loader, MapPin } from 'lucide-react';
 
+declare global {
+  interface Window {
+    google: {
+      maps: {
+        Map: new (element: HTMLElement, options: any) => any;
+        Marker: new (options: any) => any;
+        Circle: new (options: any) => any;
+        LatLngBounds: new () => any;
+        Geocoder: new () => any;
+        SymbolPath: { CIRCLE: string };
+      };
+    };
+  }
+}
+
 interface ServiceAreaMapProps {
   zipCode?: string;
   radiusMiles: number;
@@ -21,7 +36,7 @@ export function ServiceAreaMap({
   contractorName = 'Contractor',
 }: ServiceAreaMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<google.maps.Map | null>(null);
+  const mapRef = useRef<any>(null);
   const [centerCoords, setCenterCoords] = useState(center);
   const [isLoading, setIsLoading] = useState(!center);
 
@@ -38,7 +53,7 @@ export function ServiceAreaMap({
     }
 
     const geocoder = new window.google.maps.Geocoder();
-    geocoder.geocode({ address: zipCode }, (results, status) => {
+    geocoder.geocode({ address: zipCode }, (results: any, status: any) => {
       if (status === 'OK' && results?.[0]?.geometry?.location) {
         const loc = results[0].geometry.location;
         setCenterCoords({ lat: loc.lat(), lng: loc.lng() });

@@ -19,6 +19,7 @@ interface Earnings {
   pendingAmount: number;
   completedJobs: number;
   totalJobs:     number;
+  monthlyEarnings: { date: string; amount: number }[];
   payouts: {
     jobId:       string;
     amount:      number;
@@ -296,7 +297,7 @@ export default function ContractorSettingsPage() {
               Earnings Trend
             </span>
           </div>
-          <EarningsChart payouts={earnings.payouts} />
+          <EarningsChart data={earnings.monthlyEarnings} />
           <div className="flex items-center justify-between mt-3 pt-3" style={{ borderTop: '1px solid var(--color-border)' }}>
             <div className="text-center">
               <p className="text-sm font-bold" style={{ color: 'var(--color-success)' }}>
