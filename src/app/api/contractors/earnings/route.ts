@@ -113,6 +113,61 @@ export async function GET(req: Request) {
       .get();
     reviewCount = reviewsSnapshot.size;
 
+    // Calculate rating trend (group by date over last 30 days)
+    const ratingTrendMap = new Map<string, { sum: number; count: number }>();
+    const thirtyDaysAgoDate = new Date();
+    thirtyDaysAgoDate.setDate(thirtyDaysAgoDate.getDate() - 30);
+
+    reviewsSnapshot.docs.forEach((doc) => {
+      const review = doc.data();
+      const reviewDate = review.createdAt?.toDate ? review.createdAt.toDate() : new Date(review.createdAt);
+      if (reviewDate >= thirtyDaysAgoDate) {
+        const dateKey = reviewDate.toISOString().split("T")[0];
+        const current = ratingTrendMap.get(dateKey) || { sum: 0, count: 0 };
+        current.sum += review.rating || 0;
+        current.count += 1;
+        ratingTrendMap.set(dateKey, current);
+      }
+    });
+
+    const ratingTrend = Array.from(ratingTrendMap.entries())
+      .map(([date, { sum, count }]) => ({
+        date,
+        rating: Math.round((sum / count) * 10) / 10,
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    // Calculate response time trend (from job invitations)
+    const responseTimeTrendMap = new Map<string, { sum: number; count: number }>();
+    const jobsSnapshot = await adminDb
+      .collection("jobs")
+      .where("claimedBy", "==", uid)
+      .get();
+
+    jobsSnapshot.docs.forEach((doc) => {
+      const job = doc.data();
+      if (job.invitedAt && job.acceptedAt) {
+        const invitedDate = job.invitedAt?.toDate ? job.invitedAt.toDate() : new Date(job.invitedAt);
+        const acceptedDate = job.acceptedAt?.toDate ? job.acceptedAt.toDate() : new Date(job.acceptedAt);
+        const responseMinutes = (acceptedDate.getTime() - invitedDate.getTime()) / (1000 * 60);
+
+        if (invitedDate >= thirtyDaysAgoDate && responseMinutes > 0 && responseMinutes < 1440) { // Less than 24 hours
+          const dateKey = invitedDate.toISOString().split("T")[0];
+          const current = responseTimeTrendMap.get(dateKey) || { sum: 0, count: 0 };
+          current.sum += responseMinutes;
+          current.count += 1;
+          responseTimeTrendMap.set(dateKey, current);
+        }
+      }
+    });
+
+    const responseTimeTrend = Array.from(responseTimeTrendMap.entries())
+      .map(([date, { sum, count }]) => ({
+        date,
+        minutes: Math.round((sum / count) * 100) / 100,
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
     // Calculate peer percentile
     let percentile = 0;
     if (completedJobs > 0 && contractor.trade && contractor.city) {
@@ -172,6 +227,8 @@ export async function GET(req: Request) {
       responseTime,
       percentile,
       reviewCount,
+      ratingTrend,
+      responseTimeTrend,
       payouts: payouts.slice(0, 20), // last 20
     });
   } catch (err: any) {

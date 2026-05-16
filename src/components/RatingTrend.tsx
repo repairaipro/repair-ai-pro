@@ -1,15 +1,19 @@
 'use client';
 
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+
 interface RatingTrendProps {
   currentRating: number;
   reviewCount: number;
   trend?: 'improving' | 'stable' | 'declining';
+  trendData?: { date: string; rating: number }[];
 }
 
 export function RatingTrend({
   currentRating,
   reviewCount,
   trend = 'stable',
+  trendData = [],
 }: RatingTrendProps) {
   const trendColor = trend === 'improving' ? '#22c55e' : trend === 'declining' ? '#ef4444' : '#6b7280';
   const trendLabel = trend === 'improving' ? '↑ Rising' : trend === 'declining' ? '↓ Dropping' : '→ Stable';
@@ -57,20 +61,61 @@ export function RatingTrend({
         Based on {reviewCount} {reviewCount === 1 ? 'review' : 'reviews'}
       </p>
 
-      {/* Quality indicator */}
-      {currentRating > 0 && (
+      {/* Trend chart or quality indicator */}
+      {trendData.length > 0 ? (
         <div className="mt-3 pt-3" style={{ borderTop: '1px solid var(--color-border)' }}>
-          <div className="flex items-center justify-between text-xs">
-            <span style={{ color: 'var(--color-text-4)' }}>Quality level</span>
-            <span
-              style={{
-                color: currentRating >= 4.5 ? '#22c55e' : currentRating >= 4 ? '#3b82f6' : currentRating >= 3 ? '#fbbf24' : '#ef4444',
-              }}
-            >
-              {currentRating >= 4.5 ? '🌟 Excellent' : currentRating >= 4 ? '👍 Great' : currentRating >= 3 ? '⚠️ Fair' : '❌ Needs Work'}
-            </span>
-          </div>
+          <p className="text-xs font-medium mb-2" style={{ color: 'var(--color-text-4)' }}>
+            Last 30 days trend
+          </p>
+          <ResponsiveContainer width="100%" height={120}>
+            <LineChart data={trendData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+              <XAxis
+                dataKey="date"
+                tick={{ fill: 'var(--color-text-4)', fontSize: 10 }}
+                interval={Math.floor(trendData.length / 3)}
+              />
+              <YAxis
+                domain={[0, 5]}
+                tick={{ fill: 'var(--color-text-4)', fontSize: 10 }}
+                tickFormatter={(value) => value.toFixed(1)}
+              />
+              <Tooltip
+                contentStyle={{
+                  background: 'var(--color-surface-2)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '6px',
+                  color: 'var(--color-text)',
+                }}
+                formatter={(value: any) => `${(value as number).toFixed(1)} ⭐`}
+                labelStyle={{ color: 'var(--color-text-4)' }}
+              />
+              <Line
+                type="monotone"
+                dataKey="rating"
+                stroke="#fbbf24"
+                strokeWidth={2}
+                dot={false}
+                isAnimationActive={true}
+              />
+            </LineChart>
+          </ResponsiveContainer>
         </div>
+      ) : (
+        currentRating > 0 && (
+          <div className="mt-3 pt-3" style={{ borderTop: '1px solid var(--color-border)' }}>
+            <div className="flex items-center justify-between text-xs">
+              <span style={{ color: 'var(--color-text-4)' }}>Quality level</span>
+              <span
+                style={{
+                  color: currentRating >= 4.5 ? '#22c55e' : currentRating >= 4 ? '#3b82f6' : currentRating >= 3 ? '#fbbf24' : '#ef4444',
+                }}
+              >
+                {currentRating >= 4.5 ? '🌟 Excellent' : currentRating >= 4 ? '👍 Great' : currentRating >= 3 ? '⚠️ Fair' : '❌ Needs Work'}
+              </span>
+            </div>
+          </div>
+        )
       )}
     </div>
   );

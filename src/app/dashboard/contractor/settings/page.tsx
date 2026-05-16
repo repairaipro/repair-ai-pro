@@ -20,6 +20,8 @@ interface Earnings {
   completedJobs: number;
   totalJobs:     number;
   monthlyEarnings: { date: string; amount: number }[];
+  ratingTrend?: { date: string; rating: number }[];
+  responseTimeTrend?: { date: string; minutes: number }[];
   payouts: {
     jobId:       string;
     amount:      number;

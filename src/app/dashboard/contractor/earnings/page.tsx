@@ -50,6 +50,8 @@ type EarningsSummary = {
   percentile: number;
   payouts:       Payout[];
   reviewCount?: number;
+  ratingTrend?: { date: string; rating: number }[];
+  responseTimeTrend?: { date: string; minutes: number }[];
 };
 
 /* ─── Helpers ── */
@@ -248,11 +250,13 @@ export default function EarningsPage() {
                 <ResponseTimeTrend
                   currentAverage={data.responseTime}
                   trend="stable"
+                  trendData={data.responseTimeTrend}
                 />
                 <RatingTrend
                   currentRating={data.rating}
                   reviewCount={data.reviewCount || 0}
                   trend="stable"
+                  trendData={data.ratingTrend}
                 />
               </div>
             </div>
