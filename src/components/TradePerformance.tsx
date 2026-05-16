@@ -29,10 +29,13 @@ export function TradePerformance({ data, loading = false }: TradePerformanceProp
   if (data.length === 0) {
     return (
       <div
-        className="w-full h-64 rounded-lg flex items-center justify-center"
+        className="w-full h-64 rounded-lg flex flex-col items-center justify-center p-4 text-center"
         style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
       >
-        <span style={{ color: 'var(--color-text-4)' }}>No trade data yet</span>
+        <span style={{ color: 'var(--color-text-4)', marginBottom: '8px' }}>No trade data yet</span>
+        <span style={{ fontSize: '12px', color: 'var(--color-text-4)' }}>
+          Complete jobs across different trades to see earnings breakdown
+        </span>
       </div>
     );
   }

@@ -26,6 +26,22 @@ export function ResponseTimeTrend({
   const trendColor = trend === 'improving' ? '#22c55e' : trend === 'declining' ? '#ef4444' : '#6b7280';
   const trendLabel = trend === 'improving' ? '↓ Improving' : trend === 'declining' ? '↑ Slowing' : '→ Stable';
 
+  if (currentAverage === 0) {
+    return (
+      <div
+        className="rounded-lg p-4"
+        style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+      >
+        <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--color-text)' }}>
+          Response Time
+        </h3>
+        <p className="text-xs text-center py-2" style={{ color: 'var(--color-text-4)' }}>
+          No response data yet. Accept job invitations to build your response time history.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div
       className="rounded-lg p-4"

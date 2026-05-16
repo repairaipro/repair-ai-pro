@@ -36,6 +36,22 @@ export function RatingTrend({
     );
   };
 
+  if (reviewCount === 0) {
+    return (
+      <div
+        className="rounded-lg p-4"
+        style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+      >
+        <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--color-text)' }}>
+          Average Rating
+        </h3>
+        <p className="text-xs text-center py-2" style={{ color: 'var(--color-text-4)' }}>
+          Complete jobs to earn reviews. Your rating will appear here.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div
       className="rounded-lg p-4"

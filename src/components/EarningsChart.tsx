@@ -22,10 +22,13 @@ export function EarningsChart({ data, loading = false }: EarningsChartProps) {
   if (data.length === 0) {
     return (
       <div
-        className="w-full h-64 rounded-lg flex items-center justify-center"
+        className="w-full h-64 rounded-lg flex flex-col items-center justify-center p-4 text-center"
         style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
       >
-        <span style={{ color: 'var(--color-text-4)' }}>No earnings data yet</span>
+        <span style={{ color: 'var(--color-text-4)', marginBottom: '8px' }}>No earnings data yet</span>
+        <span style={{ fontSize: '12px', color: 'var(--color-text-4)' }}>
+          Complete your first job to see earnings trends here
+        </span>
       </div>
     );
   }
