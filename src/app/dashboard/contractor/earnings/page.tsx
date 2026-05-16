@@ -8,6 +8,9 @@ import {
   ChevronLeft, Briefcase, ExternalLink, AlertCircle,
   Loader2, BarChart2, Download,
 } from 'lucide-react';
+import { EarningsChart } from '@/components/EarningsChart';
+import { TradePerformance } from '@/components/TradePerformance';
+import { PeerBenchmark } from '@/components/PeerBenchmark';
 
 /* ─── Types ── */
 type Payout = {
@@ -19,11 +22,30 @@ type Payout = {
   date:        string | null;
 };
 
+type TradeData = {
+  trade: string;
+  total: number;
+  count: number;
+  avg: number;
+};
+
+type MonthlyData = {
+  date: string;
+  amount: number;
+};
+
 type EarningsSummary = {
   totalEarned:   number;
   pendingAmount: number;
   completedJobs: number;
   totalJobs:     number;
+  averagePerJob: number;
+  monthlyEarnings: MonthlyData[];
+  byTrade: TradeData[];
+  completionRate: number;
+  rating: number;
+  responseTime: number;
+  percentile: number;
   payouts:       Payout[];
 };
 
@@ -185,12 +207,44 @@ export default function EarningsPage() {
               />
               <StatCard
                 icon={<TrendingUp className="w-5 h-5" />}
-                label="Bid win rate"
-                value={`${winRate}%`}
-                sub={`${data.totalJobs} total jobs`}
+                label="Avg per job"
+                value={fmtCurrency(data.averagePerJob)}
+                sub={data.completedJobs > 0 ? `${data.completedJobs} jobs` : 'No jobs yet'}
                 accent="#fbbf24"
               />
             </div>
+
+            {/* Charts section */}
+            <div className="space-y-4">
+              {/* Earnings trend */}
+              <EarningsChart data={data.monthlyEarnings} />
+
+              {/* Trade performance */}
+              {data.byTrade.length > 0 && <TradePerformance data={data.byTrade} />}
+            </div>
+
+            {/* Performance metrics */}
+            <div className="grid grid-cols-2 gap-3">
+              <StatCard
+                icon={<CheckCircle2 className="w-5 h-5" />}
+                label="Completion rate"
+                value={`${data.completionRate}%`}
+                accent="#22c55e"
+              />
+              <StatCard
+                icon={<TrendingUp className="w-5 h-5" />}
+                label="Avg rating"
+                value={data.rating > 0 ? data.rating.toFixed(1) : '—'}
+                sub={data.rating > 0 ? '⭐ from reviews' : 'No reviews yet'}
+                accent="#fbbf24"
+              />
+            </div>
+
+            {/* Peer benchmark */}
+            <PeerBenchmark
+              percentile={data.percentile}
+              totalEarnings={data.totalEarned}
+            />
 
             {/* Fee info */}
             <div

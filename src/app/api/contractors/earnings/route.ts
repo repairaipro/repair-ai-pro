@@ -1,18 +1,25 @@
 import { NextResponse } from "next/server";
 import { adminDb, adminAuth } from "@/lib/firebaseAdmin";
 
-/**
- * GET /api/contractors/earnings
- * Returns earnings summary + payout history for the authenticated contractor.
- */
 export async function GET(req: Request) {
   try {
-    const header  = req.headers.get("authorization") ?? "";
+    const header = req.headers.get("authorization") ?? "";
     const idToken = header.startsWith("Bearer ") ? header.slice(7) : null;
     if (!idToken) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const decoded = await adminAuth.verifyIdToken(idToken);
-    const uid     = decoded.uid;
+    const uid = decoded.uid;
+    const url = new URL(req.url);
+    const range = url.searchParams.get("range") || "90";
+    const days = parseInt(range, 10);
+
+    // Get contractor profile for stats
+    const contractorDoc = await adminDb.collection("contractors").doc(uid).get();
+    if (!contractorDoc.exists) {
+      return NextResponse.json({ error: "Contractor not found" }, { status: 404 });
+    }
+
+    const contractor = contractorDoc.data() as any;
 
     // Query all jobs claimed by this contractor
     const snap = await adminDb
@@ -20,47 +27,119 @@ export async function GET(req: Request) {
       .where("claimedBy", "==", uid)
       .get();
 
-    let totalEarned   = 0;
+    let totalEarned = 0;
     let pendingAmount = 0;
     let completedJobs = 0;
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - days);
+    const monthlyMap = new Map<string, number>();
+    const tradeMap = new Map<string, { total: number; count: number }>();
     const payouts: {
-      jobId:       string;
-      amount:      number;
-      status:      string;
-      trade:       string;
+      jobId: string;
+      amount: number;
+      status: string;
+      trade: string;
       description: string;
-      date:        string | null;
+      date: string | null;
     }[] = [];
 
     for (const doc of snap.docs) {
       const job = doc.data();
 
       if (job.payoutStatus === "transferred" && job.payoutAmount) {
-        totalEarned  += job.payoutAmount;
+        totalEarned += job.payoutAmount;
         completedJobs++;
         payouts.push({
-          jobId:       doc.id,
-          amount:      job.payoutAmount,
-          status:      "paid",
-          trade:       job.aiDetectedTrade ?? job.trade ?? "General",
+          jobId: doc.id,
+          amount: job.payoutAmount,
+          status: "paid",
+          trade: job.aiDetectedTrade ?? job.trade ?? "General",
           description: (job.description ?? "").slice(0, 60),
-          date:        job.payoutAt?.toDate?.()?.toISOString() ?? null,
+          date: job.payoutAt?.toDate?.()?.toISOString() ?? null,
         });
-      } else if (
-        job.paymentStatus === "held" ||
-        (job.payoutStatus === "pending" && job.paymentAmountUsd)
-      ) {
-        const pendingAmt = job.payoutAmount ??
-          (job.paymentAmountUsd ? job.paymentAmountUsd * 0.88 : 0);
+
+        // Monthly breakdown (only recent)
+        const payoutDate = job.payoutAt?.toDate ? job.payoutAt.toDate() : new Date(job.payoutAt);
+        if (payoutDate >= thirtyDaysAgo) {
+          const monthKey = payoutDate.toISOString().split("T")[0];
+          monthlyMap.set(monthKey, (monthlyMap.get(monthKey) || 0) + job.payoutAmount);
+        }
+
+        // By trade
+        const trade = job.aiDetectedTrade ?? job.trade ?? "Other";
+        const current = tradeMap.get(trade) || { total: 0, count: 0 };
+        current.total += job.payoutAmount;
+        current.count += 1;
+        tradeMap.set(trade, current);
+      } else if (job.paymentStatus === "held" || (job.payoutStatus === "pending" && job.paymentAmountUsd)) {
+        const pendingAmt = job.payoutAmount ?? (job.paymentAmountUsd ? job.paymentAmountUsd * 0.88 : 0);
         pendingAmount += pendingAmt;
         payouts.push({
-          jobId:       doc.id,
-          amount:      pendingAmt,
-          status:      "pending",
-          trade:       job.aiDetectedTrade ?? job.trade ?? "General",
+          jobId: doc.id,
+          amount: pendingAmt,
+          status: "pending",
+          trade: job.aiDetectedTrade ?? job.trade ?? "General",
           description: (job.description ?? "").slice(0, 60),
-          date:        null,
+          date: null,
         });
+      }
+    }
+
+    // Convert maps to arrays
+    const monthlyEarnings = Array.from(monthlyMap.entries())
+      .map(([date, amount]) => ({ date, amount }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    const byTrade = Array.from(tradeMap.entries())
+      .map(([trade, { total, count }]) => ({
+        trade,
+        total: Math.round(total * 100) / 100,
+        count,
+        avg: Math.round((total / count) * 100) / 100,
+      }))
+      .sort((a, b) => b.total - a.total);
+
+    const averagePerJob = completedJobs > 0 ? Math.round((totalEarned / completedJobs) * 100) / 100 : 0;
+    const jobsAccepted = contractor.jobsAccepted || 0;
+    const completionRate = jobsAccepted > 0 ? Math.round(((completedJobs / jobsAccepted) * 100) * 10) / 10 : 0;
+    const rating = Math.round((contractor.rating || 0) * 10) / 10;
+    const responseTime = contractor.averageResponseMinutes || 0;
+
+    // Calculate peer percentile
+    let percentile = 0;
+    if (completedJobs > 0 && contractor.trade && contractor.city) {
+      const peersSnapshot = await adminDb
+        .collection("contractors")
+        .where("trade", "==", contractor.trade)
+        .where("city", "==", contractor.city)
+        .get();
+
+      const peers = peersSnapshot.docs
+        .map((doc) => doc.data() as any)
+        .filter((p) => p.jobsCompleted > 0);
+
+      if (peers.length > 1) {
+        // Calculate total earnings for each peer
+        const peerEarnings = await Promise.all(
+          peers.map(async (peer) => {
+            const peerJobs = await adminDb
+              .collection("jobs")
+              .where("claimedBy", "==", peer.uid || peer.id)
+              .where("payoutStatus", "==", "transferred")
+              .get();
+
+            const total = peerJobs.docs.reduce((sum, doc) => {
+              const data = doc.data() as any;
+              return sum + (data.payoutAmount || 0);
+            }, 0);
+
+            return total;
+          })
+        );
+
+        // Calculate percentile
+        const betterPeers = peerEarnings.filter((e) => e > totalEarned).length;
+        percentile = Math.round(((peers.length - betterPeers) / peers.length) * 100);
       }
     }
 
@@ -73,11 +152,18 @@ export async function GET(req: Request) {
     });
 
     return NextResponse.json({
-      totalEarned:   Math.round(totalEarned   * 100) / 100,
-      pendingAmount: Math.round(pendingAmount  * 100) / 100,
+      totalEarned: Math.round(totalEarned * 100) / 100,
+      pendingAmount: Math.round(pendingAmount * 100) / 100,
       completedJobs,
-      totalJobs:     snap.size,
-      payouts:       payouts.slice(0, 20), // last 20
+      totalJobs: snap.size,
+      averagePerJob,
+      monthlyEarnings,
+      byTrade,
+      completionRate,
+      rating,
+      responseTime,
+      percentile,
+      payouts: payouts.slice(0, 20), // last 20
     });
   } catch (err: any) {
     console.error("earnings error:", err);

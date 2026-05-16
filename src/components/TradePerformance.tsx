@@ -1,13 +1,20 @@
 'use client';
 
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
-interface EarningsChartProps {
-  data: { date: string; amount: number }[];
+interface TradeData {
+  trade: string;
+  total: number;
+  count: number;
+  avg: number;
+}
+
+interface TradePerformanceProps {
+  data: TradeData[];
   loading?: boolean;
 }
 
-export function EarningsChart({ data, loading = false }: EarningsChartProps) {
+export function TradePerformance({ data, loading = false }: TradePerformanceProps) {
   if (loading) {
     return (
       <div
@@ -25,7 +32,7 @@ export function EarningsChart({ data, loading = false }: EarningsChartProps) {
         className="w-full h-64 rounded-lg flex items-center justify-center"
         style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
       >
-        <span style={{ color: 'var(--color-text-4)' }}>No earnings data yet</span>
+        <span style={{ color: 'var(--color-text-4)' }}>No trade data yet</span>
       </div>
     );
   }
@@ -36,16 +43,12 @@ export function EarningsChart({ data, loading = false }: EarningsChartProps) {
       style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
     >
       <h3 className="text-sm font-semibold mb-4" style={{ color: 'var(--color-text)' }}>
-        Earnings Trend (Last 90 Days)
+        Earnings by Trade
       </h3>
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+        <BarChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-          <XAxis
-            dataKey="date"
-            tick={{ fill: 'var(--color-text-4)', fontSize: 12 }}
-            interval={Math.floor(data.length / 5)}
-          />
+          <XAxis dataKey="trade" tick={{ fill: 'var(--color-text-4)', fontSize: 12 }} />
           <YAxis
             tick={{ fill: 'var(--color-text-4)', fontSize: 12 }}
             tickFormatter={(value) => `$${(value / 100).toFixed(0)}`}
@@ -60,15 +63,8 @@ export function EarningsChart({ data, loading = false }: EarningsChartProps) {
             formatter={(value: any) => `$${(value / 100).toFixed(2)}`}
             labelStyle={{ color: 'var(--color-text-4)' }}
           />
-          <Line
-            type="monotone"
-            dataKey="amount"
-            stroke="#6366f1"
-            strokeWidth={2}
-            dot={false}
-            isAnimationActive={true}
-          />
-        </LineChart>
+          <Bar dataKey="total" fill="#6366f1" isAnimationActive={true} />
+        </BarChart>
       </ResponsiveContainer>
     </div>
   );
