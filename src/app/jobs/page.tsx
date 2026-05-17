@@ -6,6 +6,9 @@ import { collection, query, onSnapshot, orderBy } from "firebase/firestore";
 import Link from "next/link";
 import { TRADES } from "@/lib/constants";
 import { Search, Plus, MapPin, Briefcase, X, SlidersHorizontal } from "lucide-react";
+import { motion } from "framer-motion";
+import { GridSkeletonLoader } from "@/components/AnimatedSkeleton";
+import { ScrollReveal } from "@/components/ScrollReveal";
 
 const STATUSES = ["open","triaged","matched","accepted","in_progress","completed","confirmed","disputed","cancelled","closed"];
 
@@ -89,7 +92,12 @@ export default function JobMarketplacePage() {
   const hasActiveFilters = search.trim() || tradeFilter !== "all" || statusFilter !== "all";
 
   return (
-    <div className="min-h-screen animate-fade-in" style={{ background: 'var(--color-bg)' }}>
+    <motion.div
+      className="min-h-screen"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      style={{ background: 'var(--color-bg)' }}
+    >
       <div className="max-w-6xl mx-auto px-4 py-8 space-y-6">
 
         {/* Header */}
@@ -163,9 +171,7 @@ export default function JobMarketplacePage() {
 
         {/* Grid */}
         {loading ? (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Array.from({ length: 6 }).map((_, i) => <JobCardSkeleton key={i} />)}
-          </div>
+          <GridSkeletonLoader count={6} />
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
             <div
@@ -196,24 +202,52 @@ export default function JobMarketplacePage() {
             )}
           </div>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filtered.map((job) => {
+          <motion.div
+            className="grid md:grid-cols-2 lg:grid-cols-3 gap-4"
+            initial="hidden"
+            animate="visible"
+            variants={{
+              hidden: { opacity: 0 },
+              visible: {
+                opacity: 1,
+                transition: {
+                  staggerChildren: 0.05,
+                },
+              },
+            }}
+          >
+            {filtered.map((job, index) => {
               const s = STATUS_STYLES[job.status] ?? STATUS_STYLES.open;
               const city = getCity(job.location);
               return (
-                <Link
+                <motion.div
                   key={job.id}
-                  href={`/chat?job=${job.id}`}
-                  className="card p-4 flex flex-col gap-3 transition-all duration-200 group"
-                  onMouseEnter={e => {
-                    (e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.3)';
-                    (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)';
-                  }}
-                  onMouseLeave={e => {
-                    (e.currentTarget as HTMLElement).style.borderColor = 'var(--color-border)';
-                    (e.currentTarget as HTMLElement).style.transform = 'translateY(0)';
+                  variants={{
+                    hidden: { opacity: 0, y: 20, scale: 0.95 },
+                    visible: {
+                      opacity: 1,
+                      y: 0,
+                      scale: 1,
+                      transition: {
+                        type: 'spring',
+                        stiffness: 100,
+                        damping: 20,
+                      },
+                    },
                   }}
                 >
+                  <Link
+                    href={`/chat?job=${job.id}`}
+                    className="card p-4 flex flex-col gap-3 transition-all duration-200 group"
+                    onMouseEnter={e => {
+                      (e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.3)';
+                      (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseLeave={e => {
+                      (e.currentTarget as HTMLElement).style.borderColor = 'var(--color-border)';
+                      (e.currentTarget as HTMLElement).style.transform = 'translateY(0)';
+                    }}
+                  >
                   {Array.isArray(job.images) && job.images[0] && (
                     <img
                       src={job.images[0]}
@@ -245,12 +279,13 @@ export default function JobMarketplacePage() {
                       {city}
                     </div>
                   )}
-                </Link>
+                  </Link>
+                </motion.div>
               );
             })}
-          </div>
+          </motion.div>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 }
