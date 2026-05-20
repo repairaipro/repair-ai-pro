@@ -57,13 +57,14 @@ export default function HomeownerOnboardingPage() {
     if (!user) return;
     setLoading(true);
     try {
-      await updateDoc(doc(db, 'users', user.uid), {
-        onboardingComplete: true,
-        city: city.trim() || undefined,
-        zipCode: zipCode.trim() || undefined,
-        phone: phone.trim() || undefined,
-      });
+      // Build update object — only include fields that have values
+      // Firestore does not accept `undefined`, so we omit empty fields entirely
+      const update: Record<string, any> = { onboardingComplete: true };
+      if (city.trim())    update.city    = city.trim();
+      if (zipCode.trim()) update.zipCode = zipCode.trim();
+      if (phone.trim())   update.phone   = phone.trim();
 
+      await updateDoc(doc(db, 'users', user.uid), update);
       router.push('/dashboard');
     } catch (err: any) {
       setError(err.message || 'Failed to complete onboarding');

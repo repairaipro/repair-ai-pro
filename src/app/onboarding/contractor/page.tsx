@@ -85,7 +85,7 @@ export default function ContractorOnboardingPage() {
         serviceRadiusMiles: parseInt(String(radius), 10),
         photoUrl: photoUrl || user.photoURL || '',
         bio: bio.trim(),
-        hourly: hourly ? parseFloat(hourly) : undefined,
+        ...(hourly ? { hourly: parseFloat(hourly) } : {}),
         availability,
         trades: trades.length > 0 ? trades : [trade],
         createdAt: serverTimestamp(),
