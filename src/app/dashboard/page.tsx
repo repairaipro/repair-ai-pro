@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { collection, query, where, onSnapshot, orderBy, doc, getDoc, limit } from "firebase/firestore";
 import { useAuth, isOnboardingComplete } from "@/lib/auth";
 import { Plus, Inbox, MessageSquare, Briefcase, Users, User, ChevronRight, Zap, TrendingUp, Clock, CheckCircle } from "lucide-react";
+import { motion } from "framer-motion";
 
 type Job = {
   id: string;
@@ -347,7 +348,12 @@ export default function DashboardPage() {
       <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
 
         {/* Greeting */}
-        <div className="flex flex-wrap items-start justify-between gap-3">
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="flex flex-wrap items-start justify-between gap-3"
+        >
           <div>
             <h1 className="text-2xl font-bold" style={{ color: 'var(--color-text)' }}>
               Hey, {displayName} 👋
@@ -377,7 +383,7 @@ export default function DashboardPage() {
               </Link>
             )}
           </div>
-        </div>
+        </motion.div>
 
         {/* Contractor pending invites */}
         {isContractor && pendingInvites > 0 && <PendingInviteCard count={pendingInvites} />}
@@ -423,12 +429,19 @@ export default function DashboardPage() {
               { value: homeownerJobs.length,         label: "Total Jobs",    color: 'var(--color-text)',  icon: <Briefcase className="w-4 h-4" /> },
               { value: openHomeownerJobs.length,      label: "Awaiting Match",color: '#818cf8',            icon: <Clock className="w-4 h-4" /> },
               { value: completedHomeownerJobs.length, label: "Completed",     color: '#34d399',            icon: <CheckCircle className="w-4 h-4" /> },
-            ].map(({ value, label, color, icon }) => (
-              <div key={label} className="card p-4 text-center">
+            ].map(({ value, label, color, icon }, i) => (
+              <motion.div
+                key={label}
+                initial={{ opacity: 0, y: 15 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: i * 0.1 }}
+                viewport={{ once: true }}
+                className="card p-4 text-center"
+              >
                 <div className="flex justify-center mb-1" style={{ color }}>{icon}</div>
                 <p className="text-2xl font-bold" style={{ color }}>{value}</p>
                 <p className="text-[10px] mt-0.5" style={{ color: 'var(--color-text-4)' }}>{label}</p>
-              </div>
+              </motion.div>
             ))}
           </div>
         )}

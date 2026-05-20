@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { Zap, Brain, Star, MessageSquare, MapPin, Shield, ArrowRight, CheckCircle } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 const STEPS = [
   {
@@ -113,7 +114,10 @@ export default function LandingPage() {
         <div className="relative max-w-5xl mx-auto px-6 py-28 md:py-36 text-center">
 
           {/* Pill badge */}
-          <div
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
             className="inline-flex items-center gap-2 text-xs font-medium px-3.5 py-1.5 rounded-full mb-8"
             style={{
               background: 'rgba(99,102,241,0.08)',
@@ -123,9 +127,12 @@ export default function LandingPage() {
           >
             <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
             AI-Powered Service Marketplace · Houston, TX
-          </div>
+          </motion.div>
 
-          <h1
+          <motion.h1
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
             className="text-5xl md:text-7xl font-extrabold leading-[1.05] mb-6 tracking-tight"
             style={{ color: 'var(--color-text)' }}
           >
@@ -136,18 +143,25 @@ export default function LandingPage() {
             >
               Done fast.
             </span>
-          </h1>
+          </motion.h1>
 
-          <p
+          <motion.p
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
             className="text-lg md:text-xl max-w-2xl mx-auto mb-10 leading-relaxed"
             style={{ color: 'var(--color-text-3)' }}
           >
             Plumber, mechanic, electrician, handyman — describe the problem and AI
             dispatches the best local pro to your door automatically.
             Like Uber, for any skilled service.
-          </p>
+          </motion.p>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-10">
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.3 }}
+            className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-10">
             <Link href="/jobs/new" className="btn btn-primary btn-lg px-8 w-full sm:w-auto">
               Describe Your Problem
               <ArrowRight className="w-4 h-4" />
@@ -158,7 +172,7 @@ export default function LandingPage() {
             >
               I'm a Service Pro
             </Link>
-          </div>
+          </motion.div>
 
           {/* Service tags */}
           <div className="flex flex-wrap justify-center gap-2 mb-6">
@@ -237,7 +251,13 @@ export default function LandingPage() {
 
           <div className="grid md:grid-cols-3 gap-6">
             {STEPS.map((s, i) => (
-              <div key={i} className="relative">
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: i * 0.1 }}
+                viewport={{ once: true, margin: "-50px" }}
+                className="relative">
                 {i < STEPS.length - 1 && (
                   <div
                     className="hidden md:block absolute top-8 z-10"
@@ -280,7 +300,7 @@ export default function LandingPage() {
                   <h3 className="text-base font-semibold mb-2" style={{ color: 'var(--color-text)' }}>{s.title}</h3>
                   <p className="text-sm leading-relaxed" style={{ color: 'var(--color-text-4)' }}>{s.desc}</p>
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
         </div>
@@ -303,16 +323,18 @@ export default function LandingPage() {
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {FEATURES.map((f, i) => (
-              <div
+              <motion.div
                 key={i}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: i * 0.05 }}
+                viewport={{ once: true, margin: "-50px" }}
                 className="card p-5 transition-all duration-300"
                 onMouseEnter={e => {
                   (e.currentTarget as HTMLElement).style.borderColor = f.border;
-                  (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)';
                 }}
                 onMouseLeave={e => {
                   (e.currentTarget as HTMLElement).style.borderColor = 'var(--color-border)';
-                  (e.currentTarget as HTMLElement).style.transform = 'translateY(0)';
                 }}
               >
                 <div
@@ -323,7 +345,7 @@ export default function LandingPage() {
                 </div>
                 <h3 className="font-semibold mb-1.5 text-sm" style={{ color: 'var(--color-text)' }}>{f.title}</h3>
                 <p className="text-sm leading-relaxed" style={{ color: 'var(--color-text-4)' }}>{f.desc}</p>
-              </div>
+              </motion.div>
             ))}
           </div>
         </div>

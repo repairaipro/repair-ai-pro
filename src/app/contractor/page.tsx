@@ -7,6 +7,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { TRADES } from "@/lib/constants";
 import { Search, MapPin, Star, Briefcase, Trophy, DollarSign, MessageSquare, X, ChevronRight } from "lucide-react";
+import { motion } from "framer-motion";
 
 type Contractor = {
   id: string;
@@ -85,28 +86,41 @@ export default function ContractorDirectory() {
       <div className="max-w-6xl mx-auto px-4 py-8 space-y-6">
 
         {/* Header */}
-        <div>
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
           <h1 className="text-2xl font-bold" style={{ color: 'var(--color-text)' }}>Find a Contractor</h1>
           {!loading && (
             <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-4)' }}>
               {filtered.length} of {contractors.length} contractors
             </p>
           )}
-        </div>
+        </motion.div>
 
         {/* Error */}
         {error && (
-          <div
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.3 }}
             className="rounded-xl px-4 py-3 text-sm flex justify-between items-center"
             style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171' }}
           >
             <span>{error}</span>
             <button onClick={() => setError(null)}><X className="w-4 h-4" /></button>
-          </div>
+          </motion.div>
         )}
 
         {/* Filter bar */}
-        <div className="card p-4 flex flex-wrap gap-3">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
+          className="card p-4 flex flex-wrap gap-3"
+        >
           <div className="relative flex-1 min-w-[180px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--color-text-4)' }} />
             <input
@@ -141,7 +155,7 @@ export default function ContractorDirectory() {
               <X className="w-3.5 h-3.5" /> Clear
             </button>
           )}
-        </div>
+        </motion.div>
 
         {/* Grid */}
         {loading ? (
@@ -149,7 +163,12 @@ export default function ContractorDirectory() {
             {Array.from({ length: 6 }).map((_, i) => <ContractorCardSkeleton key={i} />)}
           </div>
         ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="flex flex-col items-center justify-center py-24 gap-4 text-center"
+          >
             <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl"
               style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
               👷
@@ -171,20 +190,22 @@ export default function ContractorDirectory() {
                 <Link href="/contractor/profile" className="btn btn-primary btn-sm">Set Up Profile</Link>
               </>
             )}
-          </div>
+          </motion.div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {filtered.map((c) => (
-              <div
+            {filtered.map((c, i) => (
+              <motion.div
                 key={c.id}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: (i % 6) * 0.05 }}
+                viewport={{ once: true, margin: "-50px" }}
                 className="card p-5 flex flex-col transition-all duration-200"
                 onMouseEnter={e => {
                   (e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.3)';
-                  (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)';
                 }}
                 onMouseLeave={e => {
                   (e.currentTarget as HTMLElement).style.borderColor = 'var(--color-border)';
-                  (e.currentTarget as HTMLElement).style.transform = 'translateY(0)';
                 }}
               >
                 {/* Avatar */}
@@ -278,7 +299,7 @@ export default function ContractorDirectory() {
                     <MessageSquare className="w-3.5 h-3.5" /> Message / Quote
                   </Link>
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
         )}
