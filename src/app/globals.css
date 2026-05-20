@@ -130,6 +130,7 @@ a:hover { color: #a5b4fc; }
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 1.5rem;
+  box-sizing: border-box;
 }
 
 .container-sm {
@@ -137,6 +138,7 @@ a:hover { color: #a5b4fc; }
   max-width: 640px;
   margin: 0 auto;
   padding: 0 1.5rem;
+  box-sizing: border-box;
 }
 
 .container-md {
@@ -144,6 +146,18 @@ a:hover { color: #a5b4fc; }
   max-width: 900px;
   margin: 0 auto;
   padding: 0 1.5rem;
+  box-sizing: border-box;
+}
+
+.page-container {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .page-container { padding: 2rem; }
 }
 
 /* ── GLASS CARDS ──────────────────────────────────────────── */
@@ -153,14 +167,12 @@ a:hover { color: #a5b4fc; }
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: 1.5rem;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.15s ease;
 }
 
 .card:hover {
   border-color: var(--color-border-hover);
   background: var(--color-surface-2);
-  box-shadow: 0 8px 16px rgba(0,0,0,0.2);
-  transform: translateY(-2px);
 }
 
 .card-brand {
@@ -208,11 +220,11 @@ a:hover { color: #a5b4fc; }
   transform: scale(0.97);
 }
 
-/* Sizes - Mobile-friendly (min 44px tap target) */
-.btn-sm  { padding: 0.625rem 1rem; font-size: 0.8125rem; min-height: 36px; }
-.btn-md  { padding: 0.75rem 1.25rem; min-height: 44px; }
-.btn-lg  { padding: 1rem 1.75rem; font-size: 1rem; min-height: 48px; }
-.btn-xl  { padding: 1.25rem 2.25rem; font-size: 1.0625rem; min-height: 56px; }
+/* Sizes - Professional and balanced */
+.btn-sm  { padding: 0.5rem 0.875rem; font-size: 0.8125rem; }
+.btn-md  { padding: 0.625rem 1.125rem; }
+.btn-lg  { padding: 0.875rem 1.5rem; font-size: 1rem; }
+.btn-xl  { padding: 1rem 2rem; font-size: 1.0625rem; }
 
 /* Variants */
 .btn-primary {
@@ -297,7 +309,7 @@ a:hover { color: #a5b4fc; }
 .input {
   display: block;
   width: 100%;
-  padding: 0.75rem 1rem;
+  padding: 0.625rem 0.875rem;
   background: var(--color-bg-2);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -306,7 +318,6 @@ a:hover { color: #a5b4fc; }
   font-family: 'Inter', sans-serif;
   transition: var(--transition);
   appearance: none;
-  min-height: 44px;
 }
 
 .input::placeholder { color: var(--color-text-4); }
