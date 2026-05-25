@@ -1,40 +1,39 @@
-import OpenAI from "openai";
 import { NextResponse } from "next/server";
-
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
+import { openai, handleOpenAIError } from "@/lib/openaiClient";
+import type OpenAI from "openai";
 
 export async function POST(req: Request) {
   try {
     const { prompt, image } = await req.json();
 
-    const input: any[] = [
+    const content: OpenAI.ChatCompletionContentPart[] = [
       {
-        type: "input_text",
+        type: "text",
         text:
           "You are an expert repair technician. Return ONLY a JSON object. " +
           "Analyze the user's issue and return: steps, parts, difficulty, warnings, time_required, " +
-          "cost_estimate, when_to_call_pro, and summary."
-      },
-      {
-        type: "input_text",
-        text: prompt || "Analyze the attached image."
+          "cost_estimate, when_to_call_pro, and summary." +
+          "\n\n" +
+          (prompt || "Analyze the attached image.")
       }
     ];
 
     if (image) {
-      input.push({
-        type: "input_image",
-        image_url: image,
-        detail: "high"
+      content.push({
+        type: "image_url",
+        image_url: { url: image, detail: "high" }
       });
     }
 
-    const resp = await client.responses.create({
+    const resp = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      input
+      messages: [{ role: "user", content }],
+      max_tokens: 1000,
+      temperature: 0.3,
+      response_format: { type: "json_object" }
     });
 
-    const out = resp.output_text;
+    const out = resp.choices[0]?.message?.content || "";
 
     let json = {};
 
@@ -46,7 +45,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, repair: json });
   } catch (e: any) {
-    console.error(e);
-    return NextResponse.json({ ok: false, error: e.message });
+    const errorMessage = await handleOpenAIError(e);
+    return NextResponse.json({ ok: false, error: errorMessage });
   }
 }

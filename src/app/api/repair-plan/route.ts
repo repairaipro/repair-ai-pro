@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
+import { openai, handleOpenAIError } from "@/lib/openaiClient";
 
 export async function POST(req: Request) {
   try {
@@ -56,7 +54,7 @@ Return ONLY a valid JSON object (no markdown, no code fences) with exactly this 
 
     return NextResponse.json({ ok: true, repair });
   } catch (error: any) {
-    console.error("Repair Plan Error:", error.message);
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    const errorMessage = await handleOpenAIError(error);
+    return NextResponse.json({ ok: false, error: errorMessage }, { status: 500 });
   }
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { openai, handleOpenAIError } from "@/lib/openaiClient";
 import { verifyAuthToken } from "@/lib/firebaseAdmin";
 
 type EstimateRequest = {
@@ -9,10 +10,7 @@ type EstimateRequest = {
 };
 
 async function estimateWithOpenAI(payload: any) {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error("Missing OPENAI_API_KEY");
-
-  const system = `
+  const systemPrompt = `
 You are an AI estimator for skilled service jobs in the United States (home repair, automotive, tech support, moving, and more).
 Return JSON only. No markdown. No extra text.
 Be conservative: give a low/typical/high range.
@@ -20,30 +18,17 @@ If uncertain, widen the range and ask clarifying questions.
 Avoid making up local permit requirements; flag them as "may apply".
 `.trim();
 
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "gpt-4o-mini",
-      temperature: 0.2,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: JSON.stringify(payload) },
-      ],
-    }),
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    temperature: 0.2,
+    response_format: { type: "json_object" },
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: JSON.stringify(payload) },
+    ],
   });
 
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`OpenAI error ${res.status}: ${errText}`);
-  }
-
-  const data = await res.json();
-  const content = data?.choices?.[0]?.message?.content;
+  const content = completion.choices?.[0]?.message?.content;
   if (!content) throw new Error("OpenAI returned empty content");
   return JSON.parse(content);
 }
@@ -106,8 +91,9 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ estimate: ai.estimate });
   } catch (e: any) {
+    const errorMessage = await handleOpenAIError(e);
     return NextResponse.json(
-      { error: e?.message ?? "Unknown error" },
+      { error: errorMessage },
       { status: 500 }
     );
   }

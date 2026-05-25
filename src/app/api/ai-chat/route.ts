@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
+import { openai, handleOpenAIError } from "@/lib/openaiClient";
 
 type ExplainMode = "beginner" | "homeowner" | "pro";
 type HistoryItem = { role: "user" | "assistant"; content: string };
@@ -80,7 +78,7 @@ export async function POST(req: Request) {
     const reply = completion.choices[0]?.message?.content ?? "Sorry, I couldn't generate a response. Please try again.";
     return NextResponse.json({ reply });
   } catch (error: any) {
-    console.error("AI Chat Error:", error.message);
-    return NextResponse.json({ error: error.message || "Unknown server error" }, { status: 500 });
+    const errorMessage = await handleOpenAIError(error);
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

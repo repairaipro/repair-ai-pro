@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
+import { openai, handleOpenAIError } from "@/lib/openaiClient";
 import { adminDb, adminAuth } from "@/lib/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
 /**
  * POST /api/jobs/[jobId]/insurance-report
@@ -108,9 +106,9 @@ Include sections: Executive Summary, Damage Assessment, Repair Scope, Cost Estim
       generatedAt: new Date().toISOString(),
     });
   } catch (err: any) {
-    console.error("insurance-report error:", err);
+    const errorMessage = await handleOpenAIError(err);
     return NextResponse.json(
-      { error: err.message ?? "Failed to generate insurance report" },
+      { error: errorMessage },
       { status: 500 }
     );
   }

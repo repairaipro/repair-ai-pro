@@ -1,9 +1,5 @@
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
-
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+import { openai, handleOpenAIError } from "@/lib/openaiClient";
 
 export async function POST(req: Request) {
   try {
@@ -14,7 +10,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing imageUrl" }, { status: 400 });
     }
 
-    const result = await client.chat.completions.create({
+    const result = await openai.chat.completions.create({
       model: "gpt-4o-mini", // or any vision-capable model you use
       messages: [
         {
@@ -37,9 +33,9 @@ export async function POST(req: Request) {
     const text = result.choices[0]?.message?.content ?? "No response";
     return NextResponse.json({ analysis: text });
   } catch (err: any) {
-    console.error("Vision error:", err);
+    const errorMessage = await handleOpenAIError(err);
     return NextResponse.json(
-      { error: "Vision error", detail: err.message ?? String(err) },
+      { error: errorMessage },
       { status: 500 }
     );
   }

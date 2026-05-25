@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+import { openai, handleOpenAIError } from "@/lib/openaiClient";
 
 export interface Part {
   name: string;
@@ -57,8 +55,8 @@ export async function POST(req: Request) {
       .slice(0, 6);
 
     return NextResponse.json({ parts: validated });
-  } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : "Failed to fetch parts";
-    return NextResponse.json({ error: message }, { status: 500 });
+  } catch (e: any) {
+    const errorMessage = await handleOpenAIError(e);
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

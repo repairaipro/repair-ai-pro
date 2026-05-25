@@ -1,20 +1,16 @@
-import OpenAI from "openai";
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
-});
+import { openai } from "@/lib/openaiClient";
+import type OpenAI from "openai";
 
 export async function analyzeAttachment(imageUrl: string) {
-  const response = await openai.responses.create(
-    {
-      model: "gpt-4.1",
-      input: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "input_text",
-              text: `
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: `
 You are an expert maintenance diagnostic system.
 
 Analyze the image and return ONLY valid JSON.
@@ -34,19 +30,20 @@ Rules:
 - Be concise
 - No explanation outside JSON
 `,
-            },
-            {
-              type: "input_image",
-              image_url: imageUrl,
-              detail: "auto",
-            },
-          ],
-        },
-      ],
-    } as any
-  );
+          },
+          {
+            type: "image_url",
+            image_url: { url: imageUrl, detail: "auto" },
+          },
+        ],
+      },
+    ],
+    max_tokens: 600,
+    temperature: 0.2,
+    response_format: { type: "json_object" },
+  });
 
-  const text = response.output_text ?? "";
+  const text = response.choices[0]?.message?.content ?? "";
 
   let parsed;
 

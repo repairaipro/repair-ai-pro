@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
+import { openai, handleOpenAIError } from "@/lib/openaiClient";
 
 export async function POST(req: Request) {
   try {
@@ -26,7 +24,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ text: transcription.text });
   } catch (err: any) {
-    console.error("Whisper transcription error:", err.message);
-    return NextResponse.json({ error: err.message || "Transcription failed" }, { status: 500 });
+    const errorMessage = await handleOpenAIError(err);
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
