@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { openai, handleOpenAIError } from "@/lib/openaiClient";
-import { verifyAuthToken } from "@/lib/firebaseAdmin";
+import type OpenAI from "openai";
 
 type BidPackRequest = {
   description: string;
@@ -15,8 +15,6 @@ type BidPackRequest = {
     labor_hours_high?: number;
   } | null;
 };
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 async function bidPackWithOpenAI(payload: any) {
   const systemPrompt = `
@@ -42,11 +40,6 @@ Be clear, practical, and short.
 
 export async function POST(req: Request) {
   try {
-    const decoded = await verifyAuthToken(req).catch(() => null);
-    if (!decoded) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const body = (await req.json()) as BidPackRequest;
 
     if (!body?.description || !body?.trade || !body?.city) {

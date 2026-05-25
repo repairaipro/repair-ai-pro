@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { openai, handleOpenAIError } from "@/lib/openaiClient";
+import type OpenAI from "openai";
 
 type ExplainMode = "beginner" | "homeowner" | "pro";
 type HistoryItem = { role: "user" | "assistant"; content: string };

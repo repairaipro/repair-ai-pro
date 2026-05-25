@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { openai, handleOpenAIError } from "@/lib/openaiClient";
-import { verifyAuthToken } from "@/lib/firebaseAdmin";
 
 type EstimateRequest = {
   description: string;
@@ -35,11 +34,6 @@ Avoid making up local permit requirements; flag them as "may apply".
 
 export async function POST(req: Request) {
   try {
-    const decoded = await verifyAuthToken(req).catch(() => null);
-    if (!decoded) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const body = (await req.json()) as EstimateRequest;
 
     if (!body?.description || !body?.trade || !body?.city) {
