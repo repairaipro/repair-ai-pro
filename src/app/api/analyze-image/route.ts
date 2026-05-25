@@ -15,7 +15,7 @@ export async function POST(req: Request) {
     }
 
     const result = await client.chat.completions.create({
-      model: "gpt-4.1-mini", // or any vision-capable model you use
+      model: "gpt-4o-mini", // or any vision-capable model you use
       messages: [
         {
           role: "user",

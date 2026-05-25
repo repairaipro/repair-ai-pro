@@ -27,7 +27,7 @@ Avoid making up local permit requirements; flag them as "may apply".
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "gpt-4.1-mini",
+      model: "gpt-4o-mini",
       temperature: 0.2,
       response_format: { type: "json_object" },
       messages: [
