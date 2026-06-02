@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { doc, updateDoc, arrayUnion, serverTimestamp } from "firebase/firestore";
+import { doc, updateDoc, collection, addDoc, serverTimestamp, getDoc } from "firebase/firestore";
 import { verifyAuth } from "@/lib/auth";
 
 type JobLocation = {
@@ -34,8 +34,16 @@ export async function POST(
 
     const jobRef = doc(db, "jobs", jobId);
 
+    // Verify user is the claiming contractor
+    const jobSnap = await getDoc(jobRef);
+    if (!jobSnap.exists() || jobSnap.data().claimedBy !== user.uid) {
+      return NextResponse.json(
+        { error: "Not authorized to update this job's location" },
+        { status: 403 }
+      );
+    }
+
     // Update the job with latest contractor location
-    // Store in a subcollection for history, latest in main doc
     await updateDoc(jobRef, {
       contractorLocation: {
         lat: location.lat,
@@ -46,6 +54,19 @@ export async function POST(
         heading: location.heading,
       },
       lastLocationUpdate: serverTimestamp(),
+    });
+
+    // Store in location history subcollection for trip tracking
+    const historyRef = collection(db, "jobs", jobId, "locationHistory");
+    await addDoc(historyRef, {
+      contractorId: user.uid,
+      lat: location.lat,
+      lng: location.lng,
+      timestamp: location.timestamp,
+      accuracy: location.accuracy,
+      speed: location.speed,
+      heading: location.heading,
+      createdAt: serverTimestamp(),
     });
 
     return NextResponse.json({ success: true });

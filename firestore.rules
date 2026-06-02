@@ -209,6 +209,19 @@ service cloud.firestore {
           request.resource.data.status == "confirmed" &&
           uid() == resource.data.userId
         )
+
+        ||
+
+        /* CONTRACTOR UPDATES LOCATION (real-time tracking) */
+        (
+          resource.data.claimedBy == uid() &&
+          resource.data.status in ["accepted", "in_progress"] &&
+          request.resource.data.diff(resource.data).changedKeys()
+            .hasOnly([
+              "contractorLocation",
+              "lastLocationUpdate"
+            ])
+        )
       );
 
       allow delete: if false;
@@ -326,22 +339,45 @@ service cloud.firestore {
         allow update, delete: if false;
       }
 
-      /* ================= LIVE LOCATION (Real-time tracking) ================= */
+      /* ================= CONTRACTOR LOCATION (Real-time tracking) ================= */
+      // Update: Allow contractors to update their location on the job document
+      // Also allow location history tracking in subcollection
 
-      match /liveLocation/{locationId} {
-        // WRITE: Only the contractor claiming this job can write location
-        allow write: if signedIn()
-          && resource.data.claimedBy == uid()
+      match /locationHistory/{historyId} {
+        // WRITE: Only the claiming contractor can log location history
+        allow create: if signedIn()
           && job(jobId).data.claimedBy == uid()
-          && job(jobId).data.status in ["accepted", "in_progress"];
+          && job(jobId).data.status in ["accepted", "in_progress"]
+          && request.resource.data.contractorId == uid()
+          && request.resource.data.lat is number
+          && request.resource.data.lng is number
+          && request.resource.data.timestamp is number
+          && onlyKeys(["contractorId", "lat", "lng", "timestamp", "accuracy", "speed", "heading", "distanceMiles", "durationMinutes", "avgSpeed"]);
 
-        // READ: Only the homeowner can read contractor's location (during active job)
+        // READ: Homeowner can read location history during active job
         allow read: if signedIn()
           && uid() == job(jobId).data.userId
           && job(jobId).data.claimedBy != null
           && job(jobId).data.status in ["accepted", "in_progress"];
 
-        // DELETE: Not allowed (handled by TTL/Cloud Function)
+        // Contractor can read their own history
+        allow read: if signedIn()
+          && job(jobId).data.claimedBy == uid()
+          && job(jobId).data.status in ["accepted", "in_progress"];
+
+        // DELETE: Not allowed
+        allow delete: if false;
+      }
+
+      /* ================= NOTIFICATION HISTORY ================= */
+      match /notificationHistory/{notificationId} {
+        // WRITE: Only API can write (server-side via Cloud Function)
+        allow write: if false;
+
+        // READ: Job participants can read
+        allow read: if isParticipant(jobId);
+
+        // DELETE: Not allowed
         allow delete: if false;
       }
 

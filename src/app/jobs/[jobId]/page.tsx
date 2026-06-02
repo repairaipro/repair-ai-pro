@@ -14,6 +14,7 @@ import {
 import InsuranceReportModal from '@/components/InsuranceReportModal';
 import { ReviewModal } from '@/components/ReviewModal';
 import JobLocationTracker, { type JobLocation } from '@/components/JobLocationTracker';
+import NotificationHistory from '@/components/NotificationHistory';
 
 /* ── Types ── */
 type Job = {
@@ -255,6 +256,7 @@ export default function JobDetailPage() {
   const [cancelling,       setCancelling]       = useState(false);
   const [cancelError,      setCancelError]      = useState('');
   const [contractorLocationData, setContractorLocationData] = useState<JobLocation | null>(null);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   /* Live job */
   useEffect(() => {
@@ -686,6 +688,15 @@ export default function JobDetailPage() {
           <Link href={`/chat/${jobId}`} className="btn btn-secondary btn-full" style={{ justifyContent: 'center' }}>
             <MessageSquare size={15} /> Message
           </Link>
+          {['accepted', 'in_progress'].includes(job.status) && (
+            <button
+              onClick={() => setShowNotifications(true)}
+              className="btn btn-secondary btn-full"
+              style={{ justifyContent: 'center' }}
+            >
+              <AlertTriangle size={15} /> Notifications
+            </button>
+          )}
           {isHomeowner && (
             <button
               onClick={() => setShowInsurance(true)}
@@ -845,6 +856,13 @@ export default function JobDetailPage() {
           }}
         />
       )}
+
+      {/* Notification History Modal */}
+      <NotificationHistory
+        jobId={jobId}
+        isOpen={showNotifications}
+        onClose={() => setShowNotifications(false)}
+      />
     </div>
   );
 }

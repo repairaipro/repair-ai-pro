@@ -36,6 +36,15 @@ type Notification = {
   timestamp: number;
 };
 
+type TripEvent = {
+  id: string;
+  type: 'arrival' | 'departure' | 'milestone';
+  message: string;
+  timestamp: number;
+  distance?: number;
+  duration?: number;
+};
+
 type Props = {
   jobId: string;
   isContractor: boolean;
@@ -73,8 +82,10 @@ export default function JobLocationTracker({
     maxSpeed: 0,
   });
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [tripEvents, setTripEvents] = useState<TripEvent[]>([]);
   const [hasArrived, setHasArrived] = useState(false);
   const [arrivedTime, setArrivedTime] = useState<number | null>(null);
+  const [showTripHistory, setShowTripHistory] = useState(false);
   const watchId = useRef<number | null>(null);
   const lastNotificationTime = useRef<number>(0);
 
@@ -233,9 +244,21 @@ export default function JobLocationTracker({
                 setHasArrived(true);
                 setArrivedTime(loc.timestamp);
                 addNotification('arrival', 'You arrived at job location');
+                setTripEvents(prev => [...prev, {
+                  id: Math.random().toString(36).substr(2, 9),
+                  type: 'arrival',
+                  message: 'Arrived at job location',
+                  timestamp: loc.timestamp,
+                }]);
               } else if (!withinGeofence && hasArrived) {
                 setHasArrived(false);
                 addNotification('departure', 'You left job location');
+                setTripEvents(prev => [...prev, {
+                  id: Math.random().toString(36).substr(2, 9),
+                  type: 'departure',
+                  message: 'Left job location',
+                  timestamp: loc.timestamp,
+                }]);
               }
             }
           },
@@ -685,6 +708,21 @@ export default function JobLocationTracker({
               </div>
             )}
 
+            {/* Trip History Button */}
+            {tripEvents.length > 0 && (
+              <button
+                onClick={() => setShowTripHistory(!showTripHistory)}
+                className="w-full px-3 py-2 rounded-lg text-xs font-medium transition-all"
+                style={{
+                  background: 'rgba(99, 102, 241, 0.2)',
+                  color: '#818cf8',
+                  border: '1px solid rgba(99, 102, 241, 0.3)',
+                }}
+              >
+                {showTripHistory ? '▼ Hide' : '▶ Show'} Trip History ({tripEvents.length})
+              </button>
+            )}
+
             {/* Accuracy Info */}
             {userLocation && (
               <div className="text-xs space-y-1" style={{ color: 'var(--color-text-4)' }}>
@@ -695,6 +733,68 @@ export default function JobLocationTracker({
                 )}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Trip History Drawer */}
+      {showTripHistory && tripEvents.length > 0 && (
+        <div
+          className="fixed inset-0 z-40 flex items-end sm:items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+          onClick={() => setShowTripHistory(false)}
+        >
+          <div
+            className="w-full max-w-md max-h-96 rounded-2xl p-4 space-y-3 overflow-y-auto"
+            style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-bold" style={{ color: 'var(--color-text)' }}>
+                Trip Timeline
+              </h3>
+              <button
+                onClick={() => setShowTripHistory(false)}
+                className="w-6 h-6 rounded flex items-center justify-center"
+                style={{ background: 'var(--color-surface-2)', color: 'var(--color-text-4)' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              {tripEvents.map((event) => (
+                <div
+                  key={event.id}
+                  className="p-2 rounded-lg flex items-start gap-2"
+                  style={{
+                    background: 'var(--color-bg)',
+                    borderLeft: event.type === 'arrival'
+                      ? '3px solid #22c55e'
+                      : event.type === 'departure'
+                        ? '3px solid #ef4444'
+                        : '3px solid #818cf8',
+                  }}
+                >
+                  <span className="text-xl flex-shrink-0">
+                    {event.type === 'arrival' ? '✓' : event.type === 'departure' ? '✕' : '•'}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium" style={{ color: 'var(--color-text)' }}>
+                      {event.message}
+                    </p>
+                    <p className="text-[10px]" style={{ color: 'var(--color-text-4)' }}>
+                      {new Date(event.timestamp).toLocaleTimeString()}
+                    </p>
+                    {event.distance !== undefined && (
+                      <p className="text-[10px]" style={{ color: 'var(--color-text-4)' }}>
+                        {event.distance.toFixed(1)} mi · {Math.round(event.duration || 0)} min
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
