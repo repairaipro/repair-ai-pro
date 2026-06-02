@@ -1,39 +1,44 @@
 import { NextResponse } from "next/server";
 import { openai, handleOpenAIError } from "@/lib/openaiClient";
+import { getTradeKnowledge } from "@/lib/diagnosticKnowledge";
 import type OpenAI from "openai";
 
 type ExplainMode = "beginner" | "homeowner" | "pro";
 type HistoryItem = { role: "user" | "assistant"; content: string };
 
-function buildSystemPrompt(mode?: ExplainMode): string {
+function buildSystemPrompt(mode?: ExplainMode, trade?: string): string {
+  const tradeKnowledge = trade ? getTradeKnowledge(trade) : null;
+  const tradeContext = tradeKnowledge ? `\nYou are an expert in ${trade}.\n${tradeKnowledge.systemPrompt}` : "";
+
   const base = `You are RepairGPT — a world-class home repair and maintenance AI.
 You analyze images, diagnose problems, and give clear, actionable guidance.
 Always include: what the problem is, urgency level, estimated cost range, and whether to DIY or hire a pro.
 Use markdown formatting: **bold** for key points, bullet lists for steps.
-Be concise but complete. Never leave the user without a clear next step.`;
+Be concise but complete. Never leave the user without a clear next step.
+CRITICAL: Ask clarifying questions when diagnosis is uncertain. Narrow down the issue before committing to a diagnosis.`;
 
   if (mode === "beginner") {
-    return `${base}
+    return `${base}${tradeContext}
 Audience: Total beginner. No prior knowledge assumed.
 Style: Plain English only. No jargon whatsoever. Use numbered steps. Short sentences.
 Always reassure and encourage.`;
   }
   if (mode === "pro") {
-    return `${base}
+    return `${base}${tradeContext}
 Audience: Licensed professional or experienced tradesperson.
 Style: Technical language encouraged. Include part numbers, specs, failure modes, relevant codes (NEC, UPC, etc.).`;
   }
-  return `${base}
+  return `${base}${tradeContext}
 Audience: Typical homeowner — capable, smart, but not a specialist.
 Style: Clear and practical. Brief technical terms are fine but always define them.`;
 }
 
 export async function POST(req: Request) {
   try {
-    const { message, imageUrl, history, mode } = await req.json();
+    const { message, imageUrl, history, mode, trade } = await req.json();
 
     const messages: OpenAI.ChatCompletionMessageParam[] = [
-      { role: "system", content: buildSystemPrompt(mode as ExplainMode) },
+      { role: "system", content: buildSystemPrompt(mode as ExplainMode, trade) },
     ];
 
     // Include recent conversation history for context (last 8 turns)

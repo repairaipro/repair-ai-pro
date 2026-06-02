@@ -7,6 +7,7 @@ import Link from "next/link";
 import { TRADES, TRADES_FOR_PROMPT } from "@/lib/constants";
 import VoiceRecorder from "@/components/VoiceRecorder";
 import EmergencyBanner from "@/components/EmergencyBanner";
+import LocationInput, { LocationData } from "@/components/LocationInput";
 import {
   Zap,
   Brain,
@@ -37,6 +38,8 @@ type AIAnalysis = {
   trade: string;
   severity: "low" | "moderate" | "high" | "emergency";
   summary: string;
+  clarifyingQuestions?: string[];
+  confidence?: "high" | "medium" | "low";
 };
 
 type Estimate = {
@@ -181,11 +184,12 @@ export default function NewJobPage() {
   // Step 1
   const [activeMode, setActiveMode] = useState<InputMode>("type");
   const [description, setDescription] = useState("");
-  const [city, setCity] = useState("");
+  const [location, setLocation] = useState<LocationData>({});
   const [urgency, setUrgency] = useState<UrgencyLevel>("flexible");
   const [isEmergencyPremium, setIsEmergencyPremium] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [skipAIAnalysis, setSkipAIAnalysis] = useState(false);
 
   // Step 2
   const [analysis, setAnalysis] = useState<AIAnalysis | null>(null);
@@ -193,6 +197,8 @@ export default function NewJobPage() {
   const [estimate, setEstimate] = useState<Estimate | null>(null);
   const [parts, setParts] = useState<Part[]>([]);
   const [partsLoading, setPartsLoading] = useState(false);
+  const [answeredQuestions, setAnsweredQuestions] = useState<string[]>([]);
+  const [skipQuestions, setSkipQuestions] = useState(false);
 
   // Shared loading/error
   const [aiLoading, setAiLoading] = useState(false);
@@ -238,7 +244,8 @@ export default function NewJobPage() {
   }
 
   async function runAIAnalysis() {
-    if (!description.trim() || !city.trim()) return;
+    const hasLocation = location.zipcode || (location.city && location.state) || location.address;
+    if (!description.trim() || !hasLocation) return;
     setAiLoading(true);
     setError(null);
     try {
@@ -246,11 +253,21 @@ export default function NewJobPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: `You are analyzing a service request. The customer says: "${description.trim()}".
-Respond with ONLY a JSON object (no markdown, no extra text):
-{ "trade": "<best matching trade from: ${TRADES_FOR_PROMPT}>",
+          message: `You are diagnosing a home repair problem. The customer describes: "${description.trim()}".
+
+First, identify the trade. Then assess if you have enough information to diagnose accurately.
+If uncertain about the diagnosis (could be multiple issues), ask 2-3 clarifying questions.
+
+Respond with ONLY a JSON object:
+{
+  "trade": "<best matching trade from: ${TRADES_FOR_PROMPT}>",
   "severity": "<low|moderate|high|emergency>",
-  "summary": "<1-2 sentence plain-English summary of the problem and likely cause>" }`,
+  "summary": "<1-2 sentence diagnosis>",
+  "clarifyingQuestions": ["<question 1>", "<question 2>"],
+  "confidence": "<high|medium|low>"
+}
+
+CRITICAL: If you're not confident, ask clarifying questions rather than guessing. Better to ask than to misdiagnose.`,
           imageUrl: imagePreview,
           mode: "homeowner",
         }),
@@ -271,7 +288,7 @@ Respond with ONLY a JSON object (no markdown, no extra text):
 
       setAnalysis(result);
       setDetectedTrade(result.trade);
-      if (city.trim()) fetchEstimate(result.trade, city.trim());
+      if (hasLocation) fetchEstimate(result.trade, location);
       fetchParts(result.trade, description.trim());
       setStep(2);
     } catch {
@@ -285,14 +302,14 @@ Respond with ONLY a JSON object (no markdown, no extra text):
     }
   }
 
-  async function fetchEstimate(trade: string, cityVal: string) {
+  async function fetchEstimate(trade: string, loc: LocationData) {
     setEstimateLoading(true);
     try {
       const token = await user.getIdToken();
       const res = await fetch("/api/estimate-job", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ description: description.trim(), trade, city: cityVal, urgency }),
+        body: JSON.stringify({ description: description.trim(), trade, location: loc, urgency }),
       });
       const data = await res.json();
       if (data.estimate) setEstimate(data.estimate);
@@ -315,8 +332,9 @@ Respond with ONLY a JSON object (no markdown, no extra text):
   }
 
   async function handleSubmit() {
-    if (!description.trim() || !city.trim()) {
-      setError("Please fill in the description and city.");
+    const hasLocation = location.zipcode || (location.city && location.state) || location.address;
+    if (!description.trim() || !hasLocation) {
+      setError("Please fill in the description and location.");
       return;
     }
     setSubmitting(true);
@@ -328,7 +346,7 @@ Respond with ONLY a JSON object (no markdown, no extra text):
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           description: description.trim(),
-          location: { city: city.trim() },
+          location,
           aiDetectedTrade: detectedTrade || analysis?.trade || null,
           aiSummary: analysis?.summary ?? null,
           urgency,
@@ -564,21 +582,8 @@ Respond with ONLY a JSON object (no markdown, no extra text):
                 </div>
               )}
 
-              {/* City */}
-              <div>
-                <label className="label">
-                  Your City <span style={{ color: '#f87171' }}>*</span>
-                </label>
-                <div className="relative">
-                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--color-text-4)' }} />
-                  <input
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    placeholder="e.g. Houston, TX"
-                    className="input pl-9"
-                  />
-                </div>
-              </div>
+              {/* Location */}
+              <LocationInput value={location} onChange={setLocation} required />
 
               {/* Urgency */}
               <div>
@@ -618,27 +623,41 @@ Respond with ONLY a JSON object (no markdown, no extra text):
               )}
             </div>
 
-            <button
-              onClick={runAIAnalysis}
-              disabled={!description.trim() || !city.trim() || aiLoading}
-              className="btn btn-primary btn-full btn-lg"
-            >
-              {aiLoading ? (
-                <>
-                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" opacity=".25" />
-                    <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  AI is analyzing your problem…
-                </>
-              ) : (
-                <>
-                  <Brain className="w-4 h-4" />
-                  Analyze with AI
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={runAIAnalysis}
+                disabled={!description.trim() || !(location.zipcode || (location.city && location.state) || location.address) || aiLoading}
+                className="btn btn-primary flex-1 btn-lg"
+              >
+                {aiLoading ? (
+                  <>
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" opacity=".25" />
+                      <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    AI is analyzing…
+                  </>
+                ) : (
+                  <>
+                    <Brain className="w-4 h-4" />
+                    Analyze with AI
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => {
+                  setSkipAIAnalysis(true);
+                  setStep(3);
+                }}
+                disabled={!description.trim() || !(location.zipcode || (location.city && location.state) || location.address)}
+                className="btn btn-secondary"
+                type="button"
+                title="Skip AI analysis and go straight to job posting"
+              >
+                Skip →
+              </button>
+            </div>
           </div>
         )}
 
@@ -678,6 +697,59 @@ Respond with ONLY a JSON object (no markdown, no extra text):
                 </div>
               )}
 
+              {analysis.clarifyingQuestions && analysis.clarifyingQuestions.length > 0 && !skipQuestions && (
+                <div
+                  className="rounded-lg p-3 space-y-3"
+                  style={{ background: 'rgba(251, 191, 36, 0.08)', border: '1px solid rgba(251, 191, 36, 0.2)' }}
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-xs font-semibold" style={{ color: '#fbbf24' }}>
+                        📋 Answer these to narrow down the diagnosis (optional):
+                      </p>
+                      <p className="text-[11px] mt-1" style={{ color: 'var(--color-text-4)' }}>
+                        These help contractors understand your issue better, but you can skip if you're in a hurry.
+                      </p>
+                    </div>
+                  </div>
+                  <ul className="space-y-1.5">
+                    {analysis.clarifyingQuestions.map((q, i) => (
+                      <li key={i} className="text-xs flex gap-2" style={{ color: 'var(--color-text-3)' }}>
+                        <span style={{ color: '#fbbf24' }}>•</span>
+                        <span>{q}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <textarea
+                    placeholder="(Optional) Paste your answers to the questions above, or add any other details you think are important..."
+                    value={answeredQuestions.join('\n')}
+                    onChange={(e) => setAnsweredQuestions(e.target.value.split('\n').filter((a) => a.trim()))}
+                    rows={2}
+                    className="input resize-none text-xs"
+                    style={{ fontSize: '12px' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setSkipQuestions(true)}
+                    className="text-xs"
+                    style={{ color: '#818cf8', textDecoration: 'underline' }}
+                  >
+                    Skip these questions, I'll add details in the description
+                  </button>
+                </div>
+              )}
+
+              {skipQuestions && (
+                <div
+                  className="rounded-lg p-3"
+                  style={{ background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.2)' }}
+                >
+                  <p className="text-xs" style={{ color: '#818cf8' }}>
+                    ✓ Got it — skipped clarifying questions. Contractors will work with your description.
+                  </p>
+                </div>
+              )}
+
               <div>
                 <label className="label">
                   Detected Trade{" "}
@@ -687,7 +759,8 @@ Respond with ONLY a JSON object (no markdown, no extra text):
                   value={detectedTrade}
                   onChange={(e) => {
                     setDetectedTrade(e.target.value);
-                    if (city.trim()) fetchEstimate(e.target.value, city.trim());
+                    const hasLocation = location.zipcode || (location.city && location.state) || location.address;
+                    if (hasLocation) fetchEstimate(e.target.value, location);
                     fetchParts(e.target.value, description.trim());
                   }}
                   className="input"
@@ -751,7 +824,7 @@ Respond with ONLY a JSON object (no markdown, no extra text):
                 <p className="text-sm" style={{ color: 'var(--color-text-4)' }}>
                   Estimate unavailable.{" "}
                   <button
-                    onClick={() => fetchEstimate(detectedTrade, city.trim())}
+                    onClick={() => fetchEstimate(detectedTrade, location)}
                     className="underline hover:opacity-70 transition-opacity"
                     style={{ color: '#818cf8' }}
                   >
@@ -904,6 +977,25 @@ Respond with ONLY a JSON object (no markdown, no extra text):
         {step === 3 && (
           <div className="space-y-5 animate-fade-up">
 
+            {/* Warning if skipped analysis */}
+            {skipAIAnalysis && (
+              <div
+                className="rounded-xl px-4 py-3 flex items-start gap-3"
+                style={{
+                  background: 'rgba(59, 130, 246, 0.08)',
+                  border: '1px solid rgba(59, 130, 246, 0.2)',
+                }}
+              >
+                <span style={{ fontSize: 18, flexShrink: 0 }}>ℹ️</span>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold" style={{ color: '#3b82f6' }}>AI Analysis Skipped</p>
+                  <p className="text-xs mt-1" style={{ color: 'rgba(59, 130, 246, 0.9)' }}>
+                    You've skipped AI analysis. Make sure your description is detailed so contractors understand the issue clearly.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Review card */}
             <div className="card p-6 space-y-4">
               <h2 className="font-semibold" style={{ color: 'var(--color-text)' }}>Review Your Job</h2>
@@ -913,7 +1005,7 @@ Respond with ONLY a JSON object (no markdown, no extra text):
                   [
                     { icon: <Brain className="w-4 h-4" />,     label: "Problem",  value: description },
                     { icon: <Briefcase className="w-4 h-4" />, label: "Trade",    value: detectedTrade || "General" },
-                    { icon: <MapPin className="w-4 h-4" />,    label: "Location", value: city },
+                    { icon: <MapPin className="w-4 h-4" />,    label: "Location", value: location.zipcode ? `ZIP ${location.zipcode}` : location.city ? `${location.city}, ${location.state}` : location.address || "Not set" },
                     { icon: <Clock className="w-4 h-4" />,     label: "Urgency",  value: urgency.charAt(0).toUpperCase() + urgency.slice(1) },
                     ...(estimate
                       ? [{ icon: <DollarSign className="w-4 h-4" />, label: "Est. Cost", value: `$${estimate.price_low_usd.toLocaleString()} – $${estimate.price_high_usd.toLocaleString()}` }]
@@ -990,7 +1082,7 @@ Respond with ONLY a JSON object (no markdown, no extra text):
             </div>
 
             <div className="flex gap-3">
-              <button onClick={() => setStep(2)} className="btn btn-secondary flex-1">
+              <button onClick={() => setStep(skipAIAnalysis ? 1 : 2)} className="btn btn-secondary flex-1">
                 <ArrowLeft className="w-4 h-4" /> Back
               </button>
               <button

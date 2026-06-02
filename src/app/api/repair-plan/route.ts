@@ -13,18 +13,26 @@ export async function POST(req: Request) {
     const userContent: OpenAI.ChatCompletionContentPart[] = [
       {
         type: "text",
-        text: `Generate a detailed, actionable repair plan for this problem: "${prompt?.trim() ?? "See image"}".
+        text: `Create a detailed repair plan for: "${prompt?.trim() ?? "See image"}".
 
-Return ONLY a valid JSON object (no markdown, no code fences) with exactly this structure:
+Before committing to a plan, verify you understand the full scope:
+- What exactly is broken or not working?
+- What is the root cause?
+- Are there any related issues that should be addressed?
+- What is the simplest solution vs. comprehensive fix?
+
+Return ONLY a valid JSON object (no markdown, no code fences):
 {
-  "summary": "2-3 sentence overview of the problem and fix",
+  "summary": "2-3 sentence overview of problem and recommended fix",
+  "diagnosis": "What specifically is wrong and why",
   "difficulty": "Easy | Medium | Hard | Call a Pro",
   "time_required": "e.g. 30 minutes | 2-3 hours",
   "steps": ["Step 1: ...", "Step 2: ...", "..."],
   "tools": ["Tool 1", "Tool 2", "..."],
   "parts": ["Part 1 (approx cost)", "Part 2", "..."],
   "warnings": ["Safety warning 1", "..."],
-  "cost_estimate": { "diy": "$X - $Y", "pro": "$A - $B" }
+  "cost_estimate": { "diy": "$X - $Y", "pro": "$A - $B" },
+  "questions_answered": ["question 1 we answered", "question 2"]
 }`,
       },
     ];

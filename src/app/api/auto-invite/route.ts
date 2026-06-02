@@ -2,6 +2,25 @@ import { NextResponse } from "next/server";
 import { adminDb, adminAuth } from "@/lib/firebaseAdmin";
 import { notifyContractorInvited } from "@/lib/notif";
 
+function haversineDistance(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number {
+  const R = 3959;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
 function score(contractor: any, job: any) {
   let s = 0;
 
@@ -13,11 +32,35 @@ function score(contractor: any, job: any) {
     }
   }
 
-  if (contractor.city && job.location?.city) {
-    if (
-      contractor.city.toLowerCase() === job.location.city.toLowerCase()
-    ) {
-      s += 25;
+  const jobLocation = job.location;
+  const contractorLat = contractor.latitude;
+  const contractorLon = contractor.longitude;
+
+  if (jobLocation) {
+    if (jobLocation.zipcode && contractor.zipcode) {
+      if (jobLocation.zipcode === contractor.zipcode) {
+        s += 30;
+      } else {
+        s += 5;
+      }
+    } else if (contractorLat && contractorLon && jobLocation.coordinates) {
+      const distance = haversineDistance(
+        contractorLat,
+        contractorLon,
+        jobLocation.coordinates.lat,
+        jobLocation.coordinates.lng
+      );
+      if (distance <= 10) {
+        s += 30;
+      } else if (distance <= 25) {
+        s += 20;
+      } else if (distance <= 50) {
+        s += 10;
+      }
+    } else if (contractor.city && jobLocation.city) {
+      if (contractor.city.toLowerCase() === jobLocation.city.toLowerCase()) {
+        s += 20;
+      }
     }
   }
 
@@ -116,9 +159,14 @@ export async function POST(req: Request) {
 
     // Notify each invited contractor (fire-and-forget)
     const trade = job?.aiDetectedTrade || job?.trade || "General";
-    const city  = job?.location?.city  || job?.location || "your area";
+    const location = job?.location || {};
+    const locationStr =
+      (location.zipcode && `ZIP ${location.zipcode}`) ||
+      (location.address && location.address) ||
+      (location.city && location.state && `${location.city}, ${location.state}`) ||
+      "your area";
     Promise.all(
-      top.map((c) => notifyContractorInvited(c.id, jobId, trade, city))
+      top.map((c) => notifyContractorInvited(c.id, jobId, trade, locationStr))
     ).catch((e) => console.error("Invite notifications error:", e));
 
     // 🔥 timeline

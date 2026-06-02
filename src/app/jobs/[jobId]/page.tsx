@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { db } from '@/lib/db';
-import { doc, onSnapshot, collection, query, orderBy } from 'firebase/firestore';
+import { doc, onSnapshot, collection, query, orderBy, updateDoc } from 'firebase/firestore';
 import { useAuth } from '@/lib/auth';
 import {
   ChevronLeft, MessageSquare, CheckCircle2, Clock, AlertTriangle,
@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import InsuranceReportModal from '@/components/InsuranceReportModal';
 import { ReviewModal } from '@/components/ReviewModal';
+import JobLocationTracker, { type JobLocation } from '@/components/JobLocationTracker';
 
 /* ── Types ── */
 type Job = {
@@ -32,6 +33,8 @@ type Job = {
   aiSummary?:       string;
   bidCount?:        number;
   insuranceReport?: { content: string; generatedAt: any };
+  contractorLocation?: { lat: number; lng: number; timestamp: number; accuracy?: number; speed?: number; heading?: number };
+  lastLocationUpdate?: any;
 };
 
 type Bid = {
@@ -251,13 +254,22 @@ export default function JobDetailPage() {
   const [cancelReason,     setCancelReason]     = useState('');
   const [cancelling,       setCancelling]       = useState(false);
   const [cancelError,      setCancelError]      = useState('');
+  const [contractorLocationData, setContractorLocationData] = useState<JobLocation | null>(null);
 
   /* Live job */
   useEffect(() => {
     if (!jobId) return;
     const unsub = onSnapshot(doc(db, 'jobs', jobId), (snap) => {
-      if (snap.exists()) setJob({ id: snap.id, ...(snap.data() as any) });
-      else setJob(null);
+      if (snap.exists()) {
+        const jobData = { id: snap.id, ...(snap.data() as any) };
+        setJob(jobData);
+        // Update contractor location from job data
+        if (jobData.contractorLocation) {
+          setContractorLocationData(jobData.contractorLocation);
+        }
+      } else {
+        setJob(null);
+      }
       setJobLoading(false);
     }, () => setJobLoading(false));
     return unsub;
@@ -359,6 +371,21 @@ export default function JobDetailPage() {
       setCancelError('Network error. Please try again.');
     }
     setCancelling(false);
+  }
+
+  async function handleLocationUpdate(location: JobLocation) {
+    if (!jobId || !user) return;
+    setContractorLocationData(location);
+    try {
+      const token = await user.getIdToken();
+      await fetch(`/api/jobs/${jobId}/location`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ location }),
+      });
+    } catch (err) {
+      console.error('Failed to update location:', err);
+    }
   }
 
   if (jobLoading) {
@@ -575,6 +602,22 @@ export default function JobDetailPage() {
               </Link>
             </div>
           </div>
+        )}
+
+        {/* ── Location Tracking ── */}
+        {['accepted', 'in_progress'].includes(job.status) && job.claimedBy && (
+          <JobLocationTracker
+            jobId={jobId}
+            isContractor={isContractor}
+            isActive={true}
+            customerAddress={typeof job.location === 'object' ? job.location?.address : undefined}
+            contractorName={selectedBid?.name || bids.find(b => b.contractorId === job.claimedBy)?.name}
+            contractorLocation={contractorLocationData || undefined}
+            customerLocation={typeof job.location === 'object' && job.location?.coordinates
+              ? { lat: job.location.coordinates.lat, lng: job.location.coordinates.lng }
+              : undefined}
+            onLocationUpdate={handleLocationUpdate}
+          />
         )}
 
         {/* ── Bids section ── */}
