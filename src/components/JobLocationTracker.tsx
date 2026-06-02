@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { MapPin, Navigation, Cloud, CloudRain, CloudSnow, X } from 'lucide-react';
+import { MapPin, Navigation, Cloud, CloudRain, CloudSnow, X, CheckCircle2, LogOut, AlertCircle } from 'lucide-react';
 
 export type JobLocation = {
   lat: number;
@@ -20,6 +20,22 @@ type WeatherData = {
   description: string;
 };
 
+type TripStats = {
+  distanceMiles: number;
+  durationMinutes: number;
+  avgSpeed: number;
+  maxSpeed: number;
+  arrivalTime?: number;
+  departureTime?: number;
+};
+
+type Notification = {
+  id: string;
+  type: 'arrival' | 'departure' | 'info';
+  message: string;
+  timestamp: number;
+};
+
 type Props = {
   jobId: string;
   isContractor: boolean;
@@ -30,6 +46,8 @@ type Props = {
   customerLocation?: { lat: number; lng: number };
   onLocationUpdate?: (location: JobLocation) => void;
 };
+
+const GEOFENCE_RADIUS_MILES = 0.5; // Job location radius
 
 export default function JobLocationTracker({
   jobId,
@@ -47,7 +65,92 @@ export default function JobLocationTracker({
   const [userLocation, setUserLocation] = useState<JobLocation | null>(null);
   const [locationEnabled, setLocationEnabled] = useState(false);
   const [eta, setEta] = useState<string | null>(null);
+  const [locationHistory, setLocationHistory] = useState<JobLocation[]>([]);
+  const [tripStats, setTripStats] = useState<TripStats>({
+    distanceMiles: 0,
+    durationMinutes: 0,
+    avgSpeed: 0,
+    maxSpeed: 0,
+  });
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [hasArrived, setHasArrived] = useState(false);
+  const [arrivedTime, setArrivedTime] = useState<number | null>(null);
   const watchId = useRef<number | null>(null);
+  const lastNotificationTime = useRef<number>(0);
+
+  // Calculate distance between two points
+  const haversineDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+    const R = 3959; // Earth's radius in miles
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLng = ((lng2 - lng1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLng / 2) *
+        Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
+  // Check if contractor is within geofence
+  const isWithinGeofence = (currentLoc: JobLocation): boolean => {
+    if (!customerLocation) return false;
+    const distance = haversineDistance(
+      currentLoc.lat,
+      currentLoc.lng,
+      customerLocation.lat,
+      customerLocation.lng
+    );
+    return distance <= GEOFENCE_RADIUS_MILES;
+  };
+
+  // Add notification
+  const addNotification = (type: Notification['type'], message: string) => {
+    const now = Date.now();
+    if (now - lastNotificationTime.current < 3000) return; // Debounce
+    lastNotificationTime.current = now;
+
+    const id = Math.random().toString(36).substr(2, 9);
+    setNotifications(prev => [...prev, { id, type, message, timestamp: now }]);
+    setTimeout(() => {
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    }, 6000);
+  };
+
+  // Calculate trip statistics
+  const calculateTripStats = (history: JobLocation[]) => {
+    if (history.length < 2) return;
+
+    let totalDistance = 0;
+    let maxSpeed = 0;
+
+    for (let i = 1; i < history.length; i++) {
+      const dist = haversineDistance(
+        history[i - 1].lat,
+        history[i - 1].lng,
+        history[i].lat,
+        history[i].lng
+      );
+      totalDistance += dist;
+
+      if (history[i].speed) {
+        maxSpeed = Math.max(maxSpeed, history[i].speed || 0);
+      }
+    }
+
+    const durationMs = history[history.length - 1].timestamp - history[0].timestamp;
+    const durationMinutes = durationMs / 1000 / 60;
+    const avgSpeed = durationMinutes > 0 ? (totalDistance / durationMinutes) * 60 : 0;
+
+    setTripStats({
+      distanceMiles: totalDistance,
+      durationMinutes,
+      avgSpeed,
+      maxSpeed,
+      arrivalTime: arrivedTime,
+    });
+  };
 
   // Get weather data
   const fetchWeather = async (lat: number, lng: number) => {
@@ -100,6 +203,11 @@ export default function JobLocationTracker({
   const toggleLocationSharing = () => {
     if (!locationEnabled) {
       if (navigator.geolocation) {
+        setLocationHistory([]);
+        setHasArrived(false);
+        setArrivedTime(null);
+        setNotifications([]);
+
         watchId.current = navigator.geolocation.watchPosition(
           (position) => {
             const loc: JobLocation = {
@@ -110,9 +218,26 @@ export default function JobLocationTracker({
               speed: position.coords.speed || undefined,
               heading: position.coords.heading || undefined,
             };
+
             setUserLocation(loc);
             fetchWeather(loc.lat, loc.lng);
             onLocationUpdate?.(loc);
+
+            // Update location history and stats
+            setLocationHistory(prev => [...prev, loc]);
+
+            // Check geofence for arrival/departure
+            if (isContractor && customerLocation) {
+              const withinGeofence = isWithinGeofence(loc);
+              if (withinGeofence && !hasArrived) {
+                setHasArrived(true);
+                setArrivedTime(loc.timestamp);
+                addNotification('arrival', 'You arrived at job location');
+              } else if (!withinGeofence && hasArrived) {
+                setHasArrived(false);
+                addNotification('departure', 'You left job location');
+              }
+            }
           },
           (error) => {
             console.error('Geolocation error:', error);
@@ -133,30 +258,22 @@ export default function JobLocationTracker({
 
   // Calculate ETA (rough estimate)
   const calculateETA = (from: JobLocation, to: { lat: number; lng: number }) => {
-    const R = 3959; // Earth's radius in miles
-    const dLat = ((to.lat - from.lat) * Math.PI) / 180;
-    const dLng = ((to.lng - from.lng) * Math.PI) / 180;
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((from.lat * Math.PI) / 180) *
-        Math.cos((to.lat * Math.PI) / 180) *
-        Math.sin(dLng / 2) *
-        Math.sin(dLng / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    const distance = R * c;
-
+    const distance = haversineDistance(from.lat, from.lng, to.lat, to.lng);
     // Assume average speed of 30 mph for rough ETA
     const minutes = Math.round((distance / 30) * 60);
     if (minutes < 1) return 'Arriving now';
     return `${minutes} min away`;
   };
 
-  // Update ETA when location changes
+  // Update ETA and trip stats when location changes
   useEffect(() => {
     if (contractorLocation && customerLocation) {
       setEta(calculateETA(contractorLocation, customerLocation));
     }
-  }, [contractorLocation, customerLocation]);
+    if (locationHistory.length > 0) {
+      calculateTripStats(locationHistory);
+    }
+  }, [contractorLocation, customerLocation, locationHistory]);
 
   // Open in native maps
   const openInMaps = (lat: number, lng: number, label?: string) => {
@@ -251,6 +368,47 @@ export default function JobLocationTracker({
                     ))}
                   </g>
 
+                  {/* Geofence zone around customer location */}
+                  {customerLocation && (
+                    <g>
+                      <circle
+                        cx="320"
+                        cy="160"
+                        r="40"
+                        fill="rgba(34, 197, 94, 0.05)"
+                        stroke="rgba(34, 197, 94, 0.3)"
+                        strokeWidth="2"
+                        strokeDasharray="5,5"
+                      />
+                      <text
+                        x="320"
+                        y="210"
+                        textAnchor="middle"
+                        fill="rgba(34, 197, 94, 0.6)"
+                        fontSize="10"
+                        fontWeight="bold"
+                      >
+                        Job Zone
+                      </text>
+                    </g>
+                  )}
+
+                  {/* Route path (location history) */}
+                  {locationHistory.length > 1 && (
+                    <g>
+                      <polyline
+                        points={locationHistory
+                          .slice(-10)
+                          .map((_, i) => `${80 + i * 5},${160 - Math.sin(i) * 10}`)
+                          .join(' ')}
+                        fill="none"
+                        stroke="rgba(99, 102, 241, 0.4)"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      />
+                    </g>
+                  )}
+
                   {/* Customer location */}
                   {customerLocation && (
                     <g>
@@ -265,6 +423,16 @@ export default function JobLocationTracker({
                       {/* Location pin */}
                       <circle cx="320" cy="160" r="8" fill="#a855f7" />
                       <circle cx="320" cy="160" r="4" fill="#fff" />
+                      <text
+                        x="320"
+                        y="130"
+                        textAnchor="middle"
+                        fill="#a855f7"
+                        fontSize="11"
+                        fontWeight="bold"
+                      >
+                        Customer
+                      </text>
                     </g>
                   )}
 
@@ -289,17 +457,43 @@ export default function JobLocationTracker({
                       <rect x="-10" y="-6" width="8" height="6" fill="#60a5fa" opacity="0.7" />
                     </g>
 
+                    {/* Contractor label */}
+                    <text
+                      x="80"
+                      y="125"
+                      textAnchor="middle"
+                      fill="#34d399"
+                      fontSize="11"
+                      fontWeight="bold"
+                    >
+                      You
+                    </text>
+
                     {/* ETA label */}
-                    {eta && (
+                    {eta && !hasArrived && (
                       <text
                         x="80"
                         y="200"
                         textAnchor="middle"
                         fill="#34d399"
-                        fontSize="14"
+                        fontSize="13"
                         fontWeight="bold"
                       >
                         {eta}
+                      </text>
+                    )}
+
+                    {/* Arrival indicator */}
+                    {hasArrived && (
+                      <text
+                        x="80"
+                        y="200"
+                        textAnchor="middle"
+                        fill="#22c55e"
+                        fontSize="12"
+                        fontWeight="bold"
+                      >
+                        ✓ Arrived
                       </text>
                     )}
                   </g>
@@ -359,46 +553,69 @@ export default function JobLocationTracker({
             )}
           </div>
 
-          {/* Weather & Info Bar */}
+          {/* Notifications */}
+          {notifications.length > 0 && (
+            <div className="p-3 space-y-2">
+              {notifications.map(notif => (
+                <div
+                  key={notif.id}
+                  className="px-3 py-2 rounded-lg flex items-center gap-2 text-xs font-medium transition-all"
+                  style={{
+                    background: notif.type === 'arrival'
+                      ? 'rgba(34, 197, 94, 0.15)'
+                      : notif.type === 'departure'
+                        ? 'rgba(239, 68, 68, 0.15)'
+                        : 'rgba(99, 102, 241, 0.15)',
+                    color: notif.type === 'arrival'
+                      ? '#22c55e'
+                      : notif.type === 'departure'
+                        ? '#ef4444'
+                        : '#818cf8',
+                  }}
+                >
+                  {notif.type === 'arrival' && <CheckCircle2 size={16} />}
+                  {notif.type === 'departure' && <LogOut size={16} />}
+                  {notif.type === 'info' && <AlertCircle size={16} />}
+                  <span>{notif.message}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Address & Trip Info */}
           <div
-            className="p-4 space-y-3"
+            className="p-4 space-y-4"
             style={{ background: 'var(--color-surface-2)', borderTop: '1px solid var(--color-border)' }}
           >
-            {/* Weather */}
-            {weather && (
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {weather.main === 'Rain' && <CloudRain className="w-5 h-5" style={{ color: '#60a5fa' }} />}
-                  {weather.main === 'Snow' && <CloudSnow className="w-5 h-5" style={{ color: '#f0f9ff' }} />}
-                  {weather.main === 'Clear' && <Cloud className="w-5 h-5" style={{ color: '#fbbf24' }} />}
-                  <div>
-                    <p className="text-sm font-medium" style={{ color: 'var(--color-text)' }}>
-                      {weather.temp}°F · {weather.description}
+            {/* Addresses */}
+            <div className="space-y-2">
+              {customerAddress && (
+                <div className="flex items-start gap-2">
+                  <MapPin size={16} style={{ color: '#a855f7', marginTop: '2px', flexShrink: 0 }} />
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium" style={{ color: 'var(--color-text-4)' }}>
+                      Job Location
                     </p>
-                    <p className="text-xs" style={{ color: 'var(--color-text-4)' }}>
-                      {weather.humidity}% humidity
+                    <p className="text-sm font-medium break-words" style={{ color: 'var(--color-text)' }}>
+                      {customerAddress}
                     </p>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Quick Action Buttons */}
-            <div className="flex gap-2">
               {isContractor && customerAddress && (
                 <button
                   onClick={() => {
-                    // Parse address to get coordinates (simplified)
                     alert('Open customer address in Maps:\n' + customerAddress);
                   }}
-                  className="flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all"
+                  className="w-full px-3 py-2 rounded-lg text-xs font-medium transition-all"
                   style={{
                     background: 'rgba(59, 130, 246, 0.2)',
                     color: '#3b82f6',
                     border: '1px solid rgba(59, 130, 246, 0.3)',
                   }}
                 >
-                  📍 Customer Address
+                  📍 Navigate to Customer Address
                 </button>
               )}
 
@@ -407,36 +624,75 @@ export default function JobLocationTracker({
                   onClick={() =>
                     openInMaps(contractorLocation.lat, contractorLocation.lng, contractorName || 'Contractor')
                   }
-                  className="flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all"
+                  className="w-full px-3 py-2 rounded-lg text-xs font-medium transition-all"
                   style={{
                     background: 'rgba(34, 197, 94, 0.2)',
                     color: '#34d399',
                     border: '1px solid rgba(34, 197, 94, 0.3)',
                   }}
                 >
-                  🗺️ View in Maps
-                </button>
-              )}
-
-              {userLocation && (
-                <button
-                  onClick={() => setUserLocation(null)}
-                  className="px-3 py-2 rounded-lg text-xs"
-                  style={{
-                    background: 'rgba(239, 68, 68, 0.1)',
-                    color: '#f87171',
-                  }}
-                >
-                  <X className="w-4 h-4" />
+                  🗺️ Track Contractor Location
                 </button>
               )}
             </div>
 
-            {/* Accuracy & Speed Info */}
+            {/* Trip Statistics */}
+            {locationEnabled && (
+              <div className="grid grid-cols-2 gap-2">
+                <div className="p-2 rounded-lg" style={{ background: 'var(--color-bg)' }}>
+                  <p className="text-xs" style={{ color: 'var(--color-text-4)' }}>Distance</p>
+                  <p className="text-sm font-bold" style={{ color: 'var(--color-text)' }}>
+                    {tripStats.distanceMiles.toFixed(1)} mi
+                  </p>
+                </div>
+                <div className="p-2 rounded-lg" style={{ background: 'var(--color-bg)' }}>
+                  <p className="text-xs" style={{ color: 'var(--color-text-4)' }}>Duration</p>
+                  <p className="text-sm font-bold" style={{ color: 'var(--color-text)' }}>
+                    {Math.round(tripStats.durationMinutes)} min
+                  </p>
+                </div>
+                <div className="p-2 rounded-lg" style={{ background: 'var(--color-bg)' }}>
+                  <p className="text-xs" style={{ color: 'var(--color-text-4)' }}>Avg Speed</p>
+                  <p className="text-sm font-bold" style={{ color: 'var(--color-text)' }}>
+                    {tripStats.avgSpeed.toFixed(0)} mph
+                  </p>
+                </div>
+                <div className="p-2 rounded-lg" style={{ background: 'var(--color-bg)' }}>
+                  <p className="text-xs" style={{ color: 'var(--color-text-4)' }}>Max Speed</p>
+                  <p className="text-sm font-bold" style={{ color: 'var(--color-text)' }}>
+                    {tripStats.maxSpeed.toFixed(0)} mph
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Weather */}
+            {weather && (
+              <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: 'var(--color-bg)' }}>
+                <div className="flex items-center gap-2">
+                  {weather.main === 'Rain' && <CloudRain className="w-4 h-4" style={{ color: '#60a5fa' }} />}
+                  {weather.main === 'Snow' && <CloudSnow className="w-4 h-4" style={{ color: '#f0f9ff' }} />}
+                  {weather.main === 'Clear' && <Cloud className="w-4 h-4" style={{ color: '#fbbf24' }} />}
+                  <div>
+                    <p className="text-xs font-medium" style={{ color: 'var(--color-text)' }}>
+                      {weather.temp}°F · {weather.description}
+                    </p>
+                    <p className="text-[10px]" style={{ color: 'var(--color-text-4)' }}>
+                      {weather.humidity}% humidity
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Accuracy Info */}
             {userLocation && (
               <div className="text-xs space-y-1" style={{ color: 'var(--color-text-4)' }}>
-                <p>📍 Accuracy: {userLocation.accuracy ? Math.round(userLocation.accuracy) : '?'} meters</p>
-                {userLocation.speed && <p>🚗 Speed: {Math.round(userLocation.speed * 2.237)} mph</p>}
+                <p>📍 Accuracy: ±{userLocation.accuracy ? Math.round(userLocation.accuracy) : '?'} meters</p>
+                {userLocation.speed && <p>🚗 Current Speed: {Math.round(userLocation.speed * 2.237)} mph</p>}
+                {arrivedTime && (
+                  <p>✓ Arrived: {new Date(arrivedTime).toLocaleTimeString()}</p>
+                )}
               </div>
             )}
           </div>
