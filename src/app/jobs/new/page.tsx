@@ -27,7 +27,11 @@ import {
   PenLine,
   ShoppingCart,
   ExternalLink,
+  TrendingUp,
 } from "lucide-react";
+import TradeQuestionnaire from "@/components/TradeQuestionnaire";
+import { getQuestionsForTrade } from "@/lib/tradeQuestionnaires";
+import type { Question } from "@/lib/tradeQuestionnaires";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -58,6 +62,15 @@ type Part = {
   name: string;
   estimatedPrice: string;
   why: string;
+};
+
+type SmartEstimate = {
+  estimatedPrice: number;
+  lowRange: number;
+  highRange: number;
+  complexity: number;
+  sampleSize: number;
+  aiInsights?: string;
 };
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -127,7 +140,7 @@ function ModeCard({
 function StepIndicator({ current }: { current: 1 | 2 | 3 }) {
   const steps = [
     { n: 1, label: "Describe" },
-    { n: 2, label: "AI Review" },
+    { n: 2, label: "AI + Quote" },
     { n: 3, label: "Post Job" },
   ];
   return (
@@ -199,6 +212,13 @@ export default function NewJobPage() {
   const [partsLoading, setPartsLoading] = useState(false);
   const [answeredQuestions, setAnsweredQuestions] = useState<string[]>([]);
   const [skipQuestions, setSkipQuestions] = useState(false);
+
+  // Trade questionnaire + smart estimate
+  const [questionnaireAnswers, setQuestionnaireAnswers] = useState<Record<string, any>>({});
+  const [questionnaireSubmitted, setQuestionnaireSubmitted] = useState(false);
+  const [smartEstimate, setSmartEstimate] = useState<SmartEstimate | null>(null);
+  const [smartEstimateLoading, setSmartEstimateLoading] = useState(false);
+  const [tradeQuestions, setTradeQuestions] = useState<Question[]>([]);
 
   // Shared loading/error
   const [aiLoading, setAiLoading] = useState(false);
@@ -288,6 +308,11 @@ CRITICAL: If you're not confident, ask clarifying questions rather than guessing
 
       setAnalysis(result);
       setDetectedTrade(result.trade);
+      // Load trade-specific questionnaire questions
+      setTradeQuestions(getQuestionsForTrade(result.trade));
+      setQuestionnaireAnswers({});
+      setQuestionnaireSubmitted(false);
+      setSmartEstimate(null);
       if (hasLocation) fetchEstimate(result.trade, location);
       fetchParts(result.trade, description.trim());
       setStep(2);
@@ -331,6 +356,39 @@ CRITICAL: If you're not confident, ask clarifying questions rather than guessing
     finally { setPartsLoading(false); }
   }
 
+  async function fetchSmartEstimate(answers: Record<string, any>) {
+    const zipCode = location.zipcode || '';
+    if (!zipCode || !detectedTrade) return;
+    setSmartEstimateLoading(true);
+    try {
+      const res = await fetch('/api/jobs/estimate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          trade: detectedTrade,
+          zipCode,
+          answers,
+          description: description.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.estimate) {
+        setSmartEstimate({
+          estimatedPrice: data.estimate.estimatedPrice,
+          lowRange:        data.estimate.lowRange,
+          highRange:       data.estimate.highRange,
+          complexity:      data.estimate.complexity ?? 50,
+          sampleSize:      data.estimate.sampleSize ?? 0,
+          aiInsights:      data.aiInsights ?? '',
+        });
+      }
+    } catch { /* smart estimate is optional */ }
+    finally {
+      setSmartEstimateLoading(false);
+      setQuestionnaireSubmitted(true);
+    }
+  }
+
   async function handleSubmit() {
     const hasLocation = location.zipcode || (location.city && location.state) || location.address;
     if (!description.trim() || !hasLocation) {
@@ -353,6 +411,9 @@ CRITICAL: If you're not confident, ask clarifying questions rather than guessing
           isEmergency: urgency === "emergency",
           emergencyFeeUsd: urgency === "emergency" && isEmergencyPremium ? EMERGENCY_FEE : 0,
           trade: detectedTrade || analysis?.trade || null,
+          questionnaireAnswers: Object.keys(questionnaireAnswers).length > 0
+            ? questionnaireAnswers : undefined,
+          smartEstimate: smartEstimate ?? undefined,
         }),
       });
       const data = await res.json();
@@ -758,10 +819,15 @@ CRITICAL: If you're not confident, ask clarifying questions rather than guessing
                 <select
                   value={detectedTrade}
                   onChange={(e) => {
-                    setDetectedTrade(e.target.value);
+                    const newTrade = e.target.value;
+                    setDetectedTrade(newTrade);
+                    setTradeQuestions(getQuestionsForTrade(newTrade));
+                    setQuestionnaireAnswers({});
+                    setQuestionnaireSubmitted(false);
+                    setSmartEstimate(null);
                     const hasLocation = location.zipcode || (location.city && location.state) || location.address;
-                    if (hasLocation) fetchEstimate(e.target.value, location);
-                    fetchParts(e.target.value, description.trim());
+                    if (hasLocation) fetchEstimate(newTrade, location);
+                    fetchParts(newTrade, description.trim());
                   }}
                   className="input"
                 >
@@ -769,6 +835,102 @@ CRITICAL: If you're not confident, ask clarifying questions rather than guessing
                 </select>
               </div>
             </div>
+
+            {/* ── Trade Questionnaire ── */}
+            {tradeQuestions.length > 0 && (
+              <div className="animate-fade-up">
+                <TradeQuestionnaire
+                  questions={tradeQuestions}
+                  answers={questionnaireAnswers}
+                  onChange={(id, value) =>
+                    setQuestionnaireAnswers((prev) => ({ ...prev, [id]: value }))
+                  }
+                  onSubmit={() => fetchSmartEstimate(questionnaireAnswers)}
+                  loading={smartEstimateLoading}
+                  submitted={questionnaireSubmitted}
+                  tradeName={detectedTrade}
+                />
+              </div>
+            )}
+
+            {/* ── Smart Estimate (data-driven, replaces/supplements AI estimate) ── */}
+            {smartEstimate && (
+              <div
+                className="card p-6 animate-fade-up"
+                style={{
+                  border: '1.5px solid rgba(52,211,153,0.3)',
+                  background: 'rgba(52,211,153,0.04)',
+                }}
+              >
+                <div className="flex items-center gap-2.5 mb-4">
+                  <div
+                    className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                    style={{ background: 'rgba(52,211,153,0.15)', border: '1px solid rgba(52,211,153,0.25)' }}
+                  >
+                    <TrendingUp className="w-4 h-4" style={{ color: '#34d399' }} />
+                  </div>
+                  <div>
+                    <h2 className="font-semibold text-sm" style={{ color: 'var(--color-text)' }}>
+                      Smart Estimate
+                    </h2>
+                    {smartEstimate.sampleSize > 0 && (
+                      <p className="text-xs" style={{ color: '#34d399' }}>
+                        Based on {smartEstimate.sampleSize.toLocaleString()} similar jobs in your area
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Price range */}
+                <div className="grid grid-cols-3 gap-3 mb-4">
+                  {[
+                    { label: 'Low',     value: smartEstimate.lowRange,        color: '#34d399' },
+                    { label: 'Typical', value: smartEstimate.estimatedPrice,  color: '#fbbf24' },
+                    { label: 'High',    value: smartEstimate.highRange,       color: '#f87171' },
+                  ].map((r) => (
+                    <div
+                      key={r.label}
+                      className="rounded-xl p-3 text-center"
+                      style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border)' }}
+                    >
+                      <div className="text-lg font-bold" style={{ color: r.color }}>
+                        ${r.value.toLocaleString()}
+                      </div>
+                      <div className="text-xs mt-0.5" style={{ color: 'var(--color-text-4)' }}>{r.label}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Complexity bar */}
+                <div className="mb-3">
+                  <div className="flex justify-between text-xs mb-1.5" style={{ color: 'var(--color-text-4)' }}>
+                    <span>Job Complexity</span>
+                    <span style={{ color: smartEstimate.complexity > 70 ? '#f87171' : smartEstimate.complexity > 40 ? '#fbbf24' : '#34d399' }}>
+                      {smartEstimate.complexity > 70 ? 'High' : smartEstimate.complexity > 40 ? 'Medium' : 'Low'}
+                    </span>
+                  </div>
+                  <div style={{ height: 5, background: 'rgba(255,255,255,0.08)', borderRadius: 3, overflow: 'hidden' }}>
+                    <div
+                      style={{
+                        height: '100%',
+                        width: `${smartEstimate.complexity}%`,
+                        background: smartEstimate.complexity > 70
+                          ? 'linear-gradient(90deg, #fbbf24, #f87171)'
+                          : 'linear-gradient(90deg, #34d399, #6366f1)',
+                        borderRadius: 3,
+                        transition: 'width 0.6s ease',
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {smartEstimate.aiInsights && (
+                  <p className="text-xs leading-relaxed" style={{ color: 'var(--color-text-4)' }}>
+                    {smartEstimate.aiInsights.split('\n')[0]}
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Cost Estimate card */}
             <div className="card p-6">
@@ -1007,7 +1169,9 @@ CRITICAL: If you're not confident, ask clarifying questions rather than guessing
                     { icon: <Briefcase className="w-4 h-4" />, label: "Trade",    value: detectedTrade || "General" },
                     { icon: <MapPin className="w-4 h-4" />,    label: "Location", value: location.zipcode ? `ZIP ${location.zipcode}` : location.city ? `${location.city}, ${location.state}` : location.address || "Not set" },
                     { icon: <Clock className="w-4 h-4" />,     label: "Urgency",  value: urgency.charAt(0).toUpperCase() + urgency.slice(1) },
-                    ...(estimate
+                    ...(smartEstimate
+                      ? [{ icon: <TrendingUp className="w-4 h-4" />, label: "Smart Est.", value: `$${smartEstimate.lowRange.toLocaleString()} – $${smartEstimate.highRange.toLocaleString()}${smartEstimate.sampleSize > 0 ? ` (${smartEstimate.sampleSize} similar jobs)` : ''}` }]
+                      : estimate
                       ? [{ icon: <DollarSign className="w-4 h-4" />, label: "Est. Cost", value: `$${estimate.price_low_usd.toLocaleString()} – $${estimate.price_high_usd.toLocaleString()}` }]
                       : []),
                   ] as { icon: React.ReactNode; label: string; value: string }[]
