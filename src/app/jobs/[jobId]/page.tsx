@@ -28,6 +28,7 @@ import ProgressLogger from '@/components/ProgressLogger';
 import ProgressDashboard from '@/components/ProgressDashboard';
 import FileDisputeModal from '@/components/FileDisputeModal';
 import { openDirections } from '@/lib/mapsIntegration';
+import VideoConsultationPanel from '@/components/VideoConsultationPanel';
 
 /* ── Types ── */
 type Job = {
@@ -657,6 +658,16 @@ export default function JobDetailPage() {
           <MatchStatus
             jobId={jobId}
             authToken={invoiceToken}
+            jobStatus={job.status}
+          />
+        )}
+
+        {/* ── Video Consultation Panel ── */}
+        {['triaged', 'open', 'matched', 'accepted', 'in_progress'].includes(job.status) && (
+          <VideoConsultationPanel
+            jobId={jobId}
+            isContractor={isContractor}
+            isHomeowner={isHomeowner}
             jobStatus={job.status}
           />
         )}
