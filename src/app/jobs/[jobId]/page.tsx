@@ -24,6 +24,8 @@ import MilestoneSetup from '@/components/MilestoneSetup';
 import MilestoneProgress from '@/components/MilestoneProgress';
 import DisputeResolution from '@/components/DisputeResolution';
 import MatchStatus from '@/components/MatchStatus';
+import ProgressLogger from '@/components/ProgressLogger';
+import ProgressDashboard from '@/components/ProgressDashboard';
 
 /* ── Types ── */
 type Job = {
@@ -708,6 +710,19 @@ export default function JobDetailPage() {
               </Link>
             </div>
           </div>
+        )}
+
+        {/* ── Contractor: live progress logger ── */}
+        {isContractor && job.status === 'in_progress' && (
+          <ProgressLogger
+            jobId={jobId}
+            onUpdateLogged={() => {/* silently refresh */}}
+          />
+        )}
+
+        {/* ── Homeowner: live progress dashboard ── */}
+        {isHomeowner && ['in_progress', 'completed', 'awaiting_confirmation'].includes(job.status) && (
+          <ProgressDashboard jobId={jobId} />
         )}
 
         {/* ── Milestone Setup (contractor proposes) or approval (homeowner) ── */}
