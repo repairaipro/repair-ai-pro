@@ -27,6 +27,7 @@ import MatchStatus from '@/components/MatchStatus';
 import ProgressLogger from '@/components/ProgressLogger';
 import ProgressDashboard from '@/components/ProgressDashboard';
 import FileDisputeModal from '@/components/FileDisputeModal';
+import { openDirections } from '@/lib/mapsIntegration';
 
 /* ── Types ── */
 type Job = {
@@ -732,6 +733,36 @@ export default function JobDetailPage() {
                 <MessageSquare size={15} />
               </Link>
             </div>
+
+            {/* Get Directions to job — contractor shortcut */}
+            {(() => {
+              const coords = typeof job.location === 'object' && job.location?.coordinates;
+              const addr   = typeof job.location === 'object' ? job.location?.address : (typeof job.location === 'string' ? job.location : null);
+              const dest   = coords ? { lat: coords.lat, lng: coords.lng } : addr;
+              if (!dest) return null;
+              return (
+                <button
+                  type="button"
+                  onClick={() => openDirections(dest)}
+                  className="mt-3 w-full text-xs"
+                  style={{
+                    background: 'rgba(96,165,250,0.08)',
+                    border: '1px solid rgba(96,165,250,0.25)',
+                    borderRadius: 10,
+                    padding: '9px 14px',
+                    color: '#60a5fa',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 7,
+                    fontWeight: 600,
+                  }}
+                >
+                  <MapPin size={13} /> Get Directions to Job Site
+                </button>
+              );
+            })()}
           </div>
         )}
 
@@ -805,18 +836,45 @@ export default function JobDetailPage() {
 
         {/* ── Location Tracking ── */}
         {['accepted', 'in_progress'].includes(job.status) && job.claimedBy && (
-          <JobLocationTracker
-            jobId={jobId}
-            isContractor={isContractor}
-            isActive={true}
-            customerAddress={typeof job.location === 'object' ? job.location?.address : undefined}
-            contractorName={selectedBid?.name || bids.find(b => b.contractorId === job.claimedBy)?.name}
-            contractorLocation={contractorLocationData || undefined}
-            customerLocation={typeof job.location === 'object' && job.location?.coordinates
-              ? { lat: job.location.coordinates.lat, lng: job.location.coordinates.lng }
-              : undefined}
-            onLocationUpdate={handleLocationUpdate}
-          />
+          <>
+            <JobLocationTracker
+              jobId={jobId}
+              isContractor={isContractor}
+              isActive={true}
+              customerAddress={typeof job.location === 'object' ? job.location?.address : undefined}
+              contractorName={selectedBid?.name || bids.find(b => b.contractorId === job.claimedBy)?.name}
+              contractorLocation={contractorLocationData || undefined}
+              customerLocation={typeof job.location === 'object' && job.location?.coordinates
+                ? { lat: job.location.coordinates.lat, lng: job.location.coordinates.lng }
+                : undefined}
+              onLocationUpdate={handleLocationUpdate}
+            />
+
+            {/* Homeowner: navigate to contractor's live location */}
+            {isHomeowner && contractorLocationData && (
+              <button
+                type="button"
+                onClick={() => openDirections({ lat: contractorLocationData.lat, lng: contractorLocationData.lng })}
+                style={{
+                  width: '100%',
+                  background: 'rgba(96,165,250,0.08)',
+                  border: '1px solid rgba(96,165,250,0.25)',
+                  borderRadius: 12,
+                  padding: '11px 16px',
+                  color: '#60a5fa',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  fontSize: 14,
+                  fontWeight: 600,
+                }}
+              >
+                <MapPin size={15} /> Get Directions to Contractor
+              </button>
+            )}
+          </>
         )}
 
         {/* ── Before/After Completion Photos ── */}
