@@ -26,6 +26,7 @@ import DisputeResolution from '@/components/DisputeResolution';
 import MatchStatus from '@/components/MatchStatus';
 import ProgressLogger from '@/components/ProgressLogger';
 import ProgressDashboard from '@/components/ProgressDashboard';
+import FileDisputeModal from '@/components/FileDisputeModal';
 
 /* ── Types ── */
 type Job = {
@@ -259,6 +260,7 @@ export default function JobDetailPage() {
   const [selectingBid,     setSelectingBid]     = useState<string | null>(null);
   const [showInsurance,    setShowInsurance]    = useState(false);
   const [showReview,       setShowReview]       = useState(false);
+  const [showDisputeModal, setShowDisputeModal] = useState(false);
   const [authToken,        setAuthToken]        = useState('');
   const [progressing,      setProgressing]      = useState(false);
   const [progressError,    setProgressError]    = useState('');
@@ -604,6 +606,27 @@ export default function JobDetailPage() {
                 <MessageSquare size={15} />
               </Link>
             </div>
+
+            {/* Dispute trigger */}
+            <button
+              type="button"
+              onClick={() => setShowDisputeModal(true)}
+              className="text-xs mt-3 w-full"
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#6b7280',
+                cursor: 'pointer',
+                padding: '6px 0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+              }}
+            >
+              <AlertTriangle size={12} />
+              There's an issue with this job — file a dispute
+            </button>
           </div>
         )}
 
@@ -1068,6 +1091,19 @@ export default function JobDetailPage() {
         isOpen={showNotifications}
         onClose={() => setShowNotifications(false)}
       />
+
+      {/* File Dispute Modal */}
+      {showDisputeModal && invoiceToken && (
+        <FileDisputeModal
+          jobId={jobId}
+          authToken={invoiceToken}
+          onDisputeFiled={() => {
+            setShowDisputeModal(false);
+            // Job status will update via Firestore onSnapshot — no manual refresh needed
+          }}
+          onClose={() => setShowDisputeModal(false)}
+        />
+      )}
     </div>
   );
 }
