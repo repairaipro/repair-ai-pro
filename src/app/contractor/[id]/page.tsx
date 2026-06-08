@@ -15,6 +15,7 @@ import { ProfileGallery } from "@/components/ProfileGallery";
 import { ServiceAreaMap } from "@/components/ServiceAreaMap";
 import { CertificationBadges, type Certification } from "@/components/CertificationBadges";
 import { ResponseTimeBadge } from "@/components/ResponseTimeBadge";
+import VerifiedBadge from "@/components/VerifiedBadge";
 
 /* ── Types ── */
 type Review = {
@@ -55,6 +56,9 @@ type ContractorProfile = {
   averageResponseMinutes?:  number;
   serviceRadiusMiles?:      number;
   zipCode?:                 string;
+  verificationStatus?:      'unverified' | 'pending' | 'verified' | 'rejected' | 'expired';
+  licenseVerified?:         boolean;
+  insuranceVerified?:       boolean;
 };
 
 /* ── Star renderer ── */
@@ -274,6 +278,14 @@ Reviews: ${reviews.slice(0, 5).map((r) => `${r.rating}★ — "${r.text}"`).join
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
+                  {profile.verificationStatus === 'verified' && (
+                    <VerifiedBadge
+                      status="verified"
+                      licenseVerified={profile.licenseVerified}
+                      insuranceVerified={profile.insuranceVerified}
+                      size="sm"
+                    />
+                  )}
                   <TrustBadge score={profile.trustScore ?? 0} plan={profile.subscriptionPlan} />
                   <button
                     onClick={handleShare}

@@ -74,10 +74,103 @@ export type Job = {
   updatedAt: Timestamp;
 };
 
+export type MilestoneStatus =
+  | 'pending'       // not yet started
+  | 'in_progress'   // contractor marked as working
+  | 'awaiting_approval' // contractor marked complete, waiting homeowner
+  | 'approved'      // homeowner approved, payout released
+  | 'disputed'      // homeowner rejected
+  | 'released';     // transfer sent to contractor
+
+export type Milestone = {
+  id: string;
+  jobId: string;
+  title: string;
+  description: string;
+  percentage: number;       // 0-100, must sum to 100 across all milestones
+  amount: number;           // USD
+  order: number;            // display/release order (1-based)
+  status: MilestoneStatus;
+  completedAt?: Timestamp;
+  approvedAt?: Timestamp;
+  disputedAt?: Timestamp;
+  stripeTransferId?: string;
+  payoutAmount?: number;    // after platform fee
+  contractorNotes?: string;
+  homeownerNotes?: string;
+  createdAt: Timestamp;
+  updatedAt?: Timestamp;
+};
+
 export type JobMessage = {
   id: string;
   text: string;
   senderId?: string;
   kind: "user" | "contractor" | "system" | "ai";
   createdAt: Timestamp;
+};
+
+// PHASE 1: Contractor Specializations
+export type Specialization = {
+  id: string;
+  trade: string; // plumbing, electrical, HVAC, etc.
+  specialty: string; // water heater repair, circuit breaker installation, etc.
+  completedJobs: number;
+  successRate: number; // % jobs rated 4+ stars
+  averageRating: number; // avg rating for this specialty
+  totalHoursWorked?: number;
+  verified: boolean; // auto-set after 10+ jobs with 90%+ 4+ star reviews
+  certifications?: string[];
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+};
+
+// PHASE 1: Contractor Quality Score
+export type QualityScore = {
+  overallScore: number; // 0-100
+  responseTime: number; // avg hours to respond to invite
+  timeAccuracy: number; // % jobs completed within estimated time
+  photoEvidenceScore: number; // % jobs with 3+ photos
+  disputeRate: number; // % jobs with disputes
+  specializations: {
+    count: number; // verified specialties
+    avgRatingPerSpecialty: number;
+  };
+  jobCompletionRate: number; // % invites → completed jobs
+  weights: {
+    rating: number;
+    responseTime: number;
+    timeAccuracy: number;
+    photoEvidenceScore: number;
+    disputeRate: number;
+    specializations: number;
+  };
+  lastUpdated?: Timestamp;
+};
+
+// PHASE 1: Work Photos (Evidence)
+export type WorkPhoto = {
+  id: string;
+  url: string; // Cloudinary URL
+  uploadedBy: string; // contractor userId
+  uploadedAt: Timestamp;
+  caption?: string;
+  stage: "diagnosis" | "in-progress" | "completed"; // when was photo taken
+  verified: boolean;
+  aiCategory?: string; // auto-detected category
+  thumbnailUrl?: string;
+  metadata: {
+    width: number;
+    height: number;
+    size: number; // bytes
+  };
+};
+
+// PHASE 1: Job Completion Record
+export type JobCompletion = {
+  completedBy: string; // contractor userId
+  completedAt: Timestamp;
+  photos: string[]; // photoIds of final state
+  summary?: string;
+  signoffPhotos?: string[]; // homeowner comparison photos if dispute
 };

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { db } from "@/lib/db";
 import { collection, query, where, onSnapshot, orderBy, doc, getDoc, limit } from "firebase/firestore";
 import { useAuth, isOnboardingComplete } from "@/lib/auth";
-import { Plus, Inbox, MessageSquare, Briefcase, Users, User, ChevronRight, Zap, TrendingUp, Clock, CheckCircle } from "lucide-react";
+import { Plus, Inbox, MessageSquare, Briefcase, Users, User, ChevronRight, Zap, TrendingUp, Clock, CheckCircle, Shield } from "lucide-react";
 import { motion } from "framer-motion";
 
 type Job = {
@@ -477,6 +477,8 @@ export default function DashboardPage() {
             {[
               { icon: <MessageSquare className="w-4 h-4" />, label: "Messages",         href: "/chat" },
               { icon: <Briefcase className="w-4 h-4" />,    label: "Marketplace",      href: "/jobs" },
+              { icon: <Clock className="w-4 h-4" />,        label: "Job History",      href: "/history" },
+              { icon: <Shield className="w-4 h-4" />,       label: "Maintenance",      href: "/maintenance" },
               { icon: <Users className="w-4 h-4" />,        label: "Find Contractors", href: "/contractor" },
               { icon: <User className="w-4 h-4" />,         label: "My Profile",       href: "/contractor-profile" },
             ].map((item) => (

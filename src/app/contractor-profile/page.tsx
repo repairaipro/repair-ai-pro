@@ -11,6 +11,7 @@ import { CertificationBadges, type Certification } from "@/components/Certificat
 import Link from "next/link";
 import { TRADES } from "@/lib/constants";
 import { Camera, Save, CheckCircle, AlertTriangle, ChevronLeft, Star, Briefcase, Trophy, TrendingUp, X } from "lucide-react";
+import InsuranceVerificationUpload from "@/components/InsuranceVerificationUpload";
 
 interface PortfolioImage {
   url: string;
@@ -115,10 +116,12 @@ export default function ContractorProfilePage() {
   const [saveError, setSaveError] = useState("");
   const [photoUploading, setPhotoUploading] = useState(false);
   const [stats, setStats] = useState({ rating: 0, reviewCount: 0, jobsCompleted: 0, invitationAcceptCount: 0, invitationDeclineCount: 0 });
+  const [authToken, setAuthToken] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!user) return;
+    user.getIdToken().then((t: string) => setAuthToken(t));
     (async () => {
       const snap = await getDoc(doc(db, "contractors", user.uid));
       if (snap.exists()) {
@@ -242,9 +245,14 @@ export default function ContractorProfilePage() {
             <h1 className="text-2xl font-bold" style={{ color: 'var(--color-text)' }}>Contractor Profile</h1>
             <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-4)' }}>Your profile controls which jobs you get matched to.</p>
           </div>
-          <Link href="/contractor-inbox" className="btn btn-secondary btn-sm">
-            <ChevronLeft className="w-3.5 h-3.5" /> My Inbox
-          </Link>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Link href="/contractor/earnings" className="btn btn-secondary btn-sm">
+              <TrendingUp className="w-3.5 h-3.5" /> Earnings
+            </Link>
+            <Link href="/contractor-inbox" className="btn btn-secondary btn-sm">
+              <ChevronLeft className="w-3.5 h-3.5" /> My Inbox
+            </Link>
+          </div>
         </div>
 
         {/* Completeness Bar */}
@@ -515,6 +523,13 @@ export default function ContractorProfilePage() {
               For quick additions, use the /api/contractors/certifications endpoint to add certifications directly. Verify your credentials through documentation.
             </p>
           </SectionCard>
+
+          {/* Insurance & License Verification */}
+          {authToken && (
+            <SectionCard title="License & Insurance Verification" desc="Earn the Verified Pro badge shown to homeowners on your profile and job cards.">
+              <InsuranceVerificationUpload authToken={authToken} />
+            </SectionCard>
+          )}
 
           {/* Stats (read-only) */}
           {(stats.jobsCompleted > 0 || stats.reviewCount > 0) && (

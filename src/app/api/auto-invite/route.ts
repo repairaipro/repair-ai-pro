@@ -1,89 +1,24 @@
 import { NextResponse } from "next/server";
 import { adminDb, adminAuth } from "@/lib/firebaseAdmin";
 import { notifyContractorInvited } from "@/lib/notif";
+import { scoreContractorMatch, type ContractorLike, type JobLocationInput } from "@/lib/matching";
 
-function haversineDistance(
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number
-): number {
-  const R = 3959;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
+const INITIAL_WAVE_SIZE = 10;
 
-function score(contractor: any, job: any) {
-  let s = 0;
-
-  if (contractor.trade && job.trade) {
-    if (
-      contractor.trade.toLowerCase().includes(job.trade.toLowerCase())
-    ) {
-      s += 40;
-    }
-  }
-
-  const jobLocation = job.location;
-  const contractorLat = contractor.latitude;
-  const contractorLon = contractor.longitude;
-
-  if (jobLocation) {
-    if (jobLocation.zipcode && contractor.zipcode) {
-      if (jobLocation.zipcode === contractor.zipcode) {
-        s += 30;
-      } else {
-        s += 5;
-      }
-    } else if (contractorLat && contractorLon && jobLocation.coordinates) {
-      const distance = haversineDistance(
-        contractorLat,
-        contractorLon,
-        jobLocation.coordinates.lat,
-        jobLocation.coordinates.lng
-      );
-      if (distance <= 10) {
-        s += 30;
-      } else if (distance <= 25) {
-        s += 20;
-      } else if (distance <= 50) {
-        s += 10;
-      }
-    } else if (contractor.city && jobLocation.city) {
-      if (contractor.city.toLowerCase() === jobLocation.city.toLowerCase()) {
-        s += 20;
-      }
-    }
-  }
-
-  s += (contractor.rating || 0) * 5;
-  s += Math.min(contractor.jobsCompleted || 0, 50) * 0.5;
-
-  const accepted = contractor.invitationAcceptCount || 0;
-  const declined = contractor.invitationDeclineCount || 0;
-  const total = accepted + declined;
-
-  if (total > 0) {
-    s += (accepted / total) * 20;
-  }
-
-  return s;
+function buildJobLocation(location: any): JobLocationInput {
+  return {
+    zone:    location?.zone     || location?.city || null,
+    city:    location?.city     || null,
+    zipCode: location?.zipcode  || location?.zipCode || null,
+    lat:     location?.coordinates?.lat ?? location?.lat ?? null,
+    lng:     location?.coordinates?.lng ?? location?.lng ?? null,
+  };
 }
 
 async function getUid(req: Request) {
   const auth = req.headers.get("authorization") || "";
   const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
-
   if (!token) throw new Error("No token");
-
   const decoded = await adminAuth.verifyIdToken(token);
   return decoded.uid;
 }
@@ -99,44 +34,46 @@ export async function POST(req: Request) {
 
     const jobRef = adminDb.collection("jobs").doc(jobId);
     const jobSnap = await jobRef.get();
-
     if (!jobSnap.exists) {
       return NextResponse.json({ error: "Job not found" }, { status: 404 });
     }
 
-    const job = jobSnap.data();
+    const job = jobSnap.data()!;
+    const trade = job.aiDetectedTrade || job.trade || null;
+    const jobLocation = buildJobLocation(job.location);
 
-    // 🔥 get all contractors
-    const contractorSnap = await adminDb.collection("contractors").get();
+    const contractorSnap = await adminDb
+      .collection("contractors")
+      .where("availability", "!=", "offline")
+      .get();
 
-    const ranked = contractorSnap.docs.map((doc) => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        ...data,
-        score: score(data, job),
-      };
-    });
+    const ranked = contractorSnap.docs
+      .map((doc) => {
+        const data = doc.data() as ContractorLike;
+        const result = scoreContractorMatch(data, { trade, location: jobLocation });
+        return { id: doc.id, data, ...result };
+      })
+      .filter((c) => c.matched)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, INITIAL_WAVE_SIZE);
 
-    // 🔥 sort best → worst
-    ranked.sort((a, b) => b.score - a.score);
-
-    const top = ranked.slice(0, 5);
+    if (ranked.length === 0) {
+      // No matches — record this so homeowner UI can show it
+      await jobRef.update({ matchStatus: 'no_matches', matchedAt: new Date() });
+      return NextResponse.json({ success: true, invited: 0 });
+    }
 
     const batch = adminDb.batch();
 
-    top.forEach((c) => {
-      const invitationId = `contractor_${c.id}`;
-
-      const inviteRef = jobRef
-        .collection("invitations")
-        .doc(invitationId);
-
+    ranked.forEach((c) => {
+      const inviteRef = jobRef.collection("invitations").doc(`contractor_${c.id}`);
       batch.set(inviteRef, {
         contractorId: c.id,
         status: "pending",
         invitedAt: new Date(),
         score: c.score,
+        matchReason: c.reason,
+        distanceMiles: c.distanceMiles,
         auto: true,
         wave: "initial",
       });
@@ -157,55 +94,50 @@ export async function POST(req: Request) {
 
     await batch.commit();
 
-    // Notify each invited contractor (fire-and-forget)
-    const trade = job?.aiDetectedTrade || job?.trade || "General";
-    const location = job?.location || {};
+    // Update job with match summary
+    await jobRef.update({
+      matchStatus: 'invited',
+      matchedAt: new Date(),
+      matchCount: ranked.length,
+    });
+
+    // Notify (fire-and-forget)
     const locationStr =
-      (location.zipcode && `ZIP ${location.zipcode}`) ||
-      (location.address && location.address) ||
-      (location.city && location.state && `${location.city}, ${location.state}`) ||
-      "your area";
+      (job.location?.zipcode && `ZIP ${job.location.zipcode}`) ||
+      (job.location?.city && job.location?.state && `${job.location.city}, ${job.location.state}`) ||
+      (job.location?.city) ||
+      'your area';
+
     Promise.all(
-      top.map((c) => notifyContractorInvited(c.id, jobId, trade, locationStr))
+      ranked.map((c) => notifyContractorInvited(c.id, jobId, trade || 'General', locationStr))
     ).catch((e) => console.error("Invite notifications error:", e));
 
-    // 🔥 timeline
     await jobRef.collection("events").add({
       type: "providers_invited",
       actorId: uid,
       createdAt: new Date(),
-      meta: {
-        invitedCount: top.length,
-        auto: true,
-        wave: "initial",
-      },
+      meta: { invitedCount: ranked.length, auto: true, wave: "initial" },
     });
 
-    // ⏱️ 🔥 TRIGGER NEXT WAVE (IMPORTANT)
+    // Trigger second wave in 3 minutes if no one accepts
     setTimeout(async () => {
       try {
-        await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/dispatch-next`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ jobId }),
-        });
+        const updated = await jobRef.get();
+        if (!updated.data()?.claimedBy) {
+          await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/dispatch-next`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ jobId }),
+          });
+        }
       } catch (err) {
         console.error("dispatch-next trigger failed:", err);
       }
-    }, 1000 * 60 * 2); // 2 minutes
+    }, 1000 * 60 * 3);
 
-    return NextResponse.json({
-      success: true,
-      invited: top.length,
-    });
+    return NextResponse.json({ success: true, invited: ranked.length });
   } catch (err: any) {
     console.error("auto-invite error:", err);
-
-    return NextResponse.json(
-      { error: err.message || "Auto invite failed" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: err.message || "Auto invite failed" }, { status: 500 });
   }
 }

@@ -15,6 +15,15 @@ import InsuranceReportModal from '@/components/InsuranceReportModal';
 import { ReviewModal } from '@/components/ReviewModal';
 import JobLocationTracker, { type JobLocation } from '@/components/JobLocationTracker';
 import NotificationHistory from '@/components/NotificationHistory';
+import ProductRecommendations from '@/components/ProductRecommendations';
+import PhotoAnalysisFlow from '@/components/PhotoAnalysisFlow';
+import BeforeAfterPhotoUpload from '@/components/BeforeAfterPhotoUpload';
+import BeforeAfterComparison from '@/components/BeforeAfterComparison';
+import SmartInvoice from '@/components/SmartInvoice';
+import MilestoneSetup from '@/components/MilestoneSetup';
+import MilestoneProgress from '@/components/MilestoneProgress';
+import DisputeResolution from '@/components/DisputeResolution';
+import MatchStatus from '@/components/MatchStatus';
 
 /* ── Types ── */
 type Job = {
@@ -257,6 +266,21 @@ export default function JobDetailPage() {
   const [cancelError,      setCancelError]      = useState('');
   const [contractorLocationData, setContractorLocationData] = useState<JobLocation | null>(null);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [recommendations, setRecommendations] = useState<any>(null);
+  const [recommendationsLoading, setRecommendationsLoading] = useState(false);
+  const [analysisId, setAnalysisId] = useState<string | null>(null);
+  const [completion, setCompletion] = useState<any>(null);
+  const [completionLoading, setCompletionLoading] = useState(false);
+  const [invoiceToken, setInvoiceToken] = useState('');
+  const [milestones, setMilestones] = useState<any[]>([]);
+  const [milestonePlanStatus, setMilestonePlanStatus] = useState<string | null>(null);
+  const [milestonesLoading, setMilestonesLoading] = useState(false);
+
+  /* Capture auth token for child components */
+  useEffect(() => {
+    if (!user) return;
+    user.getIdToken().then(setInvoiceToken).catch(() => {});
+  }, [user]);
 
   /* Live job */
   useEffect(() => {
@@ -288,6 +312,61 @@ export default function JobDetailPage() {
         .finally(() => setBidsLoading(false))
     );
   }, [jobId, user, job?.status]);
+
+  /* Product Recommendations */
+  useEffect(() => {
+    if (!jobId || !user) return;
+    setRecommendationsLoading(true);
+    user.getIdToken().then((token: string) =>
+      fetch(`/api/jobs/${jobId}/product-recommendations`, { headers: { Authorization: `Bearer ${token}` } })
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.success && d.recommendation) {
+            setRecommendations(d.recommendation);
+          }
+        })
+        .catch(() => {})
+        .finally(() => setRecommendationsLoading(false))
+    );
+  }, [jobId, user]);
+
+  /* Before/After Completion Comparison */
+  useEffect(() => {
+    if (!jobId || !user) return;
+    setCompletionLoading(true);
+    user.getIdToken().then((token: string) =>
+      fetch(`/api/jobs/${jobId}/completion/comparison`, { headers: { Authorization: `Bearer ${token}` } })
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.success && d.comparison) {
+            setCompletion(d.comparison);
+          }
+        })
+        .catch(() => {})
+        .finally(() => setCompletionLoading(false))
+    );
+  }, [jobId, user, job?.status]);
+
+  /* Milestones */
+  function fetchMilestones(token: string) {
+    setMilestonesLoading(true);
+    fetch(`/api/jobs/${jobId}/milestones`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.success) {
+          setMilestones(d.milestones || []);
+          setMilestonePlanStatus(d.milestones?.length ? (d.milestones[0]?.status === 'released' || d.milestones[0]?.status !== 'pending' ? 'approved' : null) : null);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setMilestonesLoading(false));
+  }
+
+  useEffect(() => {
+    if (!jobId || !user || !invoiceToken) return;
+    if (!['accepted', 'in_progress', 'completed', 'confirmed'].includes(job?.status || '')) return;
+    fetchMilestones(invoiceToken);
+  }, [jobId, user, invoiceToken, job?.status]);
 
   async function handleConfirm() {
     if (!user) return;
@@ -547,6 +626,31 @@ export default function JobDetailPage() {
           </div>
         )}
 
+        {/* ── Smart Match Status ── */}
+        {isHomeowner && invoiceToken && (
+          <MatchStatus
+            jobId={jobId}
+            authToken={invoiceToken}
+            jobStatus={job.status}
+          />
+        )}
+
+        {/* ── Dispute Resolution Center ── */}
+        {job.status === 'disputed' && invoiceToken && (
+          <div style={{ background: 'var(--color-surface)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 20, padding: 20 }}>
+            <h2 className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: '#f87171' }}>
+              Dispute Resolution Center
+            </h2>
+            <DisputeResolution
+              jobId={jobId}
+              authToken={invoiceToken}
+              isHomeowner={isHomeowner}
+              paymentAmountUsd={(job as any).paymentAmountUsd || 0}
+              onResolved={() => {}}
+            />
+          </div>
+        )}
+
         {/* ── Contractor progress actions ── */}
         {isContractor && ['accepted', 'in_progress'].includes(job.status) && (
           <div
@@ -606,6 +710,61 @@ export default function JobDetailPage() {
           </div>
         )}
 
+        {/* ── Milestone Setup (contractor proposes) or approval (homeowner) ── */}
+        {['accepted', 'in_progress'].includes(job.status) && invoiceToken && !(job as any).milestoneAllReleased && (
+          <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 20, padding: 20 }}>
+            <h2 className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: 'var(--color-text-4)' }}>
+              Milestone Payments
+            </h2>
+            <MilestoneSetup
+              jobId={jobId}
+              authToken={invoiceToken}
+              totalAmount={(job as any).paymentAmountUsd || (job as any).milestoneTotalAmount || 0}
+              existingPlanStatus={(job as any).milestonePlanStatus || null}
+              isContractor={isContractor}
+              onProposed={() => fetchMilestones(invoiceToken)}
+              onApproved={() => fetchMilestones(invoiceToken)}
+            />
+          </div>
+        )}
+
+        {/* ── Milestone Progress ── */}
+        {milestones.length > 0 && invoiceToken && (
+          <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 20, padding: 20 }}>
+            <h2 className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: 'var(--color-text-4)' }}>
+              Payment Milestones
+            </h2>
+            <MilestoneProgress
+              jobId={jobId}
+              authToken={invoiceToken}
+              milestones={milestones}
+              isContractor={isContractor}
+              onUpdate={() => fetchMilestones(invoiceToken)}
+            />
+          </div>
+        )}
+
+        {/* ── Smart Invoice ── */}
+        {['in_progress', 'completed', 'awaiting_confirmation', 'confirmed'].includes(job.status)
+          && invoiceToken && (
+          <SmartInvoice
+            jobId={jobId}
+            isContractor={isContractor}
+            authToken={invoiceToken}
+            jobStatus={job.status}
+          />
+        )}
+
+        {/* ── Photo Analysis ── */}
+        {isHomeowner && ['triaged', 'open', 'matched'].includes(job.status) && (
+          <PhotoAnalysisFlow
+            jobId={jobId}
+            onAnalysisComplete={(analysis: any) => {
+              setAnalysisId(analysis.id);
+            }}
+          />
+        )}
+
         {/* ── Location Tracking ── */}
         {['accepted', 'in_progress'].includes(job.status) && job.claimedBy && (
           <JobLocationTracker
@@ -619,6 +778,37 @@ export default function JobDetailPage() {
               ? { lat: job.location.coordinates.lat, lng: job.location.coordinates.lng }
               : undefined}
             onLocationUpdate={handleLocationUpdate}
+          />
+        )}
+
+        {/* ── Before/After Completion Photos ── */}
+        {isContractor && ['in_progress', 'completed'].includes(job.status) && (
+          <BeforeAfterPhotoUpload
+            jobId={jobId}
+            onPhotoSubmitted={() => {
+              // Refresh completion data after upload
+              setCompletionLoading(true);
+            }}
+          />
+        )}
+
+        {/* ── Before/After Comparison ── */}
+        {completion && (
+          <BeforeAfterComparison
+            pairs={completion.photoPairs}
+            isLoading={completionLoading}
+          />
+        )}
+
+        {/* ── Product Recommendations ── */}
+        {recommendations && (
+          <ProductRecommendations
+            jobId={jobId}
+            recommendations={recommendations.recommendations}
+            isLoading={recommendationsLoading}
+            isContractor={isContractor}
+            disclaimer={recommendations.disclaimer}
+            totalPotentialCommission={recommendations.totalPotentialCommission}
           />
         )}
 

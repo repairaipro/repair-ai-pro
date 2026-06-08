@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { doc, updateDoc, collection, addDoc, serverTimestamp, getDoc } from "firebase/firestore";
-import { verifyAuth } from "@/lib/auth";
+import { adminAuth } from "@/lib/firebaseAdmin";
 
 type JobLocation = {
   lat: number;
@@ -13,14 +13,16 @@ type JobLocation = {
 };
 
 export async function POST(
-  req: Request,
+  req: NextRequest,
   { params }: { params: { jobId: string } }
 ) {
   try {
-    const user = await verifyAuth(req);
-    if (!user) {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const decoded = await adminAuth.verifyIdToken(authHeader.substring(7));
+    const user = { uid: decoded.uid };
 
     const { location } = (await req.json()) as { location: JobLocation };
     const jobId = params.jobId;
