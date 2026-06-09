@@ -133,6 +133,29 @@ export default function EarningsPage() {
     filter === 'all' ? true : p.status === filter,
   );
 
+  function handleExport() {
+    if (!data?.payouts.length) return;
+    const rows = [
+      ['Date', 'Job Description', 'Trade', 'Amount', 'Status', 'Job ID'],
+      ...data.payouts.map((p) => [
+        p.date ? new Date(p.date).toLocaleDateString() : '',
+        `"${(p.description ?? '').replace(/"/g, '""')}"`,
+        p.trade,
+        p.amount.toFixed(2),
+        p.status,
+        p.jobId,
+      ]),
+    ];
+    const csv  = rows.map((r) => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `earnings-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   const winRate = data && data.totalJobs > 0
     ? Math.round((data.completedJobs / data.totalJobs) * 100)
     : 0;
@@ -160,11 +183,13 @@ export default function EarningsPage() {
               </p>
             </div>
             <button
-              className="btn btn-secondary btn-sm opacity-50 cursor-not-allowed"
-              disabled
-              title="Export coming soon"
+              onClick={handleExport}
+              disabled={!data?.payouts.length}
+              className="btn btn-secondary btn-sm"
+              title={data?.payouts.length ? 'Download CSV' : 'No payouts to export'}
+              style={{ opacity: data?.payouts.length ? 1 : 0.4 }}
             >
-              <Download className="w-3.5 h-3.5" /> Export
+              <Download className="w-3.5 h-3.5" /> Export CSV
             </button>
           </div>
         </div>
