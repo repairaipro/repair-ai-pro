@@ -159,7 +159,7 @@ export default function JobLocationTracker({
       durationMinutes,
       avgSpeed,
       maxSpeed,
-      arrivalTime: arrivedTime,
+      arrivalTime: arrivedTime ?? undefined,
     });
   };
 

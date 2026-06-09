@@ -12,7 +12,7 @@
  * - Specialty retailers
  */
 
-import { getOpenAIClient } from './openai';
+import { openai as getOpenAIClient } from './openaiClient';
 import {
   RecommendedProduct,
   ProductSource,

@@ -585,6 +585,71 @@ service cloud.firestore {
         // Both homeowner and contractor can read
         allow read: if isParticipant(jobId);
       }
+
+      /* ================= MILESTONES ================= */
+      match /milestones/{milestoneId} {
+        // Both participants can read milestones
+        allow read: if isParticipant(jobId);
+
+        // Homeowner can create milestones when setting up the job
+        allow create: if isJobOwner(jobId)
+          && job(jobId).data.status in ["triaged", "open", "matched", "accepted"]
+          && onlyKeys([
+            "title",
+            "description",
+            "percentage",
+            "amount",
+            "dueDate",
+            "status",
+            "order",
+            "createdAt",
+            "updatedAt"
+          ]);
+
+        // Homeowner approves/releases milestone; contractor marks ready_for_release
+        allow update: if isParticipant(jobId)
+          && request.resource.data.diff(resource.data).changedKeys()
+            .hasOnly(["status", "approvedAt", "releasedAt", "updatedAt"]);
+
+        allow delete: if false;
+      }
+
+      /* ================= VIDEO CONSULTATIONS ================= */
+      match /videoConsultations/{consultId} {
+        // Both participants can read consultations
+        allow read: if isParticipant(jobId);
+
+        // Contractor requests a consultation
+        allow create: if signedIn()
+          && job(jobId).data.claimedBy == uid()
+          && request.resource.data.contractorId == uid()
+          && request.resource.data.status == "requested"
+          && onlyKeys([
+            "contractorId",
+            "homeownerId",
+            "status",
+            "proposedTimes",
+            "notes",
+            "requestedAt",
+            "createdAt"
+          ]);
+
+        // Either participant can update (approve/decline/complete via API)
+        // Client-side updates are limited to safe status transitions
+        allow update: if isParticipant(jobId)
+          && request.resource.data.diff(resource.data).changedKeys()
+            .hasOnly([
+              "status",
+              "scheduledAt",
+              "approvedAt",
+              "declinedAt",
+              "completedAt",
+              "agoraToken",
+              "updatedAt"
+            ]);
+
+        allow delete: if false;
+      }
     }
 
     /* ================= DEFAULT DENY ================= */

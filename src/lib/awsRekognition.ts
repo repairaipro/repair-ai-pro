@@ -1,34 +1,17 @@
-import { Rekognition, DetectLabelsRequest } from '@aws-sdk/client-rekognition';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-
 /**
- * Initialize AWS clients
- * Requires AWS credentials in environment:
- * - AWS_ACCESS_KEY_ID
- * - AWS_SECRET_ACCESS_KEY
- * - AWS_REGION
+ * Photo Analysis Engine — powered by GPT-4o Vision
+ * Drop-in replacement for the former AWS Rekognition implementation.
+ * All exported types and function signatures are identical.
  */
 
-const rekognition = new Rekognition({
-  region: process.env.AWS_REGION || 'us-east-1',
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
-  },
-});
+import { openai } from './openaiClient';
 
-const s3 = new S3Client({
-  region: process.env.AWS_REGION || 'us-east-1',
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
-  },
-});
+/* ── Public types ─────────────────────────────────────────────────────────── */
 
 export type DefectDetection = {
   defectType: string; // "water_damage", "corrosion", "crack", "deterioration", etc.
   confidence: number; // 0-100
-  location: string; // "upper_left", "center", "lower_right", etc.
+  location: string;   // "upper_left", "center", "lower_right", etc.
   severity: 'low' | 'medium' | 'high';
   description: string;
   recommendations: string[];
@@ -48,279 +31,163 @@ export type PhotoAnalysisResult = {
   requiresVideoConsultation: boolean;
 };
 
+/* ── GPT-4o Vision helpers ────────────────────────────────────────────────── */
+
+const SYSTEM_PROMPT = `You are an expert home-repair inspector AI. Analyze photos of home issues and return structured JSON.
+Your response MUST be valid JSON matching this exact schema:
+{
+  "detectedDefects": [
+    {
+      "defectType": string,       // e.g. "water_damage", "corrosion", "crack", "deterioration", "electrical_hazard", "mold"
+      "confidence": number,       // 0-100
+      "location": string,         // e.g. "upper_left", "center", "lower_right", "near_floor", "ceiling"
+      "severity": "low"|"medium"|"high",
+      "description": string,
+      "recommendations": string[] // 2-4 actionable items
+    }
+  ],
+  "detectedObjects": [
+    { "label": string, "confidence": number }
+  ],
+  "detectedText": string[],
+  "estimatedSeverity": "low"|"medium"|"high",
+  "summary": string,
+  "requiresVideoConsultation": boolean
+}
+Return ONLY the JSON object, no markdown or explanation.`;
+
+type VisionResponse = {
+  detectedDefects: DefectDetection[];
+  detectedObjects: { label: string; confidence: number }[];
+  detectedText: string[];
+  estimatedSeverity: 'low' | 'medium' | 'high';
+  summary: string;
+  requiresVideoConsultation: boolean;
+};
+
+function emptyResult(): VisionResponse {
+  return {
+    detectedDefects: [],
+    detectedObjects: [],
+    detectedText: [],
+    estimatedSeverity: 'low',
+    summary: 'No significant defects detected. Issue may be internal or require hands-on inspection.',
+    requiresVideoConsultation: false,
+  };
+}
+
+async function callVision(imageUrl: string): Promise<VisionResponse> {
+  try {
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      max_tokens: 1024,
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image_url',
+              image_url: { url: imageUrl, detail: 'high' },
+            },
+            {
+              type: 'text',
+              text: 'Analyze this home repair photo for defects, damage, and issues. Return the JSON analysis.',
+            },
+          ],
+        },
+      ],
+    });
+
+    const raw = completion.choices[0]?.message?.content?.trim() ?? '';
+    // Strip markdown code fences if present
+    const json = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+    const parsed = JSON.parse(json) as VisionResponse;
+    return parsed;
+  } catch (err) {
+    console.error('GPT-4o Vision analysis error:', err);
+    return emptyResult();
+  }
+}
+
+/* ── Exported functions ───────────────────────────────────────────────────── */
+
 /**
- * Download image from URL and analyze with AWS Rekognition
- * Returns detected labels, text, and custom defect classification
+ * Analyze a single photo URL using GPT-4o Vision.
  */
 export async function analyzeJobPhoto(
   imageUrl: string
 ): Promise<PhotoAnalysisResult> {
-  try {
-    // Fetch image from URL
-    const response = await fetch(imageUrl);
-    const imageBuffer = await response.arrayBuffer();
-    const imageBytes = Buffer.from(imageBuffer);
+  const vision = await callVision(imageUrl);
 
-    // Call AWS Rekognition DetectLabels
-    const labelsRequest: DetectLabelsRequest = {
-      Image: {
-        Bytes: imageBytes,
-      },
-      MaxLabels: 50,
-      MinConfidence: 60,
-    };
-
-    const labelsResponse = await rekognition.detectLabels(labelsRequest);
-
-    // Call AWS Rekognition DetectText
-    const textResponse = await rekognition.detectText({
-      Image: {
-        Bytes: imageBytes,
-      },
-    });
-
-    // Parse AWS responses and classify defects
-    const detectedLabels = labelsResponse.Labels || [];
-    const detectedText = textResponse.TextDetections?.filter(
-      t => t.Type === 'LINE'
-    ).map(t => t.DetectedText || '') || [];
-
-    // Classify water damage indicators
-    const waterDamageLabels = [
-      'water',
-      'wet',
-      'moisture',
-      'stain',
-      'mold',
-      'mildew',
-      'leak',
-      'puddle',
-      'flood',
-      'damp',
-    ];
-    const hasWaterDamage = detectedLabels.some(label =>
-      waterDamageLabels.some(wd => (label.Name || '').toLowerCase().includes(wd))
-    );
-
-    // Classify corrosion/rust
-    const corrosionLabels = [
-      'rust',
-      'corrosion',
-      'oxidation',
-      'discoloration',
-      'deterioration',
-      'decay',
-    ];
-    const hasCorrosion = detectedLabels.some(label =>
-      corrosionLabels.some(c => (label.Name || '').toLowerCase().includes(c))
-    );
-
-    // Classify cracks/damage
-    const crackLabels = [
-      'crack',
-      'broken',
-      'fracture',
-      'damage',
-      'shattered',
-      'crumbling',
-      'deteriorating',
-    ];
-    const hasCracks = detectedLabels.some(label =>
-      crackLabels.some(cr => (label.Name || '').toLowerCase().includes(cr))
-    );
-
-    // Detect specific fixtures/materials
-    const fixtureLabels = [
-      'sink',
-      'toilet',
-      'shower',
-      'pipe',
-      'faucet',
-      'fixture',
-      'cabinet',
-      'wall',
-      'ceiling',
-      'floor',
-      'electrical',
-      'outlet',
-      'switch',
-      'panel',
-      'HVAC',
-      'furnace',
-      'AC',
-      'ductwork',
-      'roof',
-      'shingle',
-      'gutter',
-    ];
-
-    // Build defect list
-    const defects: DefectDetection[] = [];
-    let estimatedSeverity: 'low' | 'medium' | 'high' = 'low';
-
-    if (hasWaterDamage) {
-      defects.push({
-        defectType: 'water_damage',
-        confidence: Math.round(
-          (detectedLabels.find(l =>
-            waterDamageLabels.some(wd => (l.Name || '').toLowerCase().includes(wd))
-          )?.Confidence || 0) * 100
-        ) / 100,
-        location: 'visible_area',
-        severity: 'high',
-        description: 'Water damage, stains, or moisture detected',
-        recommendations: [
-          'Check for active leaks (turn on water/run shower)',
-          'Look for mold or mildew (health concern)',
-          'May require drying/restoration work',
-          'Assess if structural damage exists',
-        ],
-      });
-      estimatedSeverity = 'high';
-    }
-
-    if (hasCorrosion) {
-      defects.push({
-        defectType: 'corrosion',
-        confidence: Math.round(
-          (detectedLabels.find(l =>
-            corrosionLabels.some(c => (l.Name || '').toLowerCase().includes(c))
-          )?.Confidence || 0) * 100
-        ) / 100,
-        location: 'visible_area',
-        severity: 'medium',
-        description: 'Rust or corrosion detected on pipes/fixtures',
-        recommendations: [
-          'May indicate pipe age or material degradation',
-          'Could affect water quality or lead to leaks',
-          'May need replacement rather than repair',
-        ],
-      });
-      if (estimatedSeverity === 'low') estimatedSeverity = 'medium';
-    }
-
-    if (hasCracks) {
-      defects.push({
-        defectType: 'cracks_or_damage',
-        confidence: Math.round(
-          (detectedLabels.find(l =>
-            crackLabels.some(cr => (l.Name || '').toLowerCase().includes(cr))
-          )?.Confidence || 0) * 100
-        ) / 100,
-        location: 'visible_area',
-        severity: 'medium',
-        description: 'Cracks, fractures, or damage detected',
-        recommendations: [
-          'Determine if cosmetic or structural',
-          'May affect functionality or safety',
-          'Could worsen over time if not addressed',
-        ],
-      });
-      if (estimatedSeverity === 'low') estimatedSeverity = 'medium';
-    }
-
-    // Determine if video consultation needed
-    const requiresVideoConsultation =
-      estimatedSeverity === 'high' || defects.length > 2;
-
-    // Generate summary
-    let summary = 'Photo analysis complete. ';
-    if (defects.length === 0) {
-      summary += 'No significant defects detected. Issue may be internal or require hands-on inspection.';
-    } else {
-      summary += `${defects.length} issue(s) detected: ${defects
-        .map(d => d.defectType)
-        .join(', ')}.`;
-    }
-
-    if (requiresVideoConsultation) {
-      summary += ' Video consultation recommended for accurate assessment.';
-    }
-
-    return {
-      photoUrl: imageUrl,
-      analysisDate: new Date(),
-      detectedDefects: defects,
-      detectedObjects: detectedLabels
-        .filter(l => (l.Confidence || 0) >= 70)
-        .slice(0, 15)
-        .map(l => ({
-          label: l.Name || '',
-          confidence: Math.round((l.Confidence || 0) * 100) / 100,
-        })),
-      detectedText,
-      estimatedSeverity,
-      summary,
-      requiresVideoConsultation,
-    };
-  } catch (error) {
-    console.error('Error analyzing photo with AWS Rekognition:', error);
-    throw error;
-  }
+  return {
+    photoUrl: imageUrl,
+    analysisDate: new Date(),
+    detectedDefects: vision.detectedDefects,
+    detectedObjects: vision.detectedObjects,
+    detectedText: vision.detectedText,
+    estimatedSeverity: vision.estimatedSeverity,
+    summary: vision.summary,
+    requiresVideoConsultation: vision.requiresVideoConsultation,
+  };
 }
 
 /**
- * Analyze multiple photos and aggregate findings
+ * Analyze multiple photos and aggregate findings.
  */
-export async function analyzeJobPhotos(
-  imageUrls: string[]
-): Promise<{
+export async function analyzeJobPhotos(imageUrls: string[]): Promise<{
   analyses: PhotoAnalysisResult[];
   aggregatedSeverity: 'low' | 'medium' | 'high';
   allDefects: DefectDetection[];
   overallSummary: string;
   requiresVideoConsultation: boolean;
 }> {
-  try {
-    const analyses = await Promise.all(
-      imageUrls.map(url => analyzeJobPhoto(url))
-    );
+  const analyses = await Promise.all(imageUrls.map(url => analyzeJobPhoto(url)));
 
-    // Aggregate defects
-    const allDefects = analyses.flatMap(a => a.detectedDefects);
-    const uniqueDefects = Array.from(
-      new Map(allDefects.map(d => [d.defectType, d])).values()
-    );
-
-    // Determine overall severity
-    let aggregatedSeverity: 'low' | 'medium' | 'high' = 'low';
-    if (analyses.some(a => a.estimatedSeverity === 'high')) {
-      aggregatedSeverity = 'high';
-    } else if (analyses.some(a => a.estimatedSeverity === 'medium')) {
-      aggregatedSeverity = 'medium';
+  // Deduplicate defects by type, keeping highest confidence
+  const defectMap = new Map<string, DefectDetection>();
+  for (const analysis of analyses) {
+    for (const defect of analysis.detectedDefects) {
+      const existing = defectMap.get(defect.defectType);
+      if (!existing || defect.confidence > existing.confidence) {
+        defectMap.set(defect.defectType, defect);
+      }
     }
-
-    // Check if video needed
-    const requiresVideoConsultation =
-      analyses.some(a => a.requiresVideoConsultation) ||
-      uniqueDefects.length > 3;
-
-    // Generate overall summary
-    let overallSummary = `Analysis of ${imageUrls.length} photo(s). `;
-    if (uniqueDefects.length === 0) {
-      overallSummary += 'No significant defects detected across photos.';
-    } else {
-      overallSummary += `Issues found: ${uniqueDefects.map(d => d.defectType).join(', ')}.`;
-    }
-    if (requiresVideoConsultation) {
-      overallSummary += ' Video consultation recommended.';
-    }
-
-    return {
-      analyses,
-      aggregatedSeverity,
-      allDefects: uniqueDefects,
-      overallSummary,
-      requiresVideoConsultation,
-    };
-  } catch (error) {
-    console.error('Error analyzing multiple photos:', error);
-    throw error;
   }
+  const allDefects = Array.from(defectMap.values());
+
+  // Aggregate severity (worst wins)
+  let aggregatedSeverity: 'low' | 'medium' | 'high' = 'low';
+  if (analyses.some(a => a.estimatedSeverity === 'high')) {
+    aggregatedSeverity = 'high';
+  } else if (analyses.some(a => a.estimatedSeverity === 'medium')) {
+    aggregatedSeverity = 'medium';
+  }
+
+  const requiresVideoConsultation =
+    analyses.some(a => a.requiresVideoConsultation) || allDefects.length > 3;
+
+  let overallSummary = `Analysis of ${imageUrls.length} photo(s). `;
+  if (allDefects.length === 0) {
+    overallSummary += 'No significant defects detected across photos.';
+  } else {
+    overallSummary += `Issues found: ${allDefects.map(d => d.defectType).join(', ')}.`;
+  }
+  if (requiresVideoConsultation) {
+    overallSummary += ' Video consultation recommended.';
+  }
+
+  return {
+    analyses,
+    aggregatedSeverity,
+    allDefects,
+    overallSummary,
+    requiresVideoConsultation,
+  };
 }
 
 /**
- * Generate contractor-ready report from photo analysis
+ * Generate a contractor-ready report from a photo analysis result.
  */
 export function generateAnalysisReport(analysis: PhotoAnalysisResult): {
   title: string;
@@ -355,7 +222,7 @@ export function generateAnalysisReport(analysis: PhotoAnalysisResult): {
             {
               heading: 'Identified Components',
               content: analysis.detectedObjects
-                .map(o => `• ${o.label} (${Math.round(o.confidence * 100)}% confidence)`)
+                .map(o => `• ${o.label} (${Math.round(o.confidence)}% confidence)`)
                 .join('\n'),
             },
           ]
