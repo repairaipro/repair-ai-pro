@@ -26,6 +26,7 @@ import DisputeResolution from '@/components/DisputeResolution';
 import MatchStatus from '@/components/MatchStatus';
 import ProgressLogger from '@/components/ProgressLogger';
 import ProgressDashboard from '@/components/ProgressDashboard';
+import WorkPhotoUpload from '@/components/WorkPhotoUpload';
 import FileDisputeModal from '@/components/FileDisputeModal';
 import { openDirections } from '@/lib/mapsIntegration';
 import VideoConsultationPanel from '@/components/VideoConsultationPanel';
@@ -281,6 +282,7 @@ export default function JobDetailPage() {
   const [milestones, setMilestones] = useState<any[]>([]);
   const [milestonePlanStatus, setMilestonePlanStatus] = useState<string | null>(null);
   const [milestonesLoading, setMilestonesLoading] = useState(false);
+  const [workPhotos, setWorkPhotos] = useState<any[]>([]);
 
   /* Capture auth token for child components */
   useEffect(() => {
@@ -372,6 +374,16 @@ export default function JobDetailPage() {
     if (!jobId || !user || !invoiceToken) return;
     if (!['accepted', 'in_progress', 'completed', 'confirmed'].includes(job?.status || '')) return;
     fetchMilestones(invoiceToken);
+  }, [jobId, user, invoiceToken, job?.status]);
+
+  /* Work photos — load once job is active */
+  useEffect(() => {
+    if (!jobId || !user || !invoiceToken) return;
+    if (!['accepted', 'in_progress', 'completed', 'confirmed', 'disputed'].includes(job?.status || '')) return;
+    fetch(`/api/jobs/${jobId}/work-photos`, { headers: { Authorization: `Bearer ${invoiceToken}` } })
+      .then((r) => r.ok ? r.json() : { photos: [] })
+      .then((d) => setWorkPhotos(d.photos ?? []))
+      .catch(() => {});
   }, [jobId, user, invoiceToken, job?.status]);
 
   async function handleConfirm() {
@@ -798,6 +810,16 @@ export default function JobDetailPage() {
         {/* ── Homeowner: live progress dashboard ── */}
         {isHomeowner && ['in_progress', 'completed', 'awaiting_confirmation'].includes(job.status) && (
           <ProgressDashboard jobId={jobId} />
+        )}
+
+        {/* ── Work photos: contractor uploads during job, homeowner sees all ── */}
+        {['accepted', 'in_progress', 'completed', 'confirmed', 'disputed'].includes(job.status) && (
+          <WorkPhotoUpload
+            jobId={jobId}
+            role={isContractor ? 'contractor' : 'homeowner'}
+            photos={workPhotos}
+            onPhotoAdded={(p) => setWorkPhotos((prev) => [p, ...prev])}
+          />
         )}
 
         {/* ── Milestone Setup (contractor proposes) or approval (homeowner) ── */}
