@@ -28,7 +28,7 @@ type InboxItem = {
 type JobData = {
   description: string;
   trade?: string;
-  location?: string | { city?: string };
+  location?: string | { city?: string; state?: string; zipcode?: string; address?: string };
   status?: string;
   aiSummary?: string;
   estimatedValue?: number;
@@ -54,10 +54,14 @@ type InboxEntry = InboxItem & {
 
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
 
-function getCity(location: JobData["location"]): string {
+function getCity(location: JobData["location"], privacyMode?: string): string {
   if (!location) return "";
   if (typeof location === "string") return location;
-  return location.city ?? "";
+  // Respect ZIP-only privacy — only show zip code
+  if (privacyMode === "zip_only") {
+    return location.zipcode ? `ZIP ${location.zipcode}` : "Location hidden";
+  }
+  return location.city ?? location.zipcode ?? "";
 }
 
 function formatDate(ts: InboxItem["invitedAt"]): string {
@@ -555,7 +559,7 @@ export default function ContractorInvitationInbox() {
       {!loading &&
         filtered.map((entry) => {
           const trade = entry.job?.trade ?? "General";
-          const city = getCity(entry.job?.location);
+          const city = getCity(entry.job?.location, (entry.job as any)?.locationPrivacyMode);
           const isPending = entry.invitationStatus === "pending";
           const isAccepted = entry.invitationStatus === "accepted";
           const bid = entry.bid ?? defaultBid();
@@ -1064,7 +1068,7 @@ export default function ContractorInvitationInbox() {
           jobId={bidPackEntry.jobId}
           description={bidPackEntry.job.description ?? ""}
           trade={bidPackEntry.job.trade ?? "General"}
-          city={getCity(bidPackEntry.job.location)}
+          city={getCity(bidPackEntry.job.location, (bidPackEntry.job as any)?.locationPrivacyMode)}
           onClose={() => setBidPackEntry(null)}
         />
       )}

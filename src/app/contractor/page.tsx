@@ -6,7 +6,7 @@ import { collection, getDocs } from "firebase/firestore";
 import Image from "next/image";
 import Link from "next/link";
 import { TRADES } from "@/lib/constants";
-import { Search, MapPin, Star, Briefcase, Trophy, DollarSign, MessageSquare, X, ChevronRight } from "lucide-react";
+import { Search, MapPin, Star, Briefcase, Trophy, DollarSign, MessageSquare, X, ChevronRight, ShieldCheck } from "lucide-react";
 import { motion } from "framer-motion";
 
 type Contractor = {
@@ -22,6 +22,8 @@ type Contractor = {
   rating?: number;
   reviewCount?: number;
   jobsCompleted?: number;
+  qualityScore?: number;        // denormalized overall score (0-100)
+  verifiedSpecialties?: number; // count of verified specializations
 };
 
 function ContractorCardSkeleton() {
@@ -76,6 +78,7 @@ export default function ContractorDirectory() {
       if (sort === "experience") return (b.experience ?? 0) - (a.experience ?? 0);
       if (sort === "price") return (a.hourly ?? 999) - (b.hourly ?? 999);
       if (sort === "rating") return (b.rating ?? 0) - (a.rating ?? 0);
+      if (sort === "quality") return (b.qualityScore ?? 0) - (a.qualityScore ?? 0);
       return 0;
     });
 
@@ -146,6 +149,7 @@ export default function ContractorDirectory() {
           </div>
           <select value={sort} onChange={(e) => setSort(e.target.value)} className="input" style={{ width: 'auto', minWidth: '140px' }}>
             <option value="relevance">Sort: Relevance</option>
+            <option value="quality">Quality Score</option>
             <option value="rating">Highest Rated</option>
             <option value="experience">Most Experienced</option>
             <option value="price">Lowest Price</option>
@@ -264,6 +268,45 @@ export default function ContractorDirectory() {
                     </div>
                   )}
                 </div>
+
+                {/* Quality score + verified specialties */}
+                {(c.qualityScore != null && c.qualityScore > 0) || (c.verifiedSpecialties != null && c.verifiedSpecialties > 0) ? (
+                  <div className="flex items-center justify-center gap-2 mt-3 flex-wrap">
+                    {c.qualityScore != null && c.qualityScore > 0 && (
+                      <span
+                        className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
+                        style={{
+                          background: c.qualityScore >= 80
+                            ? 'rgba(34,197,94,0.12)'
+                            : c.qualityScore >= 60
+                              ? 'rgba(251,191,36,0.12)'
+                              : 'rgba(107,114,128,0.12)',
+                          color: c.qualityScore >= 80
+                            ? '#22c55e'
+                            : c.qualityScore >= 60
+                              ? '#fbbf24'
+                              : '#9ca3af',
+                          border: `1px solid ${c.qualityScore >= 80
+                            ? 'rgba(34,197,94,0.25)'
+                            : c.qualityScore >= 60
+                              ? 'rgba(251,191,36,0.25)'
+                              : 'rgba(107,114,128,0.25)'}`,
+                        }}
+                      >
+                        <ShieldCheck className="w-2.5 h-2.5" />
+                        Score {c.qualityScore}
+                      </span>
+                    )}
+                    {c.verifiedSpecialties != null && c.verifiedSpecialties > 0 && (
+                      <span
+                        className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                        style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.2)' }}
+                      >
+                        ✓ {c.verifiedSpecialties} verified {c.verifiedSpecialties === 1 ? 'specialty' : 'specialties'}
+                      </span>
+                    )}
+                  </div>
+                ) : null}
 
                 {/* Rate */}
                 {c.hourly != null && (

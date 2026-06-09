@@ -4,9 +4,9 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { useEffect, useState } from 'react';
-import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/db';
-import { LayoutDashboard, Briefcase, Plus, Inbox, MessageSquare } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Plus, Inbox, Clock } from 'lucide-react';
 
 /**
  * Sticky bottom navigation bar for mobile — only shown on small screens.
@@ -16,7 +16,6 @@ export default function MobileBottomNav() {
   const { user } = useAuth();
   const pathname  = usePathname();
   const [pendingInvites, setPendingInvites] = useState(0);
-  const [unreadMessages, setUnreadMessages] = useState(0);
 
   /* Watch contractor inbox for pending invitations */
   useEffect(() => {
@@ -28,41 +27,6 @@ export default function MobileBottomNav() {
     return onSnapshot(q, (snap) => setPendingInvites(snap.size), () => {});
   }, [user]);
 
-  /* Watch for unread messages (simplified: last message not from self) */
-  useEffect(() => {
-    if (!user) return;
-    let count = 0;
-    const listeners: (() => void)[] = [];
-    let active = true;
-
-    function watchJob(jobId: string) {
-      const q = query(
-        collection(db, 'jobs', jobId, 'messages'),
-        orderBy('createdAt', 'desc'),
-        limit(1)
-      );
-      const unsub = onSnapshot(q, (snap) => {
-        if (!active || snap.empty) return;
-        const last = snap.docs[0].data();
-        if (last?.senderId && last.senderId !== user.uid) {
-          count++;
-          setUnreadMessages(count);
-        }
-      });
-      listeners.push(unsub);
-    }
-
-    const u1 = onSnapshot(
-      query(collection(db, 'jobs'), where('userId', '==', user.uid)),
-      (snap) => snap.docs.forEach((d) => watchJob(d.id))
-    );
-    const u2 = onSnapshot(
-      query(collection(db, 'jobs'), where('claimedBy', '==', user.uid)),
-      (snap) => snap.docs.forEach((d) => watchJob(d.id))
-    );
-
-    return () => { active = false; u1(); u2(); listeners.forEach(f => f()); };
-  }, [user]);
 
   if (!user) return null;
 
@@ -97,11 +61,10 @@ export default function MobileBottomNav() {
       badge:  pendingInvites,
     },
     {
-      href:   '/chat',
-      label:  'Chat',
-      icon:   MessageSquare,
-      active: pathname?.startsWith('/chat'),
-      badge:  unreadMessages,
+      href:   '/history',
+      label:  'History',
+      icon:   Clock,
+      active: pathname?.startsWith('/history'),
     },
   ];
 

@@ -36,10 +36,13 @@ type Job = {
   createdAt?: unknown;
 };
 
-function getCity(location: Job["location"]): string {
+function getCity(location: Job["location"], privacyMode?: string): string {
   if (!location) return "";
   if (typeof location === "string") return location;
-  return (location as any).city ?? "";
+  if (privacyMode === "zip_only") {
+    return (location as any).zipcode ? `ZIP ${(location as any).zipcode}` : "Location hidden";
+  }
+  return (location as any).city ?? (location as any).zipcode ?? "";
 }
 
 function JobCardSkeleton() {
@@ -83,7 +86,7 @@ export default function JobMarketplacePage() {
       !search.trim() ||
       job.description.toLowerCase().includes(search.toLowerCase()) ||
       (job.trade ?? "").toLowerCase().includes(search.toLowerCase()) ||
-      getCity(job.location).toLowerCase().includes(search.toLowerCase());
+      getCity(job.location, (job as any).locationPrivacyMode).toLowerCase().includes(search.toLowerCase());
     const matchTrade = tradeFilter === "all" || job.trade?.toLowerCase() === tradeFilter.toLowerCase();
     const matchStatus = statusFilter === "all" || job.status === statusFilter;
     return matchSearch && matchTrade && matchStatus;
@@ -218,7 +221,7 @@ export default function JobMarketplacePage() {
           >
             {filtered.map((job, index) => {
               const s = STATUS_STYLES[job.status] ?? STATUS_STYLES.open;
-              const city = getCity(job.location);
+              const city = getCity(job.location, (job as any).locationPrivacyMode);
               return (
                 <motion.div
                   key={job.id}

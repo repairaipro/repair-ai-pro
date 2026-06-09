@@ -1,15 +1,18 @@
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
+import { openai, handleOpenAIError } from "@/lib/openaiClient";
 import { adminDb, adminAuth } from "@/lib/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
+import { stripe } from "@/lib/stripe";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
+const REPORT_FEE_CENTS = 4900; // $49.00
 
 /**
  * POST /api/jobs/[jobId]/insurance-report
  *
- * Generates a professional insurance claim report for a home repair job
- * using GPT-4o, saves it to Firestore, and returns the content.
+ * Two-step flow:
+ *   1. Call with empty body → returns {requiresPayment: true, clientSecret, amountUsd: 49}
+ *   2. Frontend confirms payment with Stripe, then call again with {paymentIntentId} →
+ *      verifies payment, generates AI report, saves to Firestore, returns report
  *
  * Auth: Bearer token (homeowner who owns the job)
  */
@@ -18,28 +21,23 @@ export async function POST(
   { params }: { params: { jobId: string } }
 ) {
   try {
-    // 1. Verify Bearer auth
+    // ── Auth ──────────────────────────────────────────────────────────────
     const header = req.headers.get("authorization") ?? "";
-    const token = header.startsWith("Bearer ") ? header.slice(7) : null;
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const token  = header.startsWith("Bearer ") ? header.slice(7) : null;
+    if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const decoded = await adminAuth.verifyIdToken(token);
-    const uid = decoded.uid;
-    const jobId = params.jobId;
+    const uid     = decoded.uid;
+    const jobId   = params.jobId;
 
-    // 2. Fetch job doc
-    const jobRef = adminDb.collection("jobs").doc(jobId);
+    // ── Load job ──────────────────────────────────────────────────────────
+    const jobRef  = adminDb.collection("jobs").doc(jobId);
     const jobSnap = await jobRef.get();
 
-    if (!jobSnap.exists) {
-      return NextResponse.json({ error: "Job not found" }, { status: 404 });
-    }
+    if (!jobSnap.exists) return NextResponse.json({ error: "Job not found" }, { status: 404 });
 
     const job = jobSnap.data()!;
 
-    // 3. Validate user owns the job
     if (job.userId !== uid) {
       return NextResponse.json(
         { error: "You do not have permission to generate a report for this job" },
@@ -47,7 +45,61 @@ export async function POST(
       );
     }
 
-    // Resolve location string
+    // ── Parse body ────────────────────────────────────────────────────────
+    let body: { paymentIntentId?: string } = {};
+    try { body = await req.json(); } catch { /* empty body is fine */ }
+
+    // ── If report already generated, return it immediately ────────────────
+    if (job.insuranceReport?.content && !body.paymentIntentId) {
+      return NextResponse.json({ report: job.insuranceReport.content, alreadyGenerated: true });
+    }
+
+    // ── Step 1: No paymentIntentId → create PaymentIntent ─────────────────
+    if (!body.paymentIntentId) {
+      // Get or create Stripe customer
+      let customerId: string = job.stripeCustomerId ?? "";
+      if (!customerId) {
+        const userRecord = await adminAuth.getUser(uid);
+        const customer = await stripe.customers.create({
+          email:    userRecord.email ?? undefined,
+          name:     userRecord.displayName ?? undefined,
+          metadata: { uid },
+        });
+        customerId = customer.id;
+        await jobRef.update({ stripeCustomerId: customerId });
+      }
+
+      const intent = await stripe.paymentIntents.create({
+        amount:             REPORT_FEE_CENTS,
+        currency:           "usd",
+        customer:           customerId,
+        description:        `Insurance report for job: ${job.description?.slice(0, 80) ?? jobId}`,
+        setup_future_usage: "off_session",
+        metadata: { jobId, homeownerId: uid, type: "insurance_report" },
+      });
+
+      return NextResponse.json({
+        requiresPayment: true,
+        clientSecret:    intent.client_secret,
+        amountUsd:       REPORT_FEE_CENTS / 100,
+      });
+    }
+
+    // ── Step 2: Verify payment ─────────────────────────────────────────────
+    const intent = await stripe.paymentIntents.retrieve(body.paymentIntentId);
+
+    if (intent.metadata?.jobId !== jobId || intent.metadata?.homeownerId !== uid) {
+      return NextResponse.json({ error: "Payment does not match this job" }, { status: 403 });
+    }
+
+    if (intent.status !== "succeeded") {
+      return NextResponse.json(
+        { error: `Payment not confirmed (status: ${intent.status})` },
+        { status: 402 }
+      );
+    }
+
+    // ── Generate report ────────────────────────────────────────────────────
     const locationStr =
       typeof job.location === "string"
         ? job.location
@@ -56,14 +108,14 @@ export async function POST(
     const jobCompleted =
       job.status === "confirmed" || job.status === "verified" ? "Yes" : "Pending";
 
-    // 4. Call OpenAI gpt-4o to generate the insurance report
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model:    "gpt-4o",
+      max_tokens: 2000,
+      temperature: 0.3,
       messages: [
         {
-          role: "system",
-          content:
-            "You are an expert home repair damage assessor. Generate a professional insurance claim report in markdown format.",
+          role:    "system",
+          content: "You are an expert home repair damage assessor. Generate a professional insurance claim report in markdown format.",
         },
         {
           role: "user",
@@ -78,40 +130,26 @@ export async function POST(
 Include sections: Executive Summary, Damage Assessment, Repair Scope, Cost Estimate Range, Insurance Claim Justification, Contractor Verification, Recommendations. Be professional and specific.`,
         },
       ],
-      max_tokens: 2000,
-      temperature: 0.3,
     });
 
-    const reportContent =
-      completion.choices[0]?.message?.content ?? "Report generation failed.";
+    const reportContent = completion.choices[0]?.message?.content ?? "Report generation failed.";
 
-    // 5. TODO: Charge a $49 report fee via Stripe
-    // TODO: Create a Stripe PaymentIntent for $49.00 (4900 cents) and confirm it
-    //       using the homeowner's saved payment method before saving the report.
-    console.log("INSURANCE_REPORT_CHARGE: $49");
-
-    // 6. Save the report to jobs/{jobId}
+    // ── Save report ────────────────────────────────────────────────────────
     const generatedAt = FieldValue.serverTimestamp();
-
     await jobRef.update({
       insuranceReport: {
-        content: reportContent,
+        content:           reportContent,
         generatedAt,
-        generatedBy: uid,
+        generatedBy:       uid,
+        paymentIntentId:   body.paymentIntentId,
+        reportFeeUsd:      REPORT_FEE_CENTS / 100,
       },
       updatedAt: generatedAt,
     });
 
-    // 7. Return the report
-    return NextResponse.json({
-      report: reportContent,
-      generatedAt: new Date().toISOString(),
-    });
+    return NextResponse.json({ report: reportContent, generatedAt: new Date().toISOString() });
   } catch (err: any) {
-    console.error("insurance-report error:", err);
-    return NextResponse.json(
-      { error: err.message ?? "Failed to generate insurance report" },
-      { status: 500 }
-    );
+    const errorMessage = await handleOpenAIError(err);
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

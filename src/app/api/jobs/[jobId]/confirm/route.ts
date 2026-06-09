@@ -4,6 +4,32 @@ import { FieldValue } from "firebase-admin/firestore";
 import { sendPayoutSentEmail } from "@/lib/email";
 import { sendSMS } from "@/lib/sms";
 
+/** Fire-and-forget: record final price so future estimates are smarter */
+async function recordPricingHistory(
+  jobId: string,
+  job: FirebaseFirestore.DocumentData,
+  origin: string,
+  token: string,
+) {
+  const finalPrice = job.paymentAmountUsd;
+  const zipCode =
+    typeof job.location === "string"
+      ? job.location
+      : job.location?.zipcode ?? job.location?.zip ?? "";
+
+  if (!finalPrice || finalPrice <= 0 || !zipCode) return;
+
+  const trade    = job.aiDetectedTrade ?? job.trade ?? "general";
+  const answers  = job.questionnaireAnswers ?? {};
+  const estimate = job.smartEstimate?.estimatedPrice ?? undefined;
+
+  fetch(`${origin}/api/jobs/estimate`, {
+    method:  "PUT",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body:    JSON.stringify({ trade, specialty: trade, zipCode, finalPrice, answers, estimatedPrice: estimate }),
+  }).catch(() => { /* non-blocking */ });
+}
+
 /**
  * Homeowner confirms the job is done.
  * Equivalent to calling /progress with nextStatus=confirmed —
@@ -93,6 +119,10 @@ export async function POST(
         }).catch((err) => console.error("Release trigger failed:", err));
       } catch { /* non-blocking */ }
     }
+
+    // Record pricing data async (does not block response)
+    const origin = req.headers.get("origin") ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+    recordPricingHistory(jobId, job, origin, token);
 
     return NextResponse.json({ success: true });
   } catch (e: any) {

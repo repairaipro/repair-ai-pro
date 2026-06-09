@@ -1,31 +1,36 @@
-import OpenAI from "openai";
 import { NextResponse } from "next/server";
-
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
-});
+import { openai, handleOpenAIError } from "@/lib/openaiClient";
+import type OpenAI from "openai";
 
 export async function POST(req: Request) {
-  const { prompt, image } = await req.json();
+  try {
+    const { prompt, image } = await req.json();
 
-  const content: any[] = [
-    { type: "input_text", text: prompt },
-  ];
+    const content: OpenAI.ChatCompletionContentPart[] = [
+      { type: "text", text: prompt },
+    ];
 
-  if (image) {
-    content.push({
-      type: "input_image",
-      image_url: image,
-      detail: "high",
+    if (image) {
+      content.push({
+        type: "image_url",
+        image_url: { url: image, detail: "high" },
+      });
+    }
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "user", content },
+      ],
+      max_tokens: 600,
+      temperature: 0.3,
     });
+
+    return NextResponse.json({
+      output: response.choices[0]?.message?.content || "No response",
+    });
+  } catch (err: any) {
+    const errorMessage = await handleOpenAIError(err);
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
-
-  const response = await client.responses.create({
-    model: "gpt-4o-mini",
-    input: content,
-  });
-
-  return NextResponse.json({
-    output: response.output_text || "No response",
-  });
 }

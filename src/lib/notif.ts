@@ -22,7 +22,9 @@ export type NotifType =
   | "job_confirmed"
   | "new_message"
   | "review_received"
-  | "payout_failed";
+  | "payout_failed"
+  | "video_consultation_requested"
+  | "video_consultation_approved";
 
 export type NotifPayload = {
   recipientId: string;

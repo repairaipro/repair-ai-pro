@@ -1,6 +1,5 @@
-import OpenAI from "openai";
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
+import { openai } from "@/lib/openaiClient";
+import type OpenAI from "openai";
 
 type AnalyzeInput = {
   imageUrl?: string;

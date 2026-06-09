@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { openai, handleOpenAIError } from "@/lib/openaiClient";
 import { db } from "@/lib/db";
 import {
   collection,
@@ -45,9 +46,6 @@ type RankedContractor = ContractorBase & {
    OpenAI Ranking Helper
 ================================ */
 async function rankWithOpenAI(payload: any) {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error("Missing OPENAI_API_KEY");
-
   const systemPrompt = `
 You are an AI contractor matching engine for a home repair marketplace.
 
@@ -63,30 +61,17 @@ Rules:
 - Scores must be integers 0–100
 `.trim();
 
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "gpt-4o-mini",
-      temperature: 0.2,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: JSON.stringify(payload) },
-      ],
-    }),
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    temperature: 0.2,
+    response_format: { type: "json_object" },
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: JSON.stringify(payload) },
+    ],
   });
 
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`OpenAI error ${res.status}: ${text}`);
-  }
-
-  const json = await res.json();
-  const content = json?.choices?.[0]?.message?.content;
+  const content = completion.choices?.[0]?.message?.content;
   if (!content) throw new Error("OpenAI returned empty response");
 
   return JSON.parse(content);
@@ -232,8 +217,9 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ranked });
   } catch (e: any) {
+    const errorMessage = await handleOpenAIError(e);
     return NextResponse.json(
-      { error: e?.message ?? "Unknown server error" },
+      { error: errorMessage },
       { status: 500 }
     );
   }

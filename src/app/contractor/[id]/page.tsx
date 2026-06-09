@@ -9,12 +9,13 @@ import Link from "next/link";
 import {
   Star, MapPin, Briefcase, Clock, CheckCircle2, Award,
   Share2, ChevronLeft, Brain, Loader2, MessageSquare,
-  Shield, Zap, ChevronRight, Copy, Check,
+  Shield, Zap, ChevronRight, Copy, Check, TrendingUp, Wrench,
 } from "lucide-react";
 import { ProfileGallery } from "@/components/ProfileGallery";
 import { ServiceAreaMap } from "@/components/ServiceAreaMap";
 import { CertificationBadges, type Certification } from "@/components/CertificationBadges";
 import { ResponseTimeBadge } from "@/components/ResponseTimeBadge";
+import VerifiedBadge from "@/components/VerifiedBadge";
 
 /* ── Types ── */
 type Review = {
@@ -55,6 +56,9 @@ type ContractorProfile = {
   averageResponseMinutes?:  number;
   serviceRadiusMiles?:      number;
   zipCode?:                 string;
+  verificationStatus?:      'unverified' | 'pending' | 'verified' | 'rejected' | 'expired';
+  licenseVerified?:         boolean;
+  insuranceVerified?:       boolean;
 };
 
 /* ── Star renderer ── */
@@ -110,6 +114,8 @@ export default function ContractorProfilePage({ params }: { params: { id?: strin
   const [aiSummary,      setAISummary]      = useState("");
   const [aiLoading,      setAILoading]      = useState(false);
   const [copied,         setCopied]         = useState(false);
+  const [qualityScore,   setQualityScore]   = useState<any>(null);
+  const [specs,          setSpecs]          = useState<any[]>([]);
 
   if (!contractorId) {
     return <div className="p-6 text-sm" style={{ color: 'var(--color-text-4)' }}>Loading…</div>;
@@ -131,6 +137,19 @@ export default function ContractorProfilePage({ params }: { params: { id?: strin
       setReviews(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })));
     });
     return unsub;
+  }, [contractorId]);
+
+  /* Load quality score + specializations (best-effort, non-blocking) */
+  useEffect(() => {
+    if (!contractorId) return;
+    fetch(`/api/contractors/${contractorId}/quality-score`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => d && setQualityScore(d))
+      .catch(() => {});
+    fetch(`/api/contractors/${contractorId}/specializations`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => d?.specializations && setSpecs(d.specializations))
+      .catch(() => {});
   }, [contractorId]);
 
   const avgRating = useMemo(() => {
@@ -274,6 +293,14 @@ Reviews: ${reviews.slice(0, 5).map((r) => `${r.rating}★ — "${r.text}"`).join
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
+                  {profile.verificationStatus === 'verified' && (
+                    <VerifiedBadge
+                      status="verified"
+                      licenseVerified={profile.licenseVerified}
+                      insuranceVerified={profile.insuranceVerified}
+                      size="sm"
+                    />
+                  )}
                   <TrustBadge score={profile.trustScore ?? 0} plan={profile.subscriptionPlan} />
                   <button
                     onClick={handleShare}
@@ -410,6 +437,102 @@ Reviews: ${reviews.slice(0, 5).map((r) => `${r.rating}★ — "${r.text}"`).join
           >
             <h2 className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: 'var(--color-text-4)' }}>Credentials</h2>
             <CertificationBadges certifications={profile.certifications} />
+          </div>
+        )}
+
+        {/* ── Verified Specializations ── */}
+        {specs.filter((s) => s.verified || s.completedJobs >= 3).length > 0 && (
+          <div
+            className="rounded-2xl p-5"
+            style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+          >
+            <h2 className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: 'var(--color-text-4)' }}>
+              Specializations
+            </h2>
+            <div className="space-y-2.5">
+              {specs
+                .filter((s) => s.verified || s.completedJobs >= 3)
+                .slice(0, 6)
+                .map((s: any) => (
+                  <div key={`${s.trade}-${s.specialty}`} className="flex items-center gap-3">
+                    <div
+                      className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                      style={{ background: s.verified ? 'rgba(52,211,153,0.12)' : 'var(--color-surface-2)', border: `1px solid ${s.verified ? 'rgba(52,211,153,0.3)' : 'var(--color-border)'}` }}
+                    >
+                      <Wrench size={13} style={{ color: s.verified ? '#34d399' : 'var(--color-text-4)' }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate" style={{ color: 'var(--color-text-2)' }}>
+                        {s.specialty}
+                      </p>
+                      <p className="text-[10px]" style={{ color: 'var(--color-text-4)' }}>
+                        {s.trade} · {s.completedJobs} jobs
+                        {s.averageRating > 0 && ` · ${s.averageRating.toFixed(1)}★`}
+                      </p>
+                    </div>
+                    {s.verified && (
+                      <span
+                        className="text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0"
+                        style={{ background: 'rgba(52,211,153,0.12)', color: '#34d399', border: '1px solid rgba(52,211,153,0.25)' }}
+                      >
+                        ✓ Verified
+                      </span>
+                    )}
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Quality Score ── */}
+        {qualityScore && qualityScore.overallScore > 0 && (
+          <div
+            className="rounded-2xl p-5"
+            style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-4)' }}>
+                Quality Score
+              </h2>
+              <span
+                className="text-2xl font-black"
+                style={{
+                  color: qualityScore.overallScore >= 80 ? '#34d399' : qualityScore.overallScore >= 60 ? '#fbbf24' : '#fb923c',
+                }}
+              >
+                {qualityScore.overallScore}
+                <span className="text-xs font-normal" style={{ color: 'var(--color-text-4)' }}>/100</span>
+              </span>
+            </div>
+            <div className="space-y-2.5">
+              {[
+                { label: 'Star Rating',       value: qualityScore.rating,           max: 5,   fmt: (v: number) => v.toFixed(1) + '★' },
+                { label: 'Response Time',     value: Math.max(0, 100 - (qualityScore.responseTime ?? 0) * 10), max: 100, fmt: (v: number) => v.toFixed(0) + ' pts' },
+                { label: 'On-Time Completion',value: (qualityScore.timeAccuracy ?? 0) * 100, max: 100, fmt: (v: number) => v.toFixed(0) + '%' },
+                { label: 'Photo Evidence',    value: (qualityScore.photoEvidenceScore ?? 0) * 100, max: 100, fmt: (v: number) => v.toFixed(0) + '%' },
+                { label: 'Dispute-Free Rate', value: (1 - (qualityScore.disputeRate ?? 0)) * 100, max: 100, fmt: (v: number) => v.toFixed(0) + '%' },
+              ].map(({ label, value, max, fmt }) => {
+                const pct = Math.min(100, (value / max) * 100);
+                const barColor = pct >= 70 ? '#34d399' : pct >= 40 ? '#fbbf24' : '#f87171';
+                return (
+                  <div key={label}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs" style={{ color: 'var(--color-text-3)' }}>{label}</span>
+                      <span className="text-xs font-semibold" style={{ color: 'var(--color-text-2)' }}>{fmt(value)}</span>
+                    </div>
+                    <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--color-surface-2)' }}>
+                      <div
+                        className="h-full rounded-full transition-all duration-700"
+                        style={{ width: `${pct}%`, background: barColor }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-[10px] mt-3" style={{ color: 'var(--color-text-4)' }}>
+              Score based on {qualityScore.jobsCompleted ?? 0} completed jobs · Updated automatically
+            </p>
           </div>
         )}
 

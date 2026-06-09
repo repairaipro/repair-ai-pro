@@ -489,6 +489,50 @@ export async function sendPayoutSentEmail(
   });
 }
 
+/** Sent to homeowner when contractor sends them an invoice. */
+export async function sendInvoiceEmail(
+  to: string,
+  {
+    contractorName,
+    invoiceNumber,
+    total,
+    jobDescription,
+    payUrl,
+  }: {
+    contractorName: string;
+    invoiceNumber: string;
+    total: number;
+    jobDescription: string;
+    payUrl: string;
+  }
+): Promise<void> {
+  const content = `
+    <h2 style="margin:0 0 8px;font-size:20px;color:#111827;">Invoice from ${contractorName}</h2>
+    <p style="margin:0 0 16px;font-size:15px;color:#374151;line-height:1.6;">
+      You have a new invoice for work completed on your home repair job.
+    </p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;margin:0 0 20px;">
+      <tr><td style="padding:16px 20px;">
+        <p style="margin:0 0 4px;font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;">Invoice</p>
+        <p style="margin:0 0 12px;font-size:16px;font-weight:700;color:#111827;">${invoiceNumber}</p>
+        <p style="margin:0 0 4px;font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;">Job</p>
+        <p style="margin:0 0 12px;font-size:14px;color:#374151;">${jobDescription.slice(0, 100)}</p>
+        <p style="margin:0 0 4px;font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;">Amount Due</p>
+        <p style="margin:0;font-size:28px;font-weight:800;color:#16a34a;">$${total.toFixed(2)}</p>
+      </td></tr>
+    </table>
+    ${directBtn(payUrl, "View & Pay Invoice →")}
+    <p style="margin:20px 0 0;font-size:13px;color:#9ca3af;text-align:center;">
+      You can also view this invoice at any time from your job page.
+    </p>
+  `;
+  await sendEmailDirect({
+    to,
+    subject: `Invoice ${invoiceNumber} from ${contractorName} — $${total.toFixed(2)} due`,
+    html: directLayout(content),
+  });
+}
+
 /** Sent to a new user immediately after registration. */
 export async function sendWelcomeEmail(
   to: string,

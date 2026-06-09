@@ -1,8 +1,133 @@
 'use client';
 
 import React, { useState } from 'react';
-import { FileText, X, AlertTriangle, Copy, CheckCircle2, Loader2 } from 'lucide-react';
+import { FileText, X, AlertTriangle, Copy, CheckCircle2, Loader2, CreditCard } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '');
+
+const STRIPE_APPEARANCE = {
+  theme: 'night' as const,
+  variables: {
+    colorPrimary:    '#6366f1',
+    colorBackground: '#111827',
+    colorText:       '#f9fafb',
+    colorDanger:     '#ef4444',
+    borderRadius:    '8px',
+  },
+};
+
+/* ─── Stripe inner checkout ─── */
+function ReportCheckoutForm({
+  amountUsd,
+  onSuccess,
+  onCancel,
+}: {
+  amountUsd: number;
+  onSuccess: (paymentIntentId: string) => void;
+  onCancel: () => void;
+}) {
+  const stripe   = useStripe();
+  const elements = useElements();
+  const [paying, setPaying] = useState(false);
+  const [cardErr, setCardErr] = useState<string | null>(null);
+
+  async function handlePay(e: React.FormEvent) {
+    e.preventDefault();
+    if (!stripe || !elements || paying) return;
+    setPaying(true);
+    setCardErr(null);
+
+    const { error: submitErr } = await elements.submit();
+    if (submitErr) { setCardErr(submitErr.message ?? 'Card error'); setPaying(false); return; }
+
+    const { error: confirmErr, paymentIntent } = await stripe.confirmPayment({
+      elements,
+      redirect: 'if_required',
+    });
+
+    if (confirmErr) {
+      setCardErr(confirmErr.message ?? 'Payment failed');
+      setPaying(false);
+    } else if (paymentIntent?.id) {
+      onSuccess(paymentIntent.id);
+    }
+  }
+
+  return (
+    <form onSubmit={handlePay} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div
+        style={{
+          background: 'rgba(99,102,241,0.06)',
+          border: '1px solid rgba(99,102,241,0.2)',
+          borderRadius: 10,
+          padding: '10px 14px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        <span style={{ fontSize: 13, color: 'var(--color-text-3)' }}>Insurance Report Fee</span>
+        <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--color-text)' }}>${amountUsd.toFixed(2)}</span>
+      </div>
+
+      <PaymentElement options={{ layout: 'tabs' }} />
+
+      {cardErr && (
+        <p style={{ fontSize: 13, color: '#f87171', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '8px 12px', margin: 0 }}>
+          {cardErr}
+        </p>
+      )}
+
+      <div style={{ display: 'flex', gap: 10 }}>
+        <button
+          type="button"
+          onClick={onCancel}
+          style={{
+            flex: 1,
+            background: 'var(--color-surface-2)',
+            border: '1px solid var(--color-border)',
+            borderRadius: 10,
+            padding: '0.65rem',
+            cursor: 'pointer',
+            fontWeight: 600,
+            fontSize: 14,
+            color: 'var(--color-text-2)',
+          }}
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={!stripe || paying}
+          style={{
+            flex: 2,
+            background: paying ? 'rgba(99,102,241,0.5)' : 'var(--color-brand)',
+            border: 'none',
+            borderRadius: 10,
+            padding: '0.65rem',
+            cursor: paying ? 'not-allowed' : 'pointer',
+            fontWeight: 700,
+            fontSize: 14,
+            color: '#fff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+          }}
+        >
+          {paying ? (
+            <><Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> Processing…</>
+          ) : (
+            <><CreditCard size={15} /> Pay ${amountUsd.toFixed(2)}</>
+          )}
+        </button>
+      </div>
+    </form>
+  );
+}
 
 /* ─── Props ─── */
 interface InsuranceReportModalProps {
@@ -96,14 +221,16 @@ export default function InsuranceReportModal({
 }: InsuranceReportModalProps) {
   const { user } = useAuth();
 
-  const [phase, setPhase] = useState<'confirm' | 'loading' | 'done' | 'error'>('confirm');
-  const [report, setReport] = useState<string | null>(null);
+  const [phase, setPhase]     = useState<'confirm' | 'payment' | 'loading' | 'done' | 'error'>('confirm');
+  const [report, setReport]   = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied]   = useState(false);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [amountUsd, setAmountUsd]       = useState(49);
 
   if (!isOpen) return null;
 
-  /* ── Generate report ── */
+  /* ── Step 1: request PaymentIntent (or skip if already generated) ── */
   async function handleGenerate() {
     if (!user) return;
     setPhase('loading');
@@ -112,11 +239,52 @@ export default function InsuranceReportModal({
     try {
       const token = await user.getIdToken();
       const res = await fetch(`/api/jobs/${jobId}/insurance-report`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        method:  'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body:    JSON.stringify({}),
+      });
+
+      if (!res.ok) {
+        const body = await res.json();
+        throw new Error(body.error ?? `Server error ${res.status}`);
+      }
+
+      const data = await res.json();
+
+      if (data.alreadyGenerated) {
+        // Report was already purchased — show it immediately
+        setReport(data.report ?? '');
+        setPhase('done');
+        return;
+      }
+
+      if (data.requiresPayment && data.clientSecret) {
+        setClientSecret(data.clientSecret);
+        setAmountUsd(data.amountUsd ?? 49);
+        setPhase('payment');
+        return;
+      }
+
+      // Unexpected — just show what came back
+      setReport(data.report ?? '');
+      setPhase('done');
+    } catch (err: any) {
+      setErrorMsg(err.message ?? 'Failed to start report generation');
+      setPhase('error');
+    }
+  }
+
+  /* ── Step 2: payment confirmed by Stripe → generate the report ── */
+  async function handlePaymentSuccess(paymentIntentId: string) {
+    if (!user) return;
+    setPhase('loading');
+
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/jobs/${jobId}/insurance-report`, {
+        method:  'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ paymentIntentId }),
       });
 
       if (!res.ok) {
@@ -128,7 +296,7 @@ export default function InsuranceReportModal({
       setReport(data.report ?? '');
       setPhase('done');
     } catch (err: any) {
-      setErrorMsg(err.message ?? 'Failed to generate report');
+      setErrorMsg(err.message ?? 'Failed to generate report after payment');
       setPhase('error');
     }
   }
@@ -151,6 +319,7 @@ export default function InsuranceReportModal({
     setReport(null);
     setErrorMsg(null);
     setCopied(false);
+    setClientSecret(null);
     onClose();
   }
 
@@ -408,6 +577,44 @@ export default function InsuranceReportModal({
                     Generate Report ($49)
                   </button>
                 </div>
+              </div>
+            )}
+
+            {/* ── PAYMENT phase ── */}
+            {phase === 'payment' && clientSecret && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                <div
+                  style={{
+                    background: 'rgba(99,102,241,0.08)',
+                    border: '1px solid rgba(99,102,241,0.2)',
+                    borderRadius: '0.75rem',
+                    padding: '1rem 1.25rem',
+                    display: 'flex',
+                    gap: '0.75rem',
+                    alignItems: 'center',
+                  }}
+                >
+                  <CreditCard size={20} style={{ color: '#818cf8', flexShrink: 0 }} />
+                  <div>
+                    <p style={{ fontWeight: 700, color: '#a5b4fc', fontSize: '0.9rem', marginBottom: 2 }}>
+                      Complete payment to generate report
+                    </p>
+                    <p style={{ color: 'var(--color-text-3)', fontSize: '0.8rem', margin: 0 }}>
+                      Your card will be charged <strong style={{ color: 'var(--color-text-2)' }}>${amountUsd.toFixed(2)}</strong> once. Report is generated immediately after.
+                    </p>
+                  </div>
+                </div>
+
+                <Elements
+                  stripe={stripePromise}
+                  options={{ clientSecret, appearance: STRIPE_APPEARANCE }}
+                >
+                  <ReportCheckoutForm
+                    amountUsd={amountUsd}
+                    onSuccess={handlePaymentSuccess}
+                    onCancel={() => setPhase('confirm')}
+                  />
+                </Elements>
               </div>
             )}
 

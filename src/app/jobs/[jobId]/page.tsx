@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { db } from '@/lib/db';
-import { doc, onSnapshot, collection, query, orderBy } from 'firebase/firestore';
+import { doc, onSnapshot, collection, query, orderBy, updateDoc } from 'firebase/firestore';
 import { useAuth } from '@/lib/auth';
 import {
   ChevronLeft, MessageSquare, CheckCircle2, Clock, AlertTriangle,
@@ -13,6 +13,23 @@ import {
 } from 'lucide-react';
 import InsuranceReportModal from '@/components/InsuranceReportModal';
 import { ReviewModal } from '@/components/ReviewModal';
+import JobLocationTracker, { type JobLocation } from '@/components/JobLocationTracker';
+import NotificationHistory from '@/components/NotificationHistory';
+import ProductRecommendations from '@/components/ProductRecommendations';
+import PhotoAnalysisFlow from '@/components/PhotoAnalysisFlow';
+import BeforeAfterPhotoUpload from '@/components/BeforeAfterPhotoUpload';
+import BeforeAfterComparison from '@/components/BeforeAfterComparison';
+import SmartInvoice from '@/components/SmartInvoice';
+import MilestoneSetup from '@/components/MilestoneSetup';
+import MilestoneProgress from '@/components/MilestoneProgress';
+import DisputeResolution from '@/components/DisputeResolution';
+import MatchStatus from '@/components/MatchStatus';
+import ProgressLogger from '@/components/ProgressLogger';
+import ProgressDashboard from '@/components/ProgressDashboard';
+import WorkPhotoUpload from '@/components/WorkPhotoUpload';
+import FileDisputeModal from '@/components/FileDisputeModal';
+import { openDirections } from '@/lib/mapsIntegration';
+import VideoConsultationPanel from '@/components/VideoConsultationPanel';
 
 /* ── Types ── */
 type Job = {
@@ -32,6 +49,8 @@ type Job = {
   aiSummary?:       string;
   bidCount?:        number;
   insuranceReport?: { content: string; generatedAt: any };
+  contractorLocation?: { lat: number; lng: number; timestamp: number; accuracy?: number; speed?: number; heading?: number };
+  lastLocationUpdate?: any;
 };
 
 type Bid = {
@@ -244,6 +263,7 @@ export default function JobDetailPage() {
   const [selectingBid,     setSelectingBid]     = useState<string | null>(null);
   const [showInsurance,    setShowInsurance]    = useState(false);
   const [showReview,       setShowReview]       = useState(false);
+  const [showDisputeModal, setShowDisputeModal] = useState(false);
   const [authToken,        setAuthToken]        = useState('');
   const [progressing,      setProgressing]      = useState(false);
   const [progressError,    setProgressError]    = useState('');
@@ -251,13 +271,39 @@ export default function JobDetailPage() {
   const [cancelReason,     setCancelReason]     = useState('');
   const [cancelling,       setCancelling]       = useState(false);
   const [cancelError,      setCancelError]      = useState('');
+  const [contractorLocationData, setContractorLocationData] = useState<JobLocation | null>(null);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [recommendations, setRecommendations] = useState<any>(null);
+  const [recommendationsLoading, setRecommendationsLoading] = useState(false);
+  const [analysisId, setAnalysisId] = useState<string | null>(null);
+  const [completion, setCompletion] = useState<any>(null);
+  const [completionLoading, setCompletionLoading] = useState(false);
+  const [invoiceToken, setInvoiceToken] = useState('');
+  const [milestones, setMilestones] = useState<any[]>([]);
+  const [milestonePlanStatus, setMilestonePlanStatus] = useState<string | null>(null);
+  const [milestonesLoading, setMilestonesLoading] = useState(false);
+  const [workPhotos, setWorkPhotos] = useState<any[]>([]);
+
+  /* Capture auth token for child components */
+  useEffect(() => {
+    if (!user) return;
+    user.getIdToken().then(setInvoiceToken).catch(() => {});
+  }, [user]);
 
   /* Live job */
   useEffect(() => {
     if (!jobId) return;
     const unsub = onSnapshot(doc(db, 'jobs', jobId), (snap) => {
-      if (snap.exists()) setJob({ id: snap.id, ...(snap.data() as any) });
-      else setJob(null);
+      if (snap.exists()) {
+        const jobData = { id: snap.id, ...(snap.data() as any) };
+        setJob(jobData);
+        // Update contractor location from job data
+        if (jobData.contractorLocation) {
+          setContractorLocationData(jobData.contractorLocation);
+        }
+      } else {
+        setJob(null);
+      }
       setJobLoading(false);
     }, () => setJobLoading(false));
     return unsub;
@@ -274,6 +320,71 @@ export default function JobDetailPage() {
         .finally(() => setBidsLoading(false))
     );
   }, [jobId, user, job?.status]);
+
+  /* Product Recommendations */
+  useEffect(() => {
+    if (!jobId || !user) return;
+    setRecommendationsLoading(true);
+    user.getIdToken().then((token: string) =>
+      fetch(`/api/jobs/${jobId}/product-recommendations`, { headers: { Authorization: `Bearer ${token}` } })
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.success && d.recommendation) {
+            setRecommendations(d.recommendation);
+          }
+        })
+        .catch(() => {})
+        .finally(() => setRecommendationsLoading(false))
+    );
+  }, [jobId, user]);
+
+  /* Before/After Completion Comparison */
+  useEffect(() => {
+    if (!jobId || !user) return;
+    setCompletionLoading(true);
+    user.getIdToken().then((token: string) =>
+      fetch(`/api/jobs/${jobId}/completion/comparison`, { headers: { Authorization: `Bearer ${token}` } })
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.success && d.comparison) {
+            setCompletion(d.comparison);
+          }
+        })
+        .catch(() => {})
+        .finally(() => setCompletionLoading(false))
+    );
+  }, [jobId, user, job?.status]);
+
+  /* Milestones */
+  function fetchMilestones(token: string) {
+    setMilestonesLoading(true);
+    fetch(`/api/jobs/${jobId}/milestones`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.success) {
+          setMilestones(d.milestones || []);
+          setMilestonePlanStatus(d.milestones?.length ? (d.milestones[0]?.status === 'released' || d.milestones[0]?.status !== 'pending' ? 'approved' : null) : null);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setMilestonesLoading(false));
+  }
+
+  useEffect(() => {
+    if (!jobId || !user || !invoiceToken) return;
+    if (!['accepted', 'in_progress', 'completed', 'confirmed'].includes(job?.status || '')) return;
+    fetchMilestones(invoiceToken);
+  }, [jobId, user, invoiceToken, job?.status]);
+
+  /* Work photos — load once job is active */
+  useEffect(() => {
+    if (!jobId || !user || !invoiceToken) return;
+    if (!['accepted', 'in_progress', 'completed', 'confirmed', 'disputed'].includes(job?.status || '')) return;
+    fetch(`/api/jobs/${jobId}/work-photos`, { headers: { Authorization: `Bearer ${invoiceToken}` } })
+      .then((r) => r.ok ? r.json() : { photos: [] })
+      .then((d) => setWorkPhotos(d.photos ?? []))
+      .catch(() => {});
+  }, [jobId, user, invoiceToken, job?.status]);
 
   async function handleConfirm() {
     if (!user) return;
@@ -359,6 +470,21 @@ export default function JobDetailPage() {
       setCancelError('Network error. Please try again.');
     }
     setCancelling(false);
+  }
+
+  async function handleLocationUpdate(location: JobLocation) {
+    if (!jobId || !user) return;
+    setContractorLocationData(location);
+    try {
+      const token = await user.getIdToken();
+      await fetch(`/api/jobs/${jobId}/location`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ location }),
+      });
+    } catch (err) {
+      console.error('Failed to update location:', err);
+    }
   }
 
   if (jobLoading) {
@@ -447,6 +573,16 @@ export default function JobDetailPage() {
                 <DollarSign size={10} /> ${job.paymentAmountUsd} escrowed
               </span>
             )}
+            {isHomeowner && (job as any).locationPrivacyMode && (job as any).locationPrivacyMode !== 'full' && (
+              <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full"
+                style={{ background: 'rgba(250,191,36,0.1)', color: '#fbbf24', border: '1px solid rgba(250,191,36,0.2)' }}>
+                <Shield size={10} /> Location: {{
+                  approximate: 'Neighborhood only',
+                  address_hidden_until_arrival: 'Hidden until arrival',
+                  zip_only: 'ZIP only',
+                }[(job as any).locationPrivacyMode as string] ?? 'Private'}
+              </span>
+            )}
           </div>
 
           {/* Progress stepper */}
@@ -494,6 +630,27 @@ export default function JobDetailPage() {
                 <MessageSquare size={15} />
               </Link>
             </div>
+
+            {/* Dispute trigger */}
+            <button
+              type="button"
+              onClick={() => setShowDisputeModal(true)}
+              className="text-xs mt-3 w-full"
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#6b7280',
+                cursor: 'pointer',
+                padding: '6px 0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+              }}
+            >
+              <AlertTriangle size={12} />
+              There's an issue with this job — file a dispute
+            </button>
           </div>
         )}
 
@@ -515,6 +672,41 @@ export default function JobDetailPage() {
                 <Star size={13} /> Leave a Review
               </button>
             )}
+          </div>
+        )}
+
+        {/* ── Smart Match Status ── */}
+        {isHomeowner && invoiceToken && (
+          <MatchStatus
+            jobId={jobId}
+            authToken={invoiceToken}
+            jobStatus={job.status}
+          />
+        )}
+
+        {/* ── Video Consultation Panel ── */}
+        {['triaged', 'open', 'matched', 'accepted', 'in_progress'].includes(job.status) && (
+          <VideoConsultationPanel
+            jobId={jobId}
+            isContractor={isContractor}
+            isHomeowner={isHomeowner}
+            jobStatus={job.status}
+          />
+        )}
+
+        {/* ── Dispute Resolution Center ── */}
+        {job.status === 'disputed' && invoiceToken && (
+          <div style={{ background: 'var(--color-surface)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 20, padding: 20 }}>
+            <h2 className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: '#f87171' }}>
+              Dispute Resolution Center
+            </h2>
+            <DisputeResolution
+              jobId={jobId}
+              authToken={invoiceToken}
+              isHomeowner={isHomeowner}
+              paymentAmountUsd={(job as any).paymentAmountUsd || 0}
+              onResolved={() => {}}
+            />
           </div>
         )}
 
@@ -574,7 +766,189 @@ export default function JobDetailPage() {
                 <MessageSquare size={15} />
               </Link>
             </div>
+
+            {/* Get Directions to job — contractor shortcut */}
+            {(() => {
+              const coords = typeof job.location === 'object' && job.location?.coordinates;
+              const addr   = typeof job.location === 'object' ? job.location?.address : (typeof job.location === 'string' ? job.location : null);
+              const dest   = coords ? { lat: coords.lat, lng: coords.lng } : addr;
+              if (!dest) return null;
+              return (
+                <button
+                  type="button"
+                  onClick={() => openDirections(dest)}
+                  className="mt-3 w-full text-xs"
+                  style={{
+                    background: 'rgba(96,165,250,0.08)',
+                    border: '1px solid rgba(96,165,250,0.25)',
+                    borderRadius: 10,
+                    padding: '9px 14px',
+                    color: '#60a5fa',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 7,
+                    fontWeight: 600,
+                  }}
+                >
+                  <MapPin size={13} /> Get Directions to Job Site
+                </button>
+              );
+            })()}
           </div>
+        )}
+
+        {/* ── Contractor: live progress logger ── */}
+        {isContractor && job.status === 'in_progress' && (
+          <ProgressLogger
+            jobId={jobId}
+            onUpdateLogged={() => {/* silently refresh */}}
+          />
+        )}
+
+        {/* ── Homeowner: live progress dashboard ── */}
+        {isHomeowner && ['in_progress', 'completed', 'awaiting_confirmation'].includes(job.status) && (
+          <ProgressDashboard jobId={jobId} />
+        )}
+
+        {/* ── Work photos: contractor uploads during job, homeowner sees all ── */}
+        {['accepted', 'in_progress', 'completed', 'confirmed', 'disputed'].includes(job.status) && (
+          <WorkPhotoUpload
+            jobId={jobId}
+            role={isContractor ? 'contractor' : 'homeowner'}
+            photos={workPhotos}
+            onPhotoAdded={(p) => setWorkPhotos((prev) => [p, ...prev])}
+          />
+        )}
+
+        {/* ── Milestone Setup (contractor proposes) or approval (homeowner) ── */}
+        {['accepted', 'in_progress'].includes(job.status) && invoiceToken && !(job as any).milestoneAllReleased && (
+          <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 20, padding: 20 }}>
+            <h2 className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: 'var(--color-text-4)' }}>
+              Milestone Payments
+            </h2>
+            <MilestoneSetup
+              jobId={jobId}
+              authToken={invoiceToken}
+              totalAmount={(job as any).paymentAmountUsd || (job as any).milestoneTotalAmount || 0}
+              existingPlanStatus={(job as any).milestonePlanStatus || null}
+              isContractor={isContractor}
+              onProposed={() => fetchMilestones(invoiceToken)}
+              onApproved={() => fetchMilestones(invoiceToken)}
+            />
+          </div>
+        )}
+
+        {/* ── Milestone Progress ── */}
+        {milestones.length > 0 && invoiceToken && (
+          <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 20, padding: 20 }}>
+            <h2 className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: 'var(--color-text-4)' }}>
+              Payment Milestones
+            </h2>
+            <MilestoneProgress
+              jobId={jobId}
+              authToken={invoiceToken}
+              milestones={milestones}
+              isContractor={isContractor}
+              onUpdate={() => fetchMilestones(invoiceToken)}
+            />
+          </div>
+        )}
+
+        {/* ── Smart Invoice ── */}
+        {['in_progress', 'completed', 'awaiting_confirmation', 'confirmed'].includes(job.status)
+          && invoiceToken && (
+          <SmartInvoice
+            jobId={jobId}
+            isContractor={isContractor}
+            authToken={invoiceToken}
+            jobStatus={job.status}
+          />
+        )}
+
+        {/* ── Photo Analysis ── */}
+        {isHomeowner && ['triaged', 'open', 'matched'].includes(job.status) && (
+          <PhotoAnalysisFlow
+            jobId={jobId}
+            onAnalysisComplete={(analysis: any) => {
+              setAnalysisId(analysis.id);
+            }}
+          />
+        )}
+
+        {/* ── Location Tracking ── */}
+        {['accepted', 'in_progress'].includes(job.status) && job.claimedBy && (
+          <>
+            <JobLocationTracker
+              jobId={jobId}
+              isContractor={isContractor}
+              isActive={true}
+              customerAddress={typeof job.location === 'object' ? job.location?.address : undefined}
+              contractorName={selectedBid?.name || bids.find(b => b.contractorId === job.claimedBy)?.name}
+              contractorLocation={contractorLocationData || undefined}
+              customerLocation={typeof job.location === 'object' && job.location?.coordinates
+                ? { lat: job.location.coordinates.lat, lng: job.location.coordinates.lng }
+                : undefined}
+              onLocationUpdate={handleLocationUpdate}
+            />
+
+            {/* Homeowner: navigate to contractor's live location */}
+            {isHomeowner && contractorLocationData && (
+              <button
+                type="button"
+                onClick={() => openDirections({ lat: contractorLocationData.lat, lng: contractorLocationData.lng })}
+                style={{
+                  width: '100%',
+                  background: 'rgba(96,165,250,0.08)',
+                  border: '1px solid rgba(96,165,250,0.25)',
+                  borderRadius: 12,
+                  padding: '11px 16px',
+                  color: '#60a5fa',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  fontSize: 14,
+                  fontWeight: 600,
+                }}
+              >
+                <MapPin size={15} /> Get Directions to Contractor
+              </button>
+            )}
+          </>
+        )}
+
+        {/* ── Before/After Completion Photos ── */}
+        {isContractor && ['in_progress', 'completed'].includes(job.status) && (
+          <BeforeAfterPhotoUpload
+            jobId={jobId}
+            onPhotoSubmitted={() => {
+              // Refresh completion data after upload
+              setCompletionLoading(true);
+            }}
+          />
+        )}
+
+        {/* ── Before/After Comparison ── */}
+        {completion && (
+          <BeforeAfterComparison
+            pairs={completion.photoPairs}
+            isLoading={completionLoading}
+          />
+        )}
+
+        {/* ── Product Recommendations ── */}
+        {recommendations && (
+          <ProductRecommendations
+            jobId={jobId}
+            recommendations={recommendations.recommendations}
+            isLoading={recommendationsLoading}
+            isContractor={isContractor}
+            disclaimer={recommendations.disclaimer}
+            totalPotentialCommission={recommendations.totalPotentialCommission}
+          />
         )}
 
         {/* ── Bids section ── */}
@@ -643,6 +1017,15 @@ export default function JobDetailPage() {
           <Link href={`/chat/${jobId}`} className="btn btn-secondary btn-full" style={{ justifyContent: 'center' }}>
             <MessageSquare size={15} /> Message
           </Link>
+          {['accepted', 'in_progress'].includes(job.status) && (
+            <button
+              onClick={() => setShowNotifications(true)}
+              className="btn btn-secondary btn-full"
+              style={{ justifyContent: 'center' }}
+            >
+              <AlertTriangle size={15} /> Notifications
+            </button>
+          )}
           {isHomeowner && (
             <button
               onClick={() => setShowInsurance(true)}
@@ -800,6 +1183,26 @@ export default function JobDetailPage() {
           onSubmitted={() => {
             // Keep modal open in "done" state — it handles its own close
           }}
+        />
+      )}
+
+      {/* Notification History Modal */}
+      <NotificationHistory
+        jobId={jobId}
+        isOpen={showNotifications}
+        onClose={() => setShowNotifications(false)}
+      />
+
+      {/* File Dispute Modal */}
+      {showDisputeModal && invoiceToken && (
+        <FileDisputeModal
+          jobId={jobId}
+          authToken={invoiceToken}
+          onDisputeFiled={() => {
+            setShowDisputeModal(false);
+            // Job status will update via Firestore onSnapshot — no manual refresh needed
+          }}
+          onClose={() => setShowDisputeModal(false)}
         />
       )}
     </div>

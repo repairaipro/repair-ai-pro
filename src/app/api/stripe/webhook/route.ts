@@ -71,6 +71,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true });
   }
 
+  /* ── Maintenance plan invoice paid → auto-create job ── */
+  if (event.type === "invoice.paid") {
+    try {
+      await handleMaintenanceInvoicePaid(obj);
+    } catch (err) {
+      console.error("Maintenance invoice webhook error:", err);
+    }
+    return NextResponse.json({ ok: true });
+  }
+
   if (!jobId) return NextResponse.json({ ok: true }); // unrelated event
 
   const jobRef = adminDb.collection("jobs").doc(jobId);
@@ -299,4 +309,67 @@ async function handleSubscriptionEvent(type: string, obj: any) {
       break;
     }
   }
+}
+
+/* ────────────────────────────────────────────────────────────────
+   Maintenance plan: invoice paid → auto-create service job
+──────────────────────────────────────────────────────────────── */
+async function handleMaintenanceInvoicePaid(invoice: any) {
+  const subscriptionId = invoice.subscription;
+  if (!subscriptionId) return;
+
+  // Look up which plan this subscription belongs to
+  const plansSnap = await adminDb
+    .collection("maintenancePlans")
+    .where("stripeSubscriptionId", "==", subscriptionId)
+    .limit(1)
+    .get();
+
+  if (plansSnap.empty) return; // not a maintenance subscription
+  const planDoc = plansSnap.docs[0];
+  const plan = planDoc.data();
+
+  if (plan.status === "cancelled") return;
+
+  // Calculate next service date based on frequency
+  const FREQ_MONTHS: Record<string, number> = {
+    monthly: 1, quarterly: 3, semi_annual: 6, annual: 12,
+  };
+  const monthsAhead = FREQ_MONTHS[plan.frequency] || 3;
+  const nextDate = new Date();
+  nextDate.setMonth(nextDate.getMonth() + monthsAhead);
+
+  // Create the service job automatically
+  const jobRef = adminDb.collection("jobs").doc();
+  await jobRef.set({
+    userId: plan.homeownerId,
+    description: `${plan.title} — scheduled maintenance visit`,
+    trade: plan.trade,
+    location: plan.address,
+    status: "triaged",
+    maintenancePlanId: planDoc.id,
+    maintenancePlanTitle: plan.title,
+    isMaintenanceJob: true,
+    claimedBy: plan.preferredContractorId || null,
+    paymentAmountUsd: plan.pricePerService,
+    paymentStatus: "held", // already paid via subscription
+    stripeInvoiceId: invoice.id,
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+
+  // If there's a preferred contractor, auto-claim the job
+  if (plan.preferredContractorId) {
+    await jobRef.update({ status: "accepted", claimedBy: plan.preferredContractorId });
+  }
+
+  // Update plan with new service dates and job count
+  await planDoc.ref.update({
+    lastServiceDate: new Date(),
+    nextServiceDate: nextDate,
+    jobsCreated: FieldValue.increment(1),
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+
+  console.log(`✅ Created maintenance job ${jobRef.id} for plan ${planDoc.id}`);
 }

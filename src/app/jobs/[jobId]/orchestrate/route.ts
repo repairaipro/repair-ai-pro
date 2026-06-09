@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { openai, handleOpenAIError } from "@/lib/openaiClient";
 import { db } from "@/lib/db";
 import {
   doc,
@@ -41,10 +42,7 @@ type OrchestratorDecision = {
 
 // --- OpenAI helper (server-only) ---
 async function orchestrateWithOpenAI(payload: any): Promise<OrchestratorDecision> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error("Missing OPENAI_API_KEY");
-
-  const system = `
+  const systemPrompt = `
 You are an AI Job Orchestrator for a home repair marketplace.
 You must return JSON only that matches this exact shape:
 
@@ -64,30 +62,17 @@ Rules:
 - Never invent facts. Use only the provided job + messages + attachments.
 `.trim();
 
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "gpt-4o-mini",
-      temperature: 0.2,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: JSON.stringify(payload) },
-      ],
-    }),
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    temperature: 0.2,
+    response_format: { type: "json_object" },
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: JSON.stringify(payload) },
+    ],
   });
 
-  if (!res.ok) {
-    const t = await res.text();
-    throw new Error(`OpenAI error ${res.status}: ${t}`);
-  }
-
-  const data = await res.json();
-  const content = data?.choices?.[0]?.message?.content;
+  const content = completion.choices?.[0]?.message?.content;
   if (!content) throw new Error("OpenAI returned empty content");
   return JSON.parse(content);
 }
@@ -255,8 +240,9 @@ export async function POST(
       decision,
     });
   } catch (e: any) {
+    const errorMessage = await handleOpenAIError(e);
     return NextResponse.json(
-      { error: e?.message ?? "Orchestrator failed" },
+      { error: errorMessage },
       { status: 500 }
     );
   }

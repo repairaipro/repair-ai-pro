@@ -1,5 +1,5 @@
-import OpenAI from "openai";
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
+import { openai } from "@/lib/openaiClient";
+import type OpenAI from "openai";
 
 export type ExplainMode = "beginner" | "homeowner" | "pro";
 
@@ -21,27 +21,31 @@ export async function analyzeWithAI(
       "Explain this for a professional technician. You can use technical language, mention likely failure modes, tools, and relevant standards where appropriate.";
   }
 
-  const fullPrompt = `${modePrompt}\n\nUser problem:\n${prompt}`;
-
-  const content: any[] = [
+  const userContent: OpenAI.ChatCompletionContentPart[] = [
     {
-      type: "input_text",
-      text: fullPrompt,
+      type: "text",
+      text: `${modePrompt}\n\nUser problem:\n${prompt}`,
     },
   ];
 
   if (imageUrl) {
-    content.push({
-      type: "input_image",
-      image_url: imageUrl,
-      detail: "high",
+    userContent.push({
+      type: "image_url",
+      image_url: { url: imageUrl, detail: "high" },
     });
   }
 
-  const response = await client.responses.create({
+  const response = await openai.chat.completions.create({
     model: "gpt-4o-mini",
-    input: content,
+    messages: [
+      {
+        role: "user",
+        content: userContent,
+      },
+    ],
+    max_tokens: 800,
+    temperature: 0.3,
   });
 
-  return response.output_text || "No response";
+  return response.choices[0]?.message?.content || "No response";
 }

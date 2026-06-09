@@ -1,13 +1,12 @@
 
 import { NextResponse } from 'next/server';
-import OpenAI from 'openai';
+import { openai, handleOpenAIError } from '@/lib/openaiClient';
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     const input: string = body.input || '';
     const media: string[] = Array.isArray(body.media) ? body.media : [];
-    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
     const prompt = [
       'You are RepairAI, an expert home repair diagnostician.',
@@ -16,7 +15,7 @@ export async function POST(req: Request) {
       'Return: likely cause(s), quick checks, parts/tools, risk/safety notes, and a plain-English repair plan.'
     ].join('\n\n');
 
-    const completion = await client.chat.completions.create({
+    const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.3,
@@ -25,6 +24,7 @@ export async function POST(req: Request) {
     const answer = completion.choices?.[0]?.message?.content || 'No answer';
     return NextResponse.json({ answer });
   } catch (e: any) {
-    return NextResponse.json({ error: e.message || 'OpenAI error' }, { status: 500 });
+    const errorMessage = await handleOpenAIError(e);
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

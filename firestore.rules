@@ -103,6 +103,22 @@ service cloud.firestore {
         allow read: if signedIn() && uid() == contractorId;
         allow write: if false; // written by API routes only
       }
+
+      /* ================= SPECIALIZATIONS ================= */
+      match /specializations/{specId} {
+        // All signed-in users can read contractor specializations
+        allow read: if signedIn();
+        // Written by API routes (admin SDK) only
+        allow write: if false;
+      }
+
+      /* ================= QUALITY SCORE ================= */
+      match /qualityScore/{scoreId} {
+        // All signed-in users can read quality scores
+        allow read: if signedIn();
+        // Written by API routes (admin SDK) only
+        allow write: if false;
+      }
     }
 
     /* ================= BUSINESSES ================= */
@@ -208,6 +224,19 @@ service cloud.firestore {
           resource.data.status == "completed" &&
           request.resource.data.status == "confirmed" &&
           uid() == resource.data.userId
+        )
+
+        ||
+
+        /* CONTRACTOR UPDATES LOCATION (real-time tracking) */
+        (
+          resource.data.claimedBy == uid() &&
+          resource.data.status in ["accepted", "in_progress"] &&
+          request.resource.data.diff(resource.data).changedKeys()
+            .hasOnly([
+              "contractorLocation",
+              "lastLocationUpdate"
+            ])
         )
       );
 
@@ -326,22 +355,45 @@ service cloud.firestore {
         allow update, delete: if false;
       }
 
-      /* ================= LIVE LOCATION (Real-time tracking) ================= */
+      /* ================= CONTRACTOR LOCATION (Real-time tracking) ================= */
+      // Update: Allow contractors to update their location on the job document
+      // Also allow location history tracking in subcollection
 
-      match /liveLocation/{locationId} {
-        // WRITE: Only the contractor claiming this job can write location
-        allow write: if signedIn()
-          && resource.data.claimedBy == uid()
+      match /locationHistory/{historyId} {
+        // WRITE: Only the claiming contractor can log location history
+        allow create: if signedIn()
           && job(jobId).data.claimedBy == uid()
-          && job(jobId).data.status in ["accepted", "in_progress"];
+          && job(jobId).data.status in ["accepted", "in_progress"]
+          && request.resource.data.contractorId == uid()
+          && request.resource.data.lat is number
+          && request.resource.data.lng is number
+          && request.resource.data.timestamp is number
+          && onlyKeys(["contractorId", "lat", "lng", "timestamp", "accuracy", "speed", "heading", "distanceMiles", "durationMinutes", "avgSpeed"]);
 
-        // READ: Only the homeowner can read contractor's location (during active job)
+        // READ: Homeowner can read location history during active job
         allow read: if signedIn()
           && uid() == job(jobId).data.userId
           && job(jobId).data.claimedBy != null
           && job(jobId).data.status in ["accepted", "in_progress"];
 
-        // DELETE: Not allowed (handled by TTL/Cloud Function)
+        // Contractor can read their own history
+        allow read: if signedIn()
+          && job(jobId).data.claimedBy == uid()
+          && job(jobId).data.status in ["accepted", "in_progress"];
+
+        // DELETE: Not allowed
+        allow delete: if false;
+      }
+
+      /* ================= NOTIFICATION HISTORY ================= */
+      match /notificationHistory/{notificationId} {
+        // WRITE: Only API can write (server-side via Cloud Function)
+        allow write: if false;
+
+        // READ: Job participants can read
+        allow read: if isParticipant(jobId);
+
+        // DELETE: Not allowed
         allow delete: if false;
       }
 
@@ -352,6 +404,251 @@ service cloud.firestore {
         allow read: if signedIn();
         // Written by API routes (admin SDK) only
         allow write: if false;
+      }
+
+      /* ================= WORK PHOTOS (Evidence) ================= */
+      match /workPhotos/{photoId} {
+        // Contractor uploads photos during job
+        allow create: if signedIn()
+          && job(jobId).data.claimedBy == uid()
+          && job(jobId).data.status in ["accepted", "in_progress"]
+          && request.resource.data.uploadedBy == uid()
+          && request.resource.data.url is string
+          && request.resource.data.stage is string
+          && onlyKeys([
+            "url",
+            "uploadedBy",
+            "uploadedAt",
+            "caption",
+            "stage",
+            "verified",
+            "aiCategory",
+            "thumbnailUrl",
+            "metadata"
+          ]);
+
+        // Homeowner can read photos after job completion
+        allow read: if signedIn()
+          && uid() == job(jobId).data.userId
+          && job(jobId).data.status in ["completed", "confirmed"];
+
+        // Contractor can read their own photos
+        allow read: if signedIn()
+          && request.auth.uid == resource.data.uploadedBy;
+
+        allow update, delete: if false;
+      }
+
+      /* ================= PROGRESS UPDATES ================= */
+      match /progressUpdates/{updateId} {
+        // Contractor logs progress during job
+        allow create: if signedIn()
+          && job(jobId).data.claimedBy == uid()
+          && job(jobId).data.status in ["accepted", "in_progress"]
+          && onlyKeys([
+            "contractorId",
+            "timestamp",
+            "status",
+            "currentTask",
+            "elapsedMinutes",
+            "estimatedMinutesRemaining",
+            "location",
+            "photoIds",
+            "notes"
+          ]);
+
+        // Homeowner can read progress during job
+        allow read: if signedIn()
+          && uid() == job(jobId).data.userId
+          && job(jobId).data.status in ["accepted", "in_progress"];
+
+        allow update, delete: if false;
+      }
+
+      /* ================= DISPUTES ================= */
+      match /disputes/{disputeId} {
+        // Homeowner can file dispute after job completion
+        allow create: if isJobOwner(jobId)
+          && job(jobId).data.status in ["completed", "confirmed"]
+          && request.resource.data.filedBy == uid()
+          && request.resource.data.status == "open"
+          && onlyKeys([
+            "filedBy",
+            "description",
+            "evidencePhotoIds",
+            "status",
+            "createdAt"
+          ]);
+
+        // Participants can read disputes
+        allow read: if isParticipant(jobId);
+
+        allow update, delete: if false;
+      }
+
+      /* ================= PHOTO ANALYSES (AI Analysis Results) ================= */
+      match /photoAnalyses/{analysisId} {
+        // Homeowner can create analyses for their jobs
+        allow create: if isJobOwner(jobId)
+          && job(jobId).data.status in ["triaged", "matched", "open"]
+          && request.resource.data.analysedAt is timestamp
+          && onlyKeys([
+            "photoUrls",
+            "trade",
+            "description",
+            "severity",
+            "defects",
+            "detectedObjects",
+            "summary",
+            "requiresVideoConsultation",
+            "report",
+            "analysedAt",
+            "analysisCount"
+          ]);
+
+        // Participants can read analyses
+        allow read: if isParticipant(jobId);
+
+        allow update, delete: if false;
+      }
+
+      /* ================= PRODUCT RECOMMENDATIONS ================= */
+      match /productRecommendations/{recId} {
+        // Participants can read recommendations
+        allow read: if isParticipant(jobId);
+        // Written by API routes (admin SDK) only
+        allow write: if false;
+      }
+
+      /* ================= PRODUCT EVENTS (Tracking clicks/views) ================= */
+      match /productEvents/{eventId} {
+        // Job participants can create product events
+        allow create: if isParticipant(jobId)
+          && request.resource.data.userId == uid()
+          && request.resource.data.timestamp is timestamp
+          && request.resource.data.eventType in ["clicked", "viewed", "purchased"]
+          && onlyKeys([
+            "productId",
+            "source",
+            "eventType",
+            "userId",
+            "userType",
+            "timestamp"
+          ]);
+
+        // Participants can read product events
+        allow read: if isParticipant(jobId);
+
+        allow update, delete: if false;
+      }
+
+      /* ================= COMPLETION PHOTOS (Final work photos) ================= */
+      match /completionPhotos/{photoId} {
+        // Contractor uploads final photos during job
+        allow create: if signedIn()
+          && job(jobId).data.claimedBy == uid()
+          && job(jobId).data.status in ["in_progress", "completed"]
+          && request.resource.data.uploadedBy == uid()
+          && request.resource.data.url is string
+          && request.resource.data.uploadedAt is timestamp
+          && onlyKeys([
+            "url",
+            "thumbnailUrl",
+            "uploadedBy",
+            "uploadedAt",
+            "cloudinaryPublicId",
+            "metadata"
+          ]);
+
+        // Homeowner can read completion photos after upload
+        allow read: if signedIn()
+          && (
+            uid() == job(jobId).data.userId
+            || uid() == job(jobId).data.claimedBy
+          );
+
+        allow update, delete: if false;
+      }
+
+      /* ================= COMPLETIONS (Before/after photo pairs) ================= */
+      match /completions/{completionId} {
+        // Written by API routes only
+        allow write: if false;
+        // Participants can read
+        allow read: if isParticipant(jobId);
+      }
+
+      /* ================= INVOICES ================= */
+      match /invoices/{invoiceId} {
+        // Written by API routes only (uses admin SDK)
+        allow write: if false;
+        // Both homeowner and contractor can read
+        allow read: if isParticipant(jobId);
+      }
+
+      /* ================= MILESTONES ================= */
+      match /milestones/{milestoneId} {
+        // Both participants can read milestones
+        allow read: if isParticipant(jobId);
+
+        // Homeowner can create milestones when setting up the job
+        allow create: if isJobOwner(jobId)
+          && job(jobId).data.status in ["triaged", "open", "matched", "accepted"]
+          && onlyKeys([
+            "title",
+            "description",
+            "percentage",
+            "amount",
+            "dueDate",
+            "status",
+            "order",
+            "createdAt",
+            "updatedAt"
+          ]);
+
+        // Homeowner approves/releases milestone; contractor marks ready_for_release
+        allow update: if isParticipant(jobId)
+          && request.resource.data.diff(resource.data).changedKeys()
+            .hasOnly(["status", "approvedAt", "releasedAt", "updatedAt"]);
+
+        allow delete: if false;
+      }
+
+      /* ================= VIDEO CONSULTATIONS ================= */
+      match /videoConsultations/{consultId} {
+        // Both participants can read consultations
+        allow read: if isParticipant(jobId);
+
+        // Contractor requests a consultation
+        allow create: if signedIn()
+          && job(jobId).data.claimedBy == uid()
+          && request.resource.data.contractorId == uid()
+          && request.resource.data.status == "requested"
+          && onlyKeys([
+            "contractorId",
+            "homeownerId",
+            "status",
+            "proposedTimes",
+            "notes",
+            "requestedAt",
+            "createdAt"
+          ]);
+
+        // Either participant can update (approve/decline/complete via API)
+        // Client-side updates are limited to safe status transitions
+        allow update: if isParticipant(jobId)
+          && request.resource.data.diff(resource.data).changedKeys()
+            .hasOnly([
+              "status",
+              "scheduledAt",
+              "approvedAt",
+              "declinedAt",
+              "completedAt",
+              "agoraToken",
+              "updatedAt"
+            ]);
+
+        allow delete: if false;
       }
     }
 
