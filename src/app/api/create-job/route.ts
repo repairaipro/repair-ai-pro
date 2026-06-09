@@ -12,7 +12,7 @@ export async function POST(req: Request) {
 
     const body = await req.json();
 
-    const { description, location, aiDetectedTrade, aiSummary, urgency, isEmergency, emergencyFeeUsd, trade, questionnaireAnswers, smartEstimate } = body;
+    const { description, location, aiDetectedTrade, aiSummary, urgency, isEmergency, emergencyFeeUsd, trade, questionnaireAnswers, smartEstimate, locationPrivacyMode } = body;
 
     // userId always comes from the verified token — never from the request body
     const userId = decoded.uid;
@@ -39,6 +39,9 @@ export async function POST(req: Request) {
       isEmergency: isEmergency ?? false,
       emergencyFeeUsd: emergencyFeeUsd ?? 0,
       trade: trade ?? aiDetectedTrade ?? null,
+
+      // Location privacy mode (controls what contractors see)
+      locationPrivacyMode: locationPrivacyMode ?? 'full',
 
       // Questionnaire answers for better contractor matching
       questionnaireAnswers: questionnaireAnswers ?? null,

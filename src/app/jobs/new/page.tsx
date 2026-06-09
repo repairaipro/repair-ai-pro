@@ -32,6 +32,8 @@ import {
 import TradeQuestionnaire from "@/components/TradeQuestionnaire";
 import { getQuestionsForTrade } from "@/lib/tradeQuestionnaires";
 import type { Question } from "@/lib/tradeQuestionnaires";
+import LocationPrivacySettings from "@/components/LocationPrivacySettings";
+import type { LocationPrivacyMode } from "@/components/LocationPrivacySettings";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -199,6 +201,7 @@ export default function NewJobPage() {
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState<LocationData>({});
   const [urgency, setUrgency] = useState<UrgencyLevel>("flexible");
+  const [locationPrivacyMode, setLocationPrivacyMode] = useState<LocationPrivacyMode>('full');
   const [isEmergencyPremium, setIsEmergencyPremium] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [voiceError, setVoiceError] = useState<string | null>(null);
@@ -414,6 +417,7 @@ CRITICAL: If you're not confident, ask clarifying questions rather than guessing
           questionnaireAnswers: Object.keys(questionnaireAnswers).length > 0
             ? questionnaireAnswers : undefined,
           smartEstimate: smartEstimate ?? undefined,
+          locationPrivacyMode,
         }),
       });
       const data = await res.json();
@@ -1221,6 +1225,14 @@ CRITICAL: If you're not confident, ask clarifying questions rather than guessing
                 </div>
               </div>
             )}
+
+            {/* Location Privacy */}
+            <div className="card p-5">
+              <LocationPrivacySettings
+                value={locationPrivacyMode}
+                onChange={setLocationPrivacyMode}
+              />
+            </div>
 
             {/* What happens next */}
             <div

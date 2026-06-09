@@ -561,6 +561,16 @@ export default function JobDetailPage() {
                 <DollarSign size={10} /> ${job.paymentAmountUsd} escrowed
               </span>
             )}
+            {isHomeowner && (job as any).locationPrivacyMode && (job as any).locationPrivacyMode !== 'full' && (
+              <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full"
+                style={{ background: 'rgba(250,191,36,0.1)', color: '#fbbf24', border: '1px solid rgba(250,191,36,0.2)' }}>
+                <Shield size={10} /> Location: {{
+                  approximate: 'Neighborhood only',
+                  address_hidden_until_arrival: 'Hidden until arrival',
+                  zip_only: 'ZIP only',
+                }[(job as any).locationPrivacyMode as string] ?? 'Private'}
+              </span>
+            )}
           </div>
 
           {/* Progress stepper */}
