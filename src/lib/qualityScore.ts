@@ -1,5 +1,5 @@
 import { db } from '@/lib/db';
-import { doc, getDoc, setDoc, collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import type { QualityScore } from '@/types/firestore';
 import { getContractorSpecializations } from './specializations';
 
@@ -252,15 +252,26 @@ export async function calculateQualityScore(
 }
 
 /**
- * Save quality score to Firestore
+ * Save quality score to Firestore.
+ * Also denormalizes `qualityScore` and `verifiedSpecialties` onto the main
+ * contractor document so the directory listing can sort/display without
+ * extra subcollection reads.
  */
 export async function saveQualityScore(
   contractorId: string,
   score: QualityScore
 ): Promise<void> {
   try {
+    // Write full score to subcollection
     const scoreRef = doc(db, 'contractors', contractorId, 'qualityScore', 'current');
     await setDoc(scoreRef, score);
+
+    // Denormalize lightweight fields to main contractor doc for list queries
+    const contractorRef = doc(db, 'contractors', contractorId);
+    await updateDoc(contractorRef, {
+      qualityScore:       score.overallScore,
+      verifiedSpecialties: score.specializations.count,
+    });
   } catch (error) {
     console.error('Error saving quality score:', error);
   }
