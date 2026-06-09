@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { db } from "@/lib/db";
 import { collection, query, where, onSnapshot, orderBy, doc, getDoc, limit } from "firebase/firestore";
 import { useAuth, isOnboardingComplete } from "@/lib/auth";
-import { Plus, Inbox, MessageSquare, Briefcase, Users, User, ChevronRight, Zap, TrendingUp, Clock, CheckCircle, Shield } from "lucide-react";
+import { Plus, Inbox, MessageSquare, Briefcase, Users, User, ChevronRight, Zap, TrendingUp, Clock, CheckCircle, Shield, Heart } from "lucide-react";
 import { motion } from "framer-motion";
 
 type Job = {
@@ -80,12 +80,13 @@ function ActiveJobCard({ job }: { job: Job }) {
   const s = STATUS_STYLES[job.status] ?? STATUS_STYLES.triaged;
   const isPulsing = job.status === "in_progress";
   const progress =
+    job.status === "triaged"     ? 10 :
     job.status === "accepted"    ? 33 :
     job.status === "in_progress" ? 66 :
     job.status === "completed"   ? 90 : 10;
 
   return (
-    <Link href={`/chat?job=${job.id}`}>
+    <Link href={`/jobs/${job.id}`}>
       <div
         className="relative overflow-hidden rounded-2xl p-5 transition-all duration-200 group"
         style={{
@@ -128,7 +129,7 @@ function ActiveJobCard({ job }: { job: Job }) {
           <span className="text-xs" style={{ color: 'var(--color-text-4)' }}>{timeAgo(job.createdAt as any)}</span>
           <span className="text-xs font-medium flex items-center gap-1 group-hover:translate-x-0.5 transition-transform"
             style={{ color: '#818cf8' }}>
-            Open Chat <ChevronRight className="w-3 h-3" />
+            View Job <ChevronRight className="w-3 h-3" />
           </span>
         </div>
 
@@ -243,7 +244,7 @@ function JobCard({ job }: { job: Job }) {
   const s = STATUS_STYLES[job.status] ?? STATUS_STYLES.cancelled;
   return (
     <Link
-      href={`/chat?job=${job.id}`}
+      href={`/jobs/${job.id}`}
       className="flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-150 group"
       style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
       onMouseEnter={e => {
@@ -326,11 +327,15 @@ export default function DashboardPage() {
   const activeContractorJobs   = contractorJobs.filter((j) => ACTIVE_STATUSES.includes(j.status));
   const pendingInvites         = inbox.length;
   const isContractor           = contractor !== null || contractorJobs.length > 0 || inbox.length > 0;
+  // "Live" section: active + awaiting-match jobs combined, deduplicated
   const allActiveJobs = [
     ...activeHomeownerJobs,
+    ...openHomeownerJobs,
     ...activeContractorJobs.filter((cj) => !activeHomeownerJobs.find((hj) => hj.id === cj.id)),
   ];
-  const recentNonActive = homeownerJobs.filter((j) => !ACTIVE_STATUSES.includes(j.status)).slice(0, 5);
+  const recentNonActive = homeownerJobs
+    .filter((j) => !ACTIVE_STATUSES.includes(j.status) && !OPEN_STATUSES.includes(j.status))
+    .slice(0, 5);
 
   if (!user) {
     return (
@@ -478,7 +483,7 @@ export default function DashboardPage() {
               { icon: <MessageSquare className="w-4 h-4" />, label: "Messages",         href: "/chat" },
               { icon: <Briefcase className="w-4 h-4" />,    label: "Marketplace",      href: "/jobs" },
               { icon: <Clock className="w-4 h-4" />,        label: "Job History",      href: "/history" },
-              { icon: <Shield className="w-4 h-4" />,       label: "Maintenance",      href: "/maintenance" },
+              { icon: <Heart className="w-4 h-4" />,        label: "Home Health",      href: "/home-health" },
               { icon: <Users className="w-4 h-4" />,        label: "Find Contractors", href: "/contractor" },
               { icon: <User className="w-4 h-4" />,         label: "My Profile",       href: "/contractor-profile" },
             ].map((item) => (
