@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { db } from "@/lib/db";
-import { collection, query, onSnapshot, orderBy } from "firebase/firestore";
+import { collection, query, onSnapshot, orderBy, limit } from "firebase/firestore";
 import Link from "next/link";
 import { TRADES } from "@/lib/constants";
 import { Search, Plus, MapPin, Briefcase, X, SlidersHorizontal } from "lucide-react";
@@ -65,7 +65,7 @@ export default function JobMarketplacePage() {
   const [statusFilter, setStatusFilter] = useState("all");
 
   useEffect(() => {
-    const q = query(collection(db, "jobs"), orderBy("createdAt", "desc"));
+    const q = query(collection(db, "jobs"), orderBy("createdAt", "desc"), limit(150));
     const unsub = onSnapshot(q,
       (snap) => {
         setJobs(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })));

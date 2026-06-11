@@ -54,7 +54,18 @@ export async function POST(
       .limit(4)
       .get();
 
-    const completionUrls: string[] = completionSnap.docs.map((d) => d.data().url);
+    let completionUrls: string[] = completionSnap.docs.map((d) => d.data().url);
+
+    // Fallback: contractors may have documented completion via workPhotos instead
+    if (completionUrls.length === 0) {
+      const workSnap = await adminDb
+        .collection('jobs').doc(jobId)
+        .collection('workPhotos')
+        .where('stage', '==', 'completed')
+        .limit(4)
+        .get();
+      completionUrls = workSnap.docs.map((d) => d.data().url);
+    }
     const evidencePhotos: Array<{ url: string; caption?: string }> = dispute.evidencePhotos || [];
 
     if (completionUrls.length === 0 && evidencePhotos.length === 0) {
