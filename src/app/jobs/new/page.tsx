@@ -364,9 +364,10 @@ CRITICAL: If you're not confident, ask clarifying questions rather than guessing
     if (!zipCode || !detectedTrade) return;
     setSmartEstimateLoading(true);
     try {
+      const token = await user.getIdToken();
       const res = await fetch('/api/jobs/estimate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           trade: detectedTrade,
           zipCode,

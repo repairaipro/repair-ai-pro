@@ -3,12 +3,27 @@ import { adminDb } from '@/lib/firebaseAdmin';
 import { getStripe } from '@/lib/stripe';
 import { FieldValue } from 'firebase-admin/firestore';
 
+/**
+ * POST /api/invoices/[invoiceId]/pay
+ *
+ * Payment is confirmed CLIENT-SIDE via Stripe Elements (PCI-compliant —
+ * raw card data never touches our server). This endpoint verifies the
+ * PaymentIntent actually succeeded and belongs to this invoice, then
+ * marks the invoice paid.
+ *
+ * Body: { paymentIntentId: string }
+ */
 export async function POST(
   request: NextRequest,
   { params }: { params: { invoiceId: string } }
 ) {
   try {
     const { invoiceId } = params;
+
+    const body = await request.json() as { paymentIntentId?: string };
+    if (!body.paymentIntentId) {
+      return NextResponse.json({ error: 'Missing paymentIntentId' }, { status: 400 });
+    }
 
     // Find the invoice across jobs
     const jobsSnap = await adminDb
@@ -17,15 +32,12 @@ export async function POST(
       .limit(1)
       .get();
 
-    let jobId: string;
-    let invoiceRef: FirebaseFirestore.DocumentReference;
-
-    if (!jobsSnap.empty) {
-      jobId = jobsSnap.docs[0].id;
-      invoiceRef = adminDb.collection('jobs').doc(jobId).collection('invoices').doc(invoiceId);
-    } else {
+    if (jobsSnap.empty) {
       return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });
     }
+
+    const jobId = jobsSnap.docs[0].id;
+    const invoiceRef = adminDb.collection('jobs').doc(jobId).collection('invoices').doc(invoiceId);
 
     const invoiceSnap = await invoiceRef.get();
     if (!invoiceSnap.exists) {
@@ -35,73 +47,41 @@ export async function POST(
     const invoice = invoiceSnap.data()!;
 
     if (invoice.status === 'paid') {
-      return NextResponse.json({ error: 'Invoice already paid' }, { status: 400 });
+      return NextResponse.json({ success: true, status: 'paid', alreadyPaid: true });
     }
     if (invoice.status === 'cancelled') {
       return NextResponse.json({ error: 'Invoice has been cancelled' }, { status: 400 });
     }
 
-    // Confirm the existing Stripe PaymentIntent
+    // The confirmed intent must be the one created for this invoice
+    if (!invoice.stripePaymentIntentId || invoice.stripePaymentIntentId !== body.paymentIntentId) {
+      return NextResponse.json({ error: 'Payment does not match this invoice' }, { status: 403 });
+    }
+
+    // Verify with Stripe that the payment actually succeeded
     const stripe = getStripe();
+    const intent = await stripe.paymentIntents.retrieve(body.paymentIntentId);
 
-    if (!invoice.stripePaymentIntentId) {
-      return NextResponse.json({ error: 'No payment intent found for this invoice' }, { status: 400 });
+    if (intent.status !== 'succeeded') {
+      return NextResponse.json(
+        { error: `Payment not confirmed (status: ${intent.status})` },
+        { status: 402 }
+      );
     }
 
-    const body = await request.json() as {
-      cardName: string;
-      cardNumber: string;
-      cardExpiry: string;
-      cardCvc: string;
-    };
-
-    const [expMonth, expYear] = body.cardExpiry.split('/').map((s: string) => parseInt(s.trim(), 10));
-
-    // Create a PaymentMethod from the raw card data
-    const paymentMethod = await stripe.paymentMethods.create({
-      type: 'card',
-      card: {
-        number: body.cardNumber,
-        exp_month: expMonth,
-        exp_year: expYear + 2000,
-        cvc: body.cardCvc,
-      },
-      billing_details: {
-        name: body.cardName,
-      },
+    await invoiceRef.update({
+      status: 'paid',
+      paidAt: FieldValue.serverTimestamp(),
     });
 
-    // Confirm the payment intent
-    const confirmed = await stripe.paymentIntents.confirm(invoice.stripePaymentIntentId, {
-      payment_method: paymentMethod.id,
+    await adminDb.collection('jobs').doc(jobId).update({
+      invoiceStatus: 'paid',
     });
 
-    if (confirmed.status === 'succeeded') {
-      await invoiceRef.update({
-        status: 'paid',
-        paidAt: FieldValue.serverTimestamp(),
-      });
-
-      await adminDb.collection('jobs').doc(jobId).update({
-        invoiceStatus: 'paid',
-      });
-
-      return NextResponse.json({ success: true, status: 'paid' });
-    }
-
-    if (confirmed.status === 'requires_action') {
-      return NextResponse.json({
-        success: false,
-        requiresAction: true,
-        clientSecret: confirmed.client_secret,
-        error: '3D Secure authentication required. Please complete verification.',
-      });
-    }
-
-    return NextResponse.json({ error: 'Payment could not be completed', status: confirmed.status }, { status: 400 });
+    return NextResponse.json({ success: true, status: 'paid' });
   } catch (err: any) {
-    console.error('Payment error:', err);
-    const message = err?.raw?.message || err?.message || 'Payment failed';
+    console.error('Payment verification error:', err);
+    const message = err?.raw?.message || err?.message || 'Payment verification failed';
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

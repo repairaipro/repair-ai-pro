@@ -179,8 +179,8 @@ export function RankedContractors() {
 
       // ✅ BEST UX: job-based chat thread + prefilled message
       const url =
-        `/chat?job=${encodeURIComponent(jid)}` +
-        `&contractor=${encodeURIComponent(contractorId)}` +
+        `/chat/${encodeURIComponent(jid)}` +
+        `?contractor=${encodeURIComponent(contractorId)}` +
         `&prefill=${encodeURIComponent(message)}`;
 
       window.location.href = url;

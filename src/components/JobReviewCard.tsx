@@ -53,12 +53,12 @@ export default function JobReviewCard({ jobId, status, contractorId, jobOwnerId 
     setLoading(true);
     setMsg("");
     try {
+      const token = await user!.getIdToken();
       const res = await fetch(`/api/jobs/${jobId}/submit-review`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           contractorId,
-          reviewerId: user!.uid,
           rating,
           text,
         }),

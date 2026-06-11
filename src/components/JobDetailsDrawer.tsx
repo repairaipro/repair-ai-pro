@@ -151,7 +151,7 @@ export default function JobDetailsDrawer({
               </p>
 
               <Link
-                href={`/chat?job=${job.id}`}
+                href={`/jobs/${job.id}`}
                 className="inline-block bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-3 py-2 rounded-md mt-3"
               >
                 💬 Open Chat

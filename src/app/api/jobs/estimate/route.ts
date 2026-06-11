@@ -2,6 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getQuestionsForTrade, validateAnswers } from '@/lib/tradeQuestionnaires';
 import { getSmartEstimate, recordJobPrice } from '@/lib/pricingEstimate';
 import { openai as openaiClient } from '@/lib/openaiClient';
+import { adminAuth } from '@/lib/firebaseAdmin';
+
+/** Verify Firebase ID token from Authorization header; returns uid or null */
+async function verifyAuth(request: NextRequest): Promise<string | null> {
+  const authHeader = request.headers.get('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) return null;
+  try {
+    const decoded = await adminAuth.verifyIdToken(authHeader.substring(7));
+    return decoded.uid;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * GET /api/jobs/estimate?trade=plumbing
@@ -50,6 +63,11 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    const uid = await verifyAuth(request);
+    if (!uid) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
     const { trade, zipCode, answers, description } = body;
 
@@ -164,6 +182,11 @@ Respond with:
  */
 export async function PUT(request: NextRequest) {
   try {
+    const uid = await verifyAuth(request);
+    if (!uid) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
     const {
       trade,

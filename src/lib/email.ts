@@ -117,7 +117,7 @@ export type EmailTemplate =
   | { type: "payout_failed"; failureReason?: string; jobId: string };
 
 function buildEmail(tpl: EmailTemplate): { subject: string; html: string } {
-  const chatUrl = (jobId: string) => `${BASE_URL}/chat?job=${jobId}`;
+  const chatUrl = (jobId: string) => `${BASE_URL}/jobs/${jobId}`;
 
   switch (tpl.type) {
     case "contractor_invited":
@@ -207,7 +207,7 @@ function buildEmail(tpl: EmailTemplate): { subject: string; html: string } {
           para(`<strong>${who}</strong> has opened a dispute on this job.`) +
           infoBox("Dispute Category", tpl.category) +
           para("Payment has been frozen until the dispute is resolved. Our team will review the case and reach out to both parties.") +
-          ctaButton("View Job →", `${BASE_URL}/chat?job=${tpl.jobId}`) +
+          ctaButton("View Job →", `${BASE_URL}/jobs/${tpl.jobId}`) +
           para(`<span style="color:#9ca3af;font-size:13px;">If you need to add more details, open the job chat and describe the situation clearly.</span>`)
         ),
       };
@@ -371,7 +371,7 @@ export async function sendJobMatchedEmail(
     jobId: string;
   }
 ): Promise<void> {
-  const chatUrl = `${APP_URL}/chat?job=${jobId}`;
+  const chatUrl = `${APP_URL}/jobs/${jobId}`;
   const content = `
     <h2 style="margin:0 0 8px;font-size:20px;color:#111827;">A contractor has been assigned!</h2>
     <p style="margin:0 0 16px;font-size:15px;color:#374151;line-height:1.6;">
@@ -407,7 +407,7 @@ export async function sendNewJobInvitationEmail(
     jobId: string;
   }
 ): Promise<void> {
-  const chatUrl = `${APP_URL}/chat?job=${jobId}`;
+  const chatUrl = `${APP_URL}/jobs/${jobId}`;
   const content = `
     <h2 style="margin:0 0 8px;font-size:20px;color:#111827;">New job invitation — ${tradeType}</h2>
     <p style="margin:0 0 16px;font-size:15px;color:#374151;line-height:1.6;">
@@ -439,7 +439,7 @@ export async function sendJobCompletedEmail(
     jobId: string;
   }
 ): Promise<void> {
-  const chatUrl = `${APP_URL}/chat?job=${jobId}`;
+  const chatUrl = `${APP_URL}/jobs/${jobId}`;
   const content = `
     <h2 style="margin:0 0 8px;font-size:20px;color:#111827;">Job marked complete</h2>
     <p style="margin:0 0 16px;font-size:15px;color:#374151;line-height:1.6;">

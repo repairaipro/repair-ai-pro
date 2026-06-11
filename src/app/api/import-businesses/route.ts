@@ -1,10 +1,20 @@
 import { NextResponse } from "next/server";
-import { adminDb } from "@/lib/firebaseAdmin";
+import { adminDb, adminAuth } from "@/lib/firebaseAdmin";
 
 const GOOGLE_API_KEY = process.env.GOOGLE_PLACES_API_KEY!;
 
 export async function GET(req: Request) {
   try {
+    // Admin-only: this endpoint makes paid Google Places calls + mass Firestore writes
+    const header = req.headers.get("authorization") ?? "";
+    const token  = header.startsWith("Bearer ") ? header.slice(7) : null;
+    if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const decoded = await adminAuth.verifyIdToken(token);
+    const adminUids = (process.env.ADMIN_UIDS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+    if (!adminUids.includes(decoded.uid)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const { searchParams } = new URL(req.url);
 
     const trade = searchParams.get("trade") || "plumbing";

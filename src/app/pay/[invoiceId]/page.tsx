@@ -7,6 +7,79 @@ import {
   CheckCircle, AlertCircle, Loader2, Shield, Lock,
   CreditCard, ChevronDown, ChevronUp, FileText
 } from 'lucide-react';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '');
+
+/* ─── Stripe Elements checkout form (PCI-compliant: card data never touches our server) ── */
+function InvoiceCheckoutForm({
+  amountLabel,
+  onSuccess,
+}: {
+  amountLabel: string;
+  onSuccess: (paymentIntentId: string) => void;
+}) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!stripe || !elements) return;
+    setSubmitting(true);
+    setError('');
+
+    const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
+      elements,
+      redirect: 'if_required',
+    });
+
+    if (confirmError) {
+      setError(confirmError.message ?? 'Payment failed. Please try again.');
+      setSubmitting(false);
+      return;
+    }
+
+    if (paymentIntent?.status === 'succeeded') {
+      onSuccess(paymentIntent.id);
+    } else {
+      setError(`Payment not completed (status: ${paymentIntent?.status ?? 'unknown'})`);
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <PaymentElement />
+
+      {error && (
+        <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '10px 14px', color: '#f87171', fontSize: 13 }}>
+          {error}
+        </div>
+      )}
+
+      <button
+        type="submit"
+        disabled={submitting || !stripe}
+        style={{
+          width: '100%', padding: '16px', marginTop: 8,
+          background: submitting ? 'rgba(99,102,241,0.5)' : 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+          border: 'none', borderRadius: 12, color: '#fff', fontSize: 16, fontWeight: 700,
+          cursor: submitting ? 'not-allowed' : 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+        }}
+      >
+        {submitting ? (
+          <><Loader2 size={18} className="animate-spin" /> Processing…</>
+        ) : (
+          <><Shield size={18} /> Pay {amountLabel} Securely</>
+        )}
+      </button>
+    </form>
+  );
+}
 
 type LineItem = {
   description: string;
@@ -55,10 +128,6 @@ export default function PayInvoicePage() {
   const [error, setError] = useState('');
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'processing' | 'success' | 'failed'>('idle');
-  const [cardName, setCardName] = useState('');
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardExpiry, setCardExpiry] = useState('');
-  const [cardCvc, setCardCvc] = useState('');
   const [formError, setFormError] = useState('');
 
   useEffect(() => {
@@ -81,45 +150,27 @@ export default function PayInvoicePage() {
     }
   }
 
-  async function handlePay(e: React.FormEvent) {
-    e.preventDefault();
-    if (!invoice) return;
-
-    if (!cardName.trim()) { setFormError('Please enter the name on card'); return; }
-    if (cardNumber.replace(/\s/g, '').length < 16) { setFormError('Please enter a valid card number'); return; }
-    if (cardExpiry.length < 5) { setFormError('Please enter a valid expiry date'); return; }
-    if (cardCvc.length < 3) { setFormError('Please enter a valid CVC'); return; }
-
+  /* Stripe confirmed payment client-side — server verifies & marks invoice paid */
+  async function handlePaymentSuccess(paymentIntentId: string) {
     setFormError('');
     setPaymentStatus('processing');
-
     try {
       const res = await fetch(`/api/invoices/${invoiceId}/pay`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cardName, cardNumber: cardNumber.replace(/\s/g, ''), cardExpiry, cardCvc }),
+        body: JSON.stringify({ paymentIntentId }),
       });
       const data = await res.json();
       if (data.success) {
         setPaymentStatus('success');
         setInvoice((prev) => prev ? { ...prev, status: 'paid' } : prev);
       } else {
-        throw new Error(data.error || 'Payment failed');
+        throw new Error(data.error || 'Payment verification failed');
       }
     } catch (e: any) {
       setFormError(e.message);
       setPaymentStatus('failed');
     }
-  }
-
-  function formatCard(val: string) {
-    return val.replace(/\D/g, '').slice(0, 16).replace(/(.{4})/g, '$1 ').trim();
-  }
-
-  function formatExpiry(val: string) {
-    const digits = val.replace(/\D/g, '').slice(0, 4);
-    if (digits.length >= 3) return digits.slice(0, 2) + '/' + digits.slice(2);
-    return digits;
   }
 
   function formatCurrency(amount: number) {
@@ -313,79 +364,30 @@ export default function PayInvoicePage() {
               </div>
             </div>
 
-            <form onSubmit={handlePay} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div>
-                <label style={{ fontSize: 12, color: '#9ca3af', fontWeight: 600, display: 'block', marginBottom: 6 }}>Name on Card</label>
-                <input
-                  type="text"
-                  value={cardName}
-                  onChange={(e) => setCardName(e.target.value)}
-                  placeholder="John Smith"
-                  style={{ width: '100%', padding: '12px 14px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, color: '#fff', fontSize: 15, outline: 'none', boxSizing: 'border-box' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ fontSize: 12, color: '#9ca3af', fontWeight: 600, display: 'block', marginBottom: 6 }}>Card Number</label>
-                <input
-                  type="text"
-                  value={cardNumber}
-                  onChange={(e) => setCardNumber(formatCard(e.target.value))}
-                  placeholder="1234 5678 9012 3456"
-                  inputMode="numeric"
-                  style={{ width: '100%', padding: '12px 14px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, color: '#fff', fontSize: 15, outline: 'none', boxSizing: 'border-box', letterSpacing: 2 }}
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div>
-                  <label style={{ fontSize: 12, color: '#9ca3af', fontWeight: 600, display: 'block', marginBottom: 6 }}>Expiry</label>
-                  <input
-                    type="text"
-                    value={cardExpiry}
-                    onChange={(e) => setCardExpiry(formatExpiry(e.target.value))}
-                    placeholder="MM/YY"
-                    inputMode="numeric"
-                    style={{ width: '100%', padding: '12px 14px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, color: '#fff', fontSize: 15, outline: 'none', boxSizing: 'border-box' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, color: '#9ca3af', fontWeight: 600, display: 'block', marginBottom: 6 }}>CVC</label>
-                  <input
-                    type="text"
-                    value={cardCvc}
-                    onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                    placeholder="123"
-                    inputMode="numeric"
-                    style={{ width: '100%', padding: '12px 14px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, color: '#fff', fontSize: 15, outline: 'none', boxSizing: 'border-box' }}
-                  />
-                </div>
-              </div>
-
-              {formError && (
-                <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '10px 14px', color: '#f87171', fontSize: 13 }}>
-                  {formError}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={paymentStatus === 'processing'}
-                style={{
-                  width: '100%', padding: '16px', marginTop: 8,
-                  background: paymentStatus === 'processing' ? 'rgba(99,102,241,0.5)' : 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                  border: 'none', borderRadius: 12, color: '#fff', fontSize: 16, fontWeight: 700,
-                  cursor: paymentStatus === 'processing' ? 'not-allowed' : 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+            {invoice.stripePaymentIntentClientSecret ? (
+              <Elements
+                stripe={stripePromise}
+                options={{
+                  clientSecret: invoice.stripePaymentIntentClientSecret,
+                  appearance: { theme: 'night', variables: { colorPrimary: '#6366f1' } },
                 }}
               >
-                {paymentStatus === 'processing' ? (
-                  <><Loader2 size={18} className="animate-spin" /> Processing…</>
-                ) : (
-                  <><Shield size={18} /> Pay {formatCurrency(invoice.total)} Securely</>
-                )}
-              </button>
-            </form>
+                <InvoiceCheckoutForm
+                  amountLabel={formatCurrency(invoice.total)}
+                  onSuccess={handlePaymentSuccess}
+                />
+              </Elements>
+            ) : (
+              <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '12px 16px', color: '#f87171', fontSize: 13 }}>
+                This invoice isn&apos;t ready for payment yet. Please contact your contractor.
+              </div>
+            )}
+
+            {formError && (
+              <div style={{ marginTop: 12, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '10px 14px', color: '#f87171', fontSize: 13 }}>
+                {formError}
+              </div>
+            )}
 
             <div style={{ marginTop: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
               <Lock size={12} color="#6b7280" />

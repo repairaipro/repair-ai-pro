@@ -132,7 +132,7 @@ export async function POST(
       await sendSMS(job.userId, {
         title: "🎉 Contractor matched!",
         body:  `${contractorName} accepted your ${trade} job. Tap to chat.`,
-        link:  `/chat?job=${params.jobId}`,
+        link:  `/jobs/${params.jobId}`,
       });
     } catch { /* non-blocking */ }
 

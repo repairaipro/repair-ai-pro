@@ -174,7 +174,7 @@ export default function AdminJobsPage() {
                   </td>
                   <td className="px-4 py-3">
                     <Link
-                      href={`/chat?job=${job.id}`}
+                      href={`/jobs/${job.id}`}
                       target="_blank"
                       className="inline-flex items-center gap-1 text-xs transition-opacity hover:opacity-70"
                       style={{ color: '#818cf8' }}

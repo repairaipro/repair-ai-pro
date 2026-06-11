@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { db } from "@/lib/db";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, query, limit } from "firebase/firestore";
 import Image from "next/image";
 import Link from "next/link";
 import { TRADES } from "@/lib/constants";
@@ -50,7 +50,7 @@ export default function ContractorDirectory() {
   useEffect(() => {
     async function load() {
       try {
-        const snap = await getDocs(collection(db, "contractors"));
+        const snap = await getDocs(query(collection(db, "contractors"), limit(200)));
         setContractors(
           snap.docs
             .map((d) => ({ id: d.id, ...(d.data() as any) }))

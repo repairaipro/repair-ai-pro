@@ -1,7 +1,12 @@
-import { db } from '@/lib/db';
-import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { adminDb } from '@/lib/firebaseAdmin';
+import { Timestamp } from 'firebase-admin/firestore';
 import type { QualityScore } from '@/types/firestore';
 import { getContractorSpecializations } from './specializations';
+
+/**
+ * SERVER-ONLY — uses the Firebase Admin SDK.
+ * Import this module only from API routes / server code, never client components.
+ */
 
 /**
  * Default weights for quality score calculation
@@ -22,12 +27,11 @@ const DEFAULT_WEIGHTS = {
  */
 async function calculateResponseTime(contractorId: string): Promise<number> {
   try {
-    // Get all invitations sent to this contractor
-    const invitesQuery = query(
-      collection(db, 'jobs'),
-      where('invitations', 'array-contains', contractorId)
-    );
-    const jobSnaps = await getDocs(invitesQuery);
+    // Get all jobs where this contractor was invited
+    const jobSnaps = await adminDb
+      .collection('jobs')
+      .where('invitations', 'array-contains', contractorId)
+      .get();
 
     if (jobSnaps.empty) return 50; // neutral score
 
@@ -35,16 +39,19 @@ async function calculateResponseTime(contractorId: string): Promise<number> {
 
     for (const jobSnap of jobSnaps.docs) {
       // Get invitation timestamp
-      const inviteRef = doc(db, 'jobs', jobSnap.id, 'invitations', contractorId);
-      const inviteSnap = await getDoc(inviteRef);
+      const inviteSnap = await adminDb
+        .collection('jobs').doc(jobSnap.id)
+        .collection('invitations').doc(contractorId)
+        .get();
 
-      if (inviteSnap.exists() && inviteSnap.data().createdAt) {
-        const inviteTime = inviteSnap.data().createdAt.toDate();
+      const invite = inviteSnap.data();
+      if (inviteSnap.exists && invite?.createdAt) {
+        const inviteTime = invite.createdAt.toDate();
         let responseTime = 999; // assume no response
 
         // Check if contractor accepted/declined
-        if (inviteSnap.data().respondedAt) {
-          const respondTime = inviteSnap.data().respondedAt.toDate();
+        if (invite.respondedAt) {
+          const respondTime = invite.respondedAt.toDate();
           responseTime = (respondTime.getTime() - inviteTime.getTime()) / (1000 * 60 * 60); // hours
         }
 
@@ -69,13 +76,12 @@ async function calculateResponseTime(contractorId: string): Promise<number> {
  */
 async function calculateTimeAccuracy(contractorId: string): Promise<number> {
   try {
-    const jobsQuery = query(
-      collection(db, 'jobs'),
-      where('claimedBy', '==', contractorId),
-      where('status', 'in', ['completed', 'confirmed'])
-    );
+    const jobSnaps = await adminDb
+      .collection('jobs')
+      .where('claimedBy', '==', contractorId)
+      .where('status', 'in', ['completed', 'confirmed'])
+      .get();
 
-    const jobSnaps = await getDocs(jobsQuery);
     if (jobSnaps.empty) return 50;
 
     let onTimeCount = 0;
@@ -103,19 +109,21 @@ async function calculateTimeAccuracy(contractorId: string): Promise<number> {
  */
 async function calculatePhotoEvidenceScore(contractorId: string): Promise<number> {
   try {
-    const jobsQuery = query(
-      collection(db, 'jobs'),
-      where('claimedBy', '==', contractorId),
-      where('status', 'in', ['completed', 'confirmed'])
-    );
+    const jobSnaps = await adminDb
+      .collection('jobs')
+      .where('claimedBy', '==', contractorId)
+      .where('status', 'in', ['completed', 'confirmed'])
+      .get();
 
-    const jobSnaps = await getDocs(jobsQuery);
     if (jobSnaps.empty) return 50;
 
     let photosCount = 0;
     for (const jobSnap of jobSnaps.docs) {
-      const photosRef = collection(db, 'jobs', jobSnap.id, 'workPhotos');
-      const photoSnaps = await getDocs(photosRef);
+      const photoSnaps = await adminDb
+        .collection('jobs').doc(jobSnap.id)
+        .collection('workPhotos')
+        .limit(3)
+        .get();
       if (photoSnaps.size >= 3) {
         photosCount++;
       }
@@ -133,19 +141,21 @@ async function calculatePhotoEvidenceScore(contractorId: string): Promise<number
  */
 async function calculateDisputeRate(contractorId: string): Promise<number> {
   try {
-    const jobsQuery = query(
-      collection(db, 'jobs'),
-      where('claimedBy', '==', contractorId),
-      where('status', 'in', ['completed', 'confirmed'])
-    );
+    const jobSnaps = await adminDb
+      .collection('jobs')
+      .where('claimedBy', '==', contractorId)
+      .where('status', 'in', ['completed', 'confirmed'])
+      .get();
 
-    const jobSnaps = await getDocs(jobsQuery);
     if (jobSnaps.empty) return 0;
 
     let disputeCount = 0;
     for (const jobSnap of jobSnaps.docs) {
-      const disputeRef = collection(db, 'jobs', jobSnap.id, 'disputes');
-      const disputeSnaps = await getDocs(disputeRef);
+      const disputeSnaps = await adminDb
+        .collection('jobs').doc(jobSnap.id)
+        .collection('disputes')
+        .limit(1)
+        .get();
       if (disputeSnaps.size > 0) {
         disputeCount++;
       }
@@ -169,8 +179,7 @@ export async function calculateQualityScore(
 ): Promise<QualityScore> {
   try {
     // Get contractor's existing rating from profile
-    const contractorRef = doc(db, 'contractors', contractorId);
-    const contractorSnap = await getDoc(contractorRef);
+    const contractorSnap = await adminDb.collection('contractors').doc(contractorId).get();
     const rating = contractorSnap.data()?.rating || contractorRating || 0;
 
     // Calculate all metrics
@@ -194,11 +203,10 @@ export async function calculateQualityScore(
       : 0;
 
     // Get job completion rate
-    const jobsQuery = query(
-      collection(db, 'jobs'),
-      where('claimedBy', '==', contractorId)
-    );
-    const allJobs = await getDocs(jobsQuery);
+    const allJobs = await adminDb
+      .collection('jobs')
+      .where('claimedBy', '==', contractorId)
+      .get();
     const completedJobs = allJobs.docs.filter(
       d => ['completed', 'confirmed'].includes(d.data().status)
     ).length;
@@ -232,7 +240,7 @@ export async function calculateQualityScore(
       },
       jobCompletionRate: Math.round(jobCompletionRate * 10) / 10,
       weights: DEFAULT_WEIGHTS,
-      lastUpdated: Timestamp.now(),
+      lastUpdated: Timestamp.now() as any,
     };
   } catch (error) {
     console.error('Error calculating quality score:', error);
@@ -246,7 +254,7 @@ export async function calculateQualityScore(
       specializations: { count: 0, avgRatingPerSpecialty: 0 },
       jobCompletionRate: 0,
       weights: DEFAULT_WEIGHTS,
-      lastUpdated: Timestamp.now(),
+      lastUpdated: Timestamp.now() as any,
     };
   }
 }
@@ -263,15 +271,19 @@ export async function saveQualityScore(
 ): Promise<void> {
   try {
     // Write full score to subcollection
-    const scoreRef = doc(db, 'contractors', contractorId, 'qualityScore', 'current');
-    await setDoc(scoreRef, score);
+    const scoreRef = adminDb
+      .collection('contractors').doc(contractorId)
+      .collection('qualityScore').doc('current');
+    await scoreRef.set(score as any);
 
     // Denormalize lightweight fields to main contractor doc for list queries
-    const contractorRef = doc(db, 'contractors', contractorId);
-    await updateDoc(contractorRef, {
-      qualityScore:       score.overallScore,
-      verifiedSpecialties: score.specializations.count,
-    });
+    await adminDb.collection('contractors').doc(contractorId).set(
+      {
+        qualityScore:        score.overallScore,
+        verifiedSpecialties: score.specializations.count,
+      },
+      { merge: true },
+    );
   } catch (error) {
     console.error('Error saving quality score:', error);
   }
@@ -282,9 +294,11 @@ export async function saveQualityScore(
  */
 export async function getQualityScore(contractorId: string): Promise<QualityScore | null> {
   try {
-    const scoreRef = doc(db, 'contractors', contractorId, 'qualityScore', 'current');
-    const scoreSnap = await getDoc(scoreRef);
-    return scoreSnap.exists() ? (scoreSnap.data() as QualityScore) : null;
+    const scoreSnap = await adminDb
+      .collection('contractors').doc(contractorId)
+      .collection('qualityScore').doc('current')
+      .get();
+    return scoreSnap.exists ? (scoreSnap.data() as QualityScore) : null;
   } catch (error) {
     console.error('Error fetching quality score:', error);
     return null;

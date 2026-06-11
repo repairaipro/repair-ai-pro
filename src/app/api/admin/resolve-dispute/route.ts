@@ -122,7 +122,7 @@ export async function POST(req: Request) {
           title:       "Your dispute has been resolved",
           body,
           jobId,
-          href:        `/chat?job=${jobId}`,
+          href:        `/jobs/${jobId}`,
         })
       )
     );

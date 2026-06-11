@@ -27,10 +27,35 @@ const NotificationToastWatcher = dynamic(() => import('@/components/Notification
   ssr: false,
 });
 
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://repairaipro.com';
+
 export const metadata: Metadata = {
-  title: 'Repair AI Pro',
-  description: 'AI-assisted service marketplace platform',
+  metadataBase: new URL(BASE_URL),
+  title: {
+    default: 'RepairAI Pro — AI-Powered Home Repair Marketplace',
+    template: '%s · RepairAI Pro',
+  },
+  description:
+    'Snap a photo, get an AI diagnosis and a data-driven price estimate, then match with verified local contractors. Milestone payments, live progress tracking, and photo-verified work.',
+  keywords: [
+    'home repair', 'contractor marketplace', 'AI diagnosis', 'plumber',
+    'electrician', 'HVAC', 'handyman', 'repair estimate', 'verified contractors',
+  ],
   manifest: '/manifest.json',
+  openGraph: {
+    type: 'website',
+    siteName: 'RepairAI Pro',
+    title: 'RepairAI Pro — AI-Powered Home Repair Marketplace',
+    description:
+      'AI diagnoses your repair from a photo, estimates cost from real local job data, and matches you with quality-scored contractors.',
+    url: BASE_URL,
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'RepairAI Pro — AI-Powered Home Repair Marketplace',
+    description:
+      'AI diagnoses your repair from a photo, estimates cost from real local job data, and matches you with quality-scored contractors.',
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
