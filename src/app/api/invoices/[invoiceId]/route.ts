@@ -1,5 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebaseAdmin';
+import { getStripe } from '@/lib/stripe';
+
+/**
+ * For unpaid invoices, fetch the PaymentIntent client secret so the pay page
+ * can mount Stripe Elements. Client secrets are payer-facing by design.
+ */
+async function withClientSecret(data: Record<string, any>): Promise<string | null> {
+  if (data.status === 'paid' || data.status === 'cancelled') return null;
+  if (!data.stripePaymentIntentId) return null;
+  try {
+    const stripe = getStripe();
+    const intent = await stripe.paymentIntents.retrieve(data.stripePaymentIntentId);
+    if (['succeeded', 'canceled'].includes(intent.status)) return null;
+    return intent.client_secret;
+  } catch {
+    return null;
+  }
+}
 
 // Public GET — no auth, used by the /pay/[invoiceId] page
 export async function GET(
@@ -30,11 +48,13 @@ export async function GET(
       }
 
       const doc = invoiceSnap.docs[0];
+      const docData = doc.data();
       return NextResponse.json({
         success: true,
         invoice: {
           id: doc.id,
-          ...sanitize(doc.data()),
+          ...sanitize(docData),
+          stripePaymentIntentClientSecret: await withClientSecret(docData),
         },
       });
     }
@@ -49,13 +69,15 @@ export async function GET(
       return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });
     }
 
+    const invData = invSnap.data()!;
     return NextResponse.json({
       success: true,
       invoice: {
         id: invSnap.id,
         jobId: jobDoc.id,
         jobDescription: jobDoc.data().description || '',
-        ...sanitize(invSnap.data()!),
+        ...sanitize(invData),
+        stripePaymentIntentClientSecret: await withClientSecret(invData),
       },
     });
   } catch (err) {

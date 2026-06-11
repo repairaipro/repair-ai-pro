@@ -240,7 +240,7 @@ export default function JobMarketplacePage() {
                   }}
                 >
                   <Link
-                    href={`/chat?job=${job.id}`}
+                    href={`/jobs/${job.id}`}
                     className="card p-4 flex flex-col gap-3 transition-all duration-200 group"
                     onMouseEnter={e => {
                       (e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.3)';

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getContractorSpecializations, recalculateSpecializations } from '@/lib/specializations';
+import { adminAuth } from '@/lib/firebaseAdmin';
 
 /**
  * GET /api/contractors/[id]/specializations
@@ -56,8 +57,12 @@ export async function POST(
       );
     }
 
-    // In production, verify the token and check if it matches contractorId or is admin
-    // For now, just proceed
+    // Verify token: only the contractor themselves (or an admin) can force recalculation
+    const decoded = await adminAuth.verifyIdToken(authHeader.substring(7));
+    const adminUids = (process.env.ADMIN_UIDS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+    if (decoded.uid !== contractorId && !adminUids.includes(decoded.uid)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     await recalculateSpecializations(contractorId);
 

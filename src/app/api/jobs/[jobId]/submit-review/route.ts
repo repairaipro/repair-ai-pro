@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
-import { adminDb } from "@/lib/firebaseAdmin";
+import { adminDb, adminAuth } from "@/lib/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
 import { notifyReviewReceived } from "@/lib/notif";
 
 type Body = {
   contractorId: string;
-  reviewerId: string; // user uid
   rating: number;     // 1-5
   text: string;
 };
@@ -13,11 +12,19 @@ type Body = {
 export async function POST(req: Request, ctx: { params: { jobId: string } }) {
   try {
     const jobId = ctx.params.jobId;
+
+    // Identity comes from the verified token — never from the request body
+    const header = req.headers.get("authorization") ?? "";
+    const token  = header.startsWith("Bearer ") ? header.slice(7) : null;
+    if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const decoded = await adminAuth.verifyIdToken(token);
+    const reviewerId = decoded.uid;
+
     const body = (await req.json()) as Body;
 
     if (!jobId) return NextResponse.json({ error: "Missing jobId" }, { status: 400 });
-    if (!body?.contractorId || !body?.reviewerId) {
-      return NextResponse.json({ error: "Missing contractorId/reviewerId" }, { status: 400 });
+    if (!body?.contractorId) {
+      return NextResponse.json({ error: "Missing contractorId" }, { status: 400 });
     }
 
     const rating = Number(body.rating);
@@ -43,7 +50,7 @@ export async function POST(req: Request, ctx: { params: { jobId: string } }) {
     }
 
     // reviewer must be job owner
-    if (job.userId !== body.reviewerId) {
+    if (job.userId !== reviewerId) {
       return NextResponse.json({ error: "Not authorized" }, { status: 403 });
     }
 
@@ -55,7 +62,7 @@ export async function POST(req: Request, ctx: { params: { jobId: string } }) {
     // 2) Enforce 1 review per job per reviewer
     const jobReviewsRef = adminDb.collection(`jobs/${jobId}/reviews`);
     const existing = await jobReviewsRef
-      .where("reviewerId", "==", body.reviewerId)
+      .where("reviewerId", "==", reviewerId)
       .limit(1)
       .get();
     if (!existing.empty) {
@@ -78,7 +85,7 @@ export async function POST(req: Request, ctx: { params: { jobId: string } }) {
       const reviewPayload = {
         jobId,
         contractorId: body.contractorId,
-        reviewerId: body.reviewerId,
+        reviewerId: reviewerId,
         rating,
         text,
         createdAt: FieldValue.serverTimestamp(),
@@ -102,7 +109,7 @@ export async function POST(req: Request, ctx: { params: { jobId: string } }) {
       const evRef = adminDb.collection(`jobs/${jobId}/events`).doc();
       tx.set(evRef, {
         type: "review_submitted",
-        actorId: body.reviewerId,
+        actorId: reviewerId,
         contractorId: body.contractorId,
         rating,
         createdAt: FieldValue.serverTimestamp(),

@@ -77,7 +77,7 @@ export async function POST(
       await sendSMS(job.userId, {
         title: "✅ Job marked complete",
         body:  `${contractorName} says it's done. Confirm to release payment.`,
-        link:  `/chat?job=${jobId}`,
+        link:  `/jobs/${jobId}`,
       });
     } catch { /* non-blocking */ }
 

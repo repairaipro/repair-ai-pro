@@ -134,6 +134,12 @@ export default function JobChat() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [text, setText] = useState('');
+
+  /* Seed message input from ?prefill= (e.g. bid-pack deep links) */
+  useEffect(() => {
+    const prefill = new URLSearchParams(window.location.search).get('prefill');
+    if (prefill) setText(prefill);
+  }, []);
   const [editId, setEditId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [sending, setSending] = useState(false);

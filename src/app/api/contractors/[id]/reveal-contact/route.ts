@@ -13,10 +13,10 @@ function getBearerToken(req: Request): string | null {
 
 export async function POST(
   req: Request,
-  { params }: { params: { contractorId: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const contractorId = params.contractorId;
+    const contractorId = params.id;
 
     // 1) Auth: must be the contractor
     const token = getBearerToken(req);

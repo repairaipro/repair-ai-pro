@@ -113,12 +113,12 @@ export async function POST(
         title:       "🏆 Your bid was selected!",
         body:        `You won the job: "${jobDescription}". Start coordinating with the homeowner.`,
         jobId:       params.jobId,
-        href:        `/chat?job=${params.jobId}`,
+        href:        `/jobs/${params.jobId}`,
       }),
       sendSMS(contractorId, {
         title: "🎉 You won the bid!",
         body:  `Your bid was selected for "${jobDescription}". Start chatting now.`,
-        link:  `/chat?job=${params.jobId}`,
+        link:  `/jobs/${params.jobId}`,
       }),
     ]).catch(() => {});
 

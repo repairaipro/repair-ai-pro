@@ -1,6 +1,11 @@
-import { db } from '@/lib/db';
-import { doc, getDoc, setDoc, collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { adminDb } from '@/lib/firebaseAdmin';
+import { Timestamp } from 'firebase-admin/firestore';
 import type { Specialization } from '@/types/firestore';
+
+/**
+ * SERVER-ONLY — uses the Firebase Admin SDK.
+ * Import this module only from API routes / server code, never client components.
+ */
 
 /**
  * Extract trade and specialty from job description using AI hints
@@ -60,13 +65,12 @@ export async function calculateContractorSpecializations(
 ): Promise<Specialization[]> {
   try {
     // Fetch all completed jobs for this contractor
-    const jobsQuery = query(
-      collection(db, 'jobs'),
-      where('claimedBy', '==', contractorId),
-      where('status', 'in', ['completed', 'confirmed'])
-    );
+    const jobSnaps = await adminDb
+      .collection('jobs')
+      .where('claimedBy', '==', contractorId)
+      .where('status', 'in', ['completed', 'confirmed'])
+      .get();
 
-    const jobSnaps = await getDocs(jobsQuery);
     const specialtyMap = new Map<string, {
       trade: string;
       specialty: string;
@@ -79,7 +83,7 @@ export async function calculateContractorSpecializations(
     for (const jobSnap of jobSnaps.docs) {
       const job = jobSnap.data();
       const trade = job.trade || 'general';
-      const specialty = job.specialty || extractSpecialty(trade, job.description);
+      const specialty = job.specialty || extractSpecialty(trade, job.description ?? '');
       const key = `${trade}::${specialty}`;
 
       if (!specialtyMap.has(key)) {
@@ -96,10 +100,11 @@ export async function calculateContractorSpecializations(
       spec.jobIds.push(jobSnap.id);
 
       // Get review for this job to extract rating
-      const reviewsQuery = query(
-        collection(db, 'jobs', jobSnap.id, 'reviews')
-      );
-      const reviewSnaps = await getDocs(reviewsQuery);
+      const reviewSnaps = await adminDb
+        .collection('jobs').doc(jobSnap.id)
+        .collection('reviews')
+        .limit(1)
+        .get();
       if (reviewSnaps.docs.length > 0) {
         const rating = reviewSnaps.docs[0].data().rating || 0;
         spec.ratings.push(rating);
@@ -129,8 +134,8 @@ export async function calculateContractorSpecializations(
         successRate: Math.round(successRate * 10) / 10,
         averageRating: Math.round(avgRating * 10) / 10,
         verified,
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
+        createdAt: Timestamp.now() as any,
+        updatedAt: Timestamp.now() as any,
       });
     }
 
@@ -149,20 +154,16 @@ export async function saveSpecializations(
   specializations: Specialization[]
 ): Promise<void> {
   try {
-    const batch: Promise<void>[] = [];
+    const batch = adminDb.batch();
 
     for (const spec of specializations) {
-      const specRef = doc(
-        db,
-        'contractors',
-        contractorId,
-        'specializations',
-        spec.id
-      );
-      batch.push(setDoc(specRef, spec));
+      const specRef = adminDb
+        .collection('contractors').doc(contractorId)
+        .collection('specializations').doc(spec.id);
+      batch.set(specRef, spec);
     }
 
-    await Promise.all(batch);
+    await batch.commit();
   } catch (error) {
     console.error('Error saving specializations:', error);
   }
@@ -175,11 +176,11 @@ export async function getContractorSpecializations(
   contractorId: string
 ): Promise<Specialization[]> {
   try {
-    const specsQuery = query(
-      collection(db, 'contractors', contractorId, 'specializations')
-    );
-    const snapshots = await getDocs(specsQuery);
-    return snapshots.docs.map(doc => ({ id: doc.id, ...doc.data() } as Specialization));
+    const snapshots = await adminDb
+      .collection('contractors').doc(contractorId)
+      .collection('specializations')
+      .get();
+    return snapshots.docs.map(doc => ({ ...doc.data(), id: doc.id } as Specialization));
   } catch (error) {
     console.error('Error fetching specializations:', error);
     return [];

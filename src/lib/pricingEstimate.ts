@@ -1,13 +1,11 @@
-import { db } from '@/lib/db';
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  addDoc,
-  Timestamp,
-} from 'firebase/firestore';
+import { adminDb } from '@/lib/firebaseAdmin';
+import { Timestamp } from 'firebase-admin/firestore';
 import { getComplexityScore } from './tradeQuestionnaires';
+
+/**
+ * SERVER-ONLY — uses the Firebase Admin SDK.
+ * Import this module only from API routes / server code, never client components.
+ */
 
 export type PricingData = {
   trade: string;
@@ -31,13 +29,12 @@ async function findSimilarJobs(
 ): Promise<PricingData[]> {
   try {
     // Query jobs by trade and approximate location (zip prefix)
-    const jobsQuery = query(
-      collection(db, 'pricingHistory'),
-      where('trade', '==', trade.toLowerCase()),
-      where('zipCode', '==', zipCode)
-    );
+    const snapshots = await adminDb
+      .collection('pricingHistory')
+      .where('trade', '==', trade.toLowerCase())
+      .where('zipCode', '==', zipCode)
+      .get();
 
-    const snapshots = await getDocs(jobsQuery);
     const similarJobs: PricingData[] = [];
 
     snapshots.docs.forEach(doc => {
@@ -46,12 +43,11 @@ async function findSimilarJobs(
 
     // If not enough exact matches, broaden search
     if (similarJobs.length < minSimilar) {
-      const broaderQuery = query(
-        collection(db, 'pricingHistory'),
-        where('trade', '==', trade.toLowerCase())
-      );
-
-      const broaderSnapshots = await getDocs(broaderQuery);
+      const broaderSnapshots = await adminDb
+        .collection('pricingHistory')
+        .where('trade', '==', trade.toLowerCase())
+        .limit(200)
+        .get();
       broaderSnapshots.docs.forEach(doc => {
         const data = doc.data() as PricingData;
         if (!similarJobs.find(j => j.timestamp === data.timestamp)) {
@@ -264,8 +260,7 @@ export async function recordJobPrice(
     };
 
     // Add to pricingHistory collection
-    const pricingRef = collection(db, 'pricingHistory');
-    await addDoc(pricingRef, {
+    await adminDb.collection('pricingHistory').add({
       ...pricingData,
       timestamp: Timestamp.now(),
     });
@@ -294,13 +289,11 @@ export async function getPricingTrends(
   lastUpdated: Date;
 }> {
   try {
-    const trendQuery = query(
-      collection(db, 'pricingHistory'),
-      where('trade', '==', trade.toLowerCase()),
-      where('zipCode', '==', zipCode)
-    );
-
-    const snapshots = await getDocs(trendQuery);
+    const snapshots = await adminDb
+      .collection('pricingHistory')
+      .where('trade', '==', trade.toLowerCase())
+      .where('zipCode', '==', zipCode)
+      .get();
     const prices = snapshots.docs.map(doc => (doc.data() as PricingData).finalPrice);
 
     const stats = calculatePriceStats(prices);
