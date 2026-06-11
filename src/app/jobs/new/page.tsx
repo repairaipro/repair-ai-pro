@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import Link from "next/link";
@@ -202,6 +202,13 @@ export default function NewJobPage() {
   const [location, setLocation] = useState<LocationData>({});
   const [urgency, setUrgency] = useState<UrgencyLevel>("flexible");
   const [locationPrivacyMode, setLocationPrivacyMode] = useState<LocationPrivacyMode>('full');
+  const [preferredContractorId, setPreferredContractorId] = useState<string | null>(null);
+
+  /* ?contractor= deep link (from directory/profile "Request a Quote") */
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('contractor');
+    if (id) setPreferredContractorId(id);
+  }, []);
   const [isEmergencyPremium, setIsEmergencyPremium] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [voiceError, setVoiceError] = useState<string | null>(null);
@@ -419,6 +426,7 @@ CRITICAL: If you're not confident, ask clarifying questions rather than guessing
             ? questionnaireAnswers : undefined,
           smartEstimate: smartEstimate ?? undefined,
           locationPrivacyMode,
+          preferredContractorId: preferredContractorId ?? undefined,
         }),
       });
       const data = await res.json();
@@ -456,6 +464,17 @@ CRITICAL: If you're not confident, ask clarifying questions rather than guessing
         </div>
 
         <StepIndicator current={step} />
+
+        {/* Preferred contractor banner (from "Request a Quote" deep link) */}
+        {preferredContractorId && (
+          <div
+            className="mb-6 rounded-xl px-4 py-3 text-sm flex items-center gap-2 animate-fade-in"
+            style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)', color: '#34d399' }}
+          >
+            <CheckCircle className="w-4 h-4 flex-shrink-0" />
+            <span>Your chosen contractor will be invited to this job first.</span>
+          </div>
+        )}
 
         {/* Error banner */}
         {error && (

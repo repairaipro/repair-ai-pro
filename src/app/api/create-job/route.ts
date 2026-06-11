@@ -11,7 +11,7 @@ export async function POST(req: Request) {
 
     const body = await req.json();
 
-    const { description, location, aiDetectedTrade, aiSummary, urgency, isEmergency, emergencyFeeUsd, trade, questionnaireAnswers, smartEstimate, locationPrivacyMode } = body;
+    const { description, location, aiDetectedTrade, aiSummary, urgency, isEmergency, emergencyFeeUsd, trade, questionnaireAnswers, smartEstimate, locationPrivacyMode, preferredContractorId } = body;
 
     // userId always comes from the verified token — never from the request body
     const userId = decoded.uid;
@@ -41,6 +41,9 @@ export async function POST(req: Request) {
 
       // Location privacy mode (controls what contractors see)
       locationPrivacyMode: locationPrivacyMode ?? 'full',
+
+      // Homeowner picked this contractor via "Request a Quote" — invite first
+      preferredContractorId: preferredContractorId ?? null,
 
       // Questionnaire answers for better contractor matching
       questionnaireAnswers: questionnaireAnswers ?? null,

@@ -63,6 +63,7 @@ export default function JobMarketplacePage() {
   const [search, setSearch] = useState("");
   const [tradeFilter, setTradeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [visibleCount, setVisibleCount] = useState(30);
 
   useEffect(() => {
     const q = query(collection(db, "jobs"), orderBy("createdAt", "desc"), limit(150));
@@ -219,7 +220,7 @@ export default function JobMarketplacePage() {
               },
             }}
           >
-            {filtered.map((job, index) => {
+            {filtered.slice(0, visibleCount).map((job, index) => {
               const s = STATUS_STYLES[job.status] ?? STATUS_STYLES.open;
               const city = getCity(job.location, (job as any).locationPrivacyMode);
               return (
@@ -287,6 +288,18 @@ export default function JobMarketplacePage() {
               );
             })}
           </motion.div>
+        )}
+
+        {/* Show more */}
+        {!loading && filtered.length > visibleCount && (
+          <div className="flex justify-center pt-2">
+            <button
+              onClick={() => setVisibleCount((c) => c + 30)}
+              className="btn btn-secondary btn-sm"
+            >
+              Show more ({filtered.length - visibleCount} remaining)
+            </button>
+          </div>
         )}
       </div>
     </motion.div>

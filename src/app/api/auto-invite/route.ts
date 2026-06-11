@@ -57,6 +57,23 @@ export async function POST(req: Request) {
       .sort((a, b) => b.score - a.score)
       .slice(0, INITIAL_WAVE_SIZE);
 
+    // Homeowner explicitly requested a quote from this contractor — invite them
+    // first regardless of automatic ranking
+    const preferredId = job.preferredContractorId as string | undefined | null;
+    if (preferredId && !ranked.some((c) => c.id === preferredId)) {
+      const prefSnap = await adminDb.collection("contractors").doc(preferredId).get();
+      if (prefSnap.exists) {
+        ranked.unshift({
+          id: preferredId,
+          data: prefSnap.data() as ContractorLike,
+          matched: true,
+          score: 100,
+          reason: "Requested by homeowner",
+          distanceMiles: null,
+        } as any);
+      }
+    }
+
     if (ranked.length === 0) {
       // No matches — record this so homeowner UI can show it
       await jobRef.update({ matchStatus: 'no_matches', matchedAt: new Date() });

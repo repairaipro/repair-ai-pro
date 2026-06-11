@@ -281,6 +281,7 @@ export async function saveQualityScore(
       {
         qualityScore:        score.overallScore,
         verifiedSpecialties: score.specializations.count,
+        responseScore:       score.responseTime, // 0-100, higher = faster responder
       },
       { merge: true },
     );
