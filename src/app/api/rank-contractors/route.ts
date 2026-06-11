@@ -1,14 +1,6 @@
 import { NextResponse } from "next/server";
 import { openai, handleOpenAIError } from "@/lib/openaiClient";
-import { db } from "@/lib/db";
-import {
-  collection,
-  getDocs,
-  limit,
-  orderBy,
-  query,
-} from "firebase/firestore";
-import { verifyAuthToken } from "@/lib/firebaseAdmin";
+import { adminDb, verifyAuthToken } from "@/lib/firebaseAdmin";
 
 /* ================================
    Types
@@ -100,21 +92,18 @@ export async function POST(req: Request) {
        1) Fetch contractors broadly
        (NO strict filtering)
     ----------------------------- */
-    const snap = await getDocs(
-      query(collection(db, "contractors"), limit(40))
-    );
+    const snap = await adminDb.collection("contractors").limit(40).get();
 
     const contractors: ContractorBase[] = await Promise.all(
       snap.docs.map(async (d) => {
         const c = d.data() as any;
 
-        const reviewsSnap = await getDocs(
-          query(
-            collection(db, "contractors", d.id, "reviews"),
-            orderBy("createdAt", "desc"),
-            limit(6)
-          )
-        );
+        const reviewsSnap = await adminDb
+          .collection("contractors").doc(d.id)
+          .collection("reviews")
+          .orderBy("createdAt", "desc")
+          .limit(6)
+          .get();
 
         const reviews = reviewsSnap.docs.map((r) => ({
           rating: Number(r.data()?.rating ?? 0),

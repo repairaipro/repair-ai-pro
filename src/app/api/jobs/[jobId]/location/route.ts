@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { doc, updateDoc, collection, addDoc, serverTimestamp, getDoc } from "firebase/firestore";
-import { adminAuth } from "@/lib/firebaseAdmin";
+import { adminDb, adminAuth } from "@/lib/firebaseAdmin";
+import { FieldValue } from "firebase-admin/firestore";
 
 type JobLocation = {
   lat: number;
@@ -11,6 +10,11 @@ type JobLocation = {
   speed?: number;
   heading?: number;
 };
+
+/** Firestore rejects undefined values — strip them */
+function compact<T extends Record<string, any>>(obj: T): Record<string, any> {
+  return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined));
+}
 
 export async function POST(
   req: NextRequest,
@@ -34,11 +38,11 @@ export async function POST(
       );
     }
 
-    const jobRef = doc(db, "jobs", jobId);
+    const jobRef = adminDb.collection("jobs").doc(jobId);
 
     // Verify user is the claiming contractor
-    const jobSnap = await getDoc(jobRef);
-    if (!jobSnap.exists() || jobSnap.data().claimedBy !== user.uid) {
+    const jobSnap = await jobRef.get();
+    if (!jobSnap.exists || jobSnap.data()!.claimedBy !== user.uid) {
       return NextResponse.json(
         { error: "Not authorized to update this job's location" },
         { status: 403 }
@@ -46,30 +50,31 @@ export async function POST(
     }
 
     // Update the job with latest contractor location
-    await updateDoc(jobRef, {
-      contractorLocation: {
+    await jobRef.update({
+      contractorLocation: compact({
         lat: location.lat,
         lng: location.lng,
         timestamp: location.timestamp,
         accuracy: location.accuracy,
         speed: location.speed,
         heading: location.heading,
-      },
-      lastLocationUpdate: serverTimestamp(),
+      }),
+      lastLocationUpdate: FieldValue.serverTimestamp(),
     });
 
     // Store in location history subcollection for trip tracking
-    const historyRef = collection(db, "jobs", jobId, "locationHistory");
-    await addDoc(historyRef, {
-      contractorId: user.uid,
-      lat: location.lat,
-      lng: location.lng,
-      timestamp: location.timestamp,
-      accuracy: location.accuracy,
-      speed: location.speed,
-      heading: location.heading,
-      createdAt: serverTimestamp(),
-    });
+    await jobRef.collection("locationHistory").add(
+      compact({
+        contractorId: user.uid,
+        lat: location.lat,
+        lng: location.lng,
+        timestamp: location.timestamp,
+        accuracy: location.accuracy,
+        speed: location.speed,
+        heading: location.heading,
+        createdAt: FieldValue.serverTimestamp(),
+      })
+    );
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

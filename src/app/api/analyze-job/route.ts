@@ -1,8 +1,12 @@
+import { rateLimit, rateLimitResponse } from "@/lib/rateLimit";
 // src/app/api/analyze-job/route.ts
 import { NextResponse } from "next/server";
 import { openai, handleOpenAIError } from "@/lib/openaiClient";
 
 export async function POST(req: Request) {
+  const rl = rateLimit(req, "analyze-job", 20);
+  if (!rl.ok) return rateLimitResponse(rl);
+
   try {
 
     const { jobId, imageUrl } = await req.json();

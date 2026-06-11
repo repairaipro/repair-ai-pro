@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
-import { verifyAuthToken } from "@/lib/firebaseAdmin";
+import { adminDb, verifyAuthToken } from "@/lib/firebaseAdmin";
+import { FieldValue } from "firebase-admin/firestore";
 
 export async function POST(req: Request) {
   try {
@@ -25,7 +24,7 @@ export async function POST(req: Request) {
     }
 
     // ✅ CREATE JOB
-    const docRef = await addDoc(collection(db, "jobs"), {
+    const docRef = await adminDb.collection("jobs").add({
       userId,
       description,
       location,
@@ -58,8 +57,8 @@ export async function POST(req: Request) {
         },
       } : {}),
 
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
     });
 
     const newJobId = docRef.id;

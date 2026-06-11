@@ -1,8 +1,12 @@
+import { rateLimit, rateLimitResponse } from "@/lib/rateLimit";
 import { NextResponse } from "next/server";
 import { openai, handleOpenAIError } from "@/lib/openaiClient";
 import type OpenAI from "openai";
 
 export async function POST(req: Request) {
+  const rl = rateLimit(req, "analyze-user", 15);
+  if (!rl.ok) return rateLimitResponse(rl);
+
   try {
     const { prompt, image } = await req.json();
 

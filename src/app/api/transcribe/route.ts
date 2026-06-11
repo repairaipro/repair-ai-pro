@@ -1,7 +1,11 @@
+import { rateLimit, rateLimitResponse } from "@/lib/rateLimit";
 import { NextResponse } from "next/server";
 import { openai, handleOpenAIError } from "@/lib/openaiClient";
 
 export async function POST(req: Request) {
+  const rl = rateLimit(req, "transcribe", 15);
+  if (!rl.ok) return rateLimitResponse(rl);
+
   try {
     const formData = await req.formData();
     const audioBlob = formData.get("audio") as Blob | null;

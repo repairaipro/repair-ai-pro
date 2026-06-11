@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { collection, getDocs } from "firebase/firestore";
+import { adminDb, verifyAuthToken } from "@/lib/firebaseAdmin";
 import { scoreContractorMatch } from "@/lib/matching";
-import { verifyAuthToken } from "@/lib/firebaseAdmin";
 
 export async function POST(req: Request) {
   try {
@@ -21,7 +19,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const snap = await getDocs(collection(db, "users"));
+    const snap = await adminDb.collection("users").limit(500).get();
     const matches: any[] = [];
 
     snap.forEach((userDoc) => {
