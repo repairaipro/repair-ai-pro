@@ -203,11 +203,19 @@ export default function NewJobPage() {
   const [urgency, setUrgency] = useState<UrgencyLevel>("flexible");
   const [locationPrivacyMode, setLocationPrivacyMode] = useState<LocationPrivacyMode>('full');
   const [preferredContractorId, setPreferredContractorId] = useState<string | null>(null);
+  const [preferredContractorName, setPreferredContractorName] = useState<string | null>(null);
 
   /* ?contractor= deep link (from directory/profile "Request a Quote") */
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get('contractor');
-    if (id) setPreferredContractorId(id);
+    if (!id) return;
+    setPreferredContractorId(id);
+    // Fetch the name so the banner is personal, not generic
+    import('@/lib/db').then(async ({ db }) => {
+      const { doc, getDoc } = await import('firebase/firestore');
+      const snap = await getDoc(doc(db, 'contractors', id));
+      if (snap.exists()) setPreferredContractorName(snap.data().name ?? null);
+    }).catch(() => {});
   }, []);
   const [isEmergencyPremium, setIsEmergencyPremium] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -472,7 +480,11 @@ CRITICAL: If you're not confident, ask clarifying questions rather than guessing
             style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)', color: '#34d399' }}
           >
             <CheckCircle className="w-4 h-4 flex-shrink-0" />
-            <span>Your chosen contractor will be invited to this job first.</span>
+            <span>
+              {preferredContractorName
+                ? <><strong>{preferredContractorName}</strong> will be invited to this job first.</>
+                : 'Your chosen contractor will be invited to this job first.'}
+            </span>
           </div>
         )}
 

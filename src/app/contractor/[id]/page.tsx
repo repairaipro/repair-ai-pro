@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { collection, doc, getDoc, onSnapshot, orderBy, query } from "firebase/firestore";
+import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -121,23 +121,29 @@ export default function ContractorProfilePage({ params }: { params: { id?: strin
     return <div className="p-6 text-sm" style={{ color: 'var(--color-text-4)' }}>Loading…</div>;
   }
 
-  /* Load profile */
+  /* Load profile + reviews via the public sanitized endpoint —
+     works for signed-out visitors and search engine crawlers */
   useEffect(() => {
     setProfileLoading(true);
-    getDoc(doc(db, "contractors", contractorId))
-      .then((snap) => setProfile(snap.exists() ? (snap.data() as ContractorProfile) : null))
+    fetch(`/api/public/contractors/${contractorId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        setProfile(d?.contractor ?? null);
+        setReviews(d?.reviews ?? []);
+      })
       .catch(() => setProfile(null))
       .finally(() => setProfileLoading(false));
   }, [contractorId]);
 
-  /* Load reviews live */
+  /* Signed-in users get live review updates on top of the public snapshot */
   useEffect(() => {
+    if (!user) return;
     const q    = query(collection(db, "contractors", contractorId, "reviews"), orderBy("createdAt", "desc"));
     const unsub = onSnapshot(q, (snap) => {
       setReviews(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })));
-    });
+    }, () => { /* permission denied for some accounts is fine — public data already loaded */ });
     return unsub;
-  }, [contractorId]);
+  }, [contractorId, user]);
 
   /* Load quality score + specializations (best-effort, non-blocking) */
   useEffect(() => {
@@ -237,8 +243,37 @@ Reviews: ${reviews.slice(0, 5).map((r) => `${r.rating}★ — "${r.text}"`).join
   const tradesList = profile.trades?.length ? profile.trades : profile.trade ? [profile.trade] : ["General Contractor"];
   const isPro      = profile.subscriptionPlan === "pro" || profile.subscriptionPlan === "elite";
 
+  /* LocalBusiness structured data for search engines */
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'HomeAndConstructionBusiness',
+    name: profile.name || 'Professional Contractor',
+    description: profile.bio || `${tradesList.join(', ')} services`,
+    ...(profile.photoUrl ? { image: profile.photoUrl } : {}),
+    ...(profile.city ? {
+      address: {
+        '@type': 'PostalAddress',
+        addressLocality: profile.city,
+        ...(profile.state ? { addressRegion: profile.state } : {}),
+      },
+    } : {}),
+    knowsAbout: tradesList,
+    ...(avgRating > 0 && reviewCount > 0 ? {
+      aggregateRating: {
+        '@type': 'AggregateRating',
+        ratingValue: Math.round(avgRating * 10) / 10,
+        reviewCount,
+        bestRating: 5,
+      },
+    } : {}),
+  };
+
   return (
     <div className="min-h-screen" style={{ background: 'var(--color-bg)' }}>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <div className="max-w-3xl mx-auto px-4 py-6 space-y-5">
 
         {/* Back nav */}

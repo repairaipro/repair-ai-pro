@@ -1,8 +1,6 @@
 'use client';
 
 import { useEffect, useState } from "react";
-import { db } from "@/lib/db";
-import { collection, getDocs, query, limit } from "firebase/firestore";
 import Image from "next/image";
 import Link from "next/link";
 import { TRADES } from "@/lib/constants";
@@ -52,12 +50,11 @@ export default function ContractorDirectory() {
   useEffect(() => {
     async function load() {
       try {
-        const snap = await getDocs(query(collection(db, "contractors"), limit(200)));
-        setContractors(
-          snap.docs
-            .map((d) => ({ id: d.id, ...(d.data() as any) }))
-            .filter((c: any) => !c.claimedByUid)
-        );
+        // Public sanitized endpoint — works for signed-out visitors and crawlers
+        const res = await fetch("/api/public/contractors");
+        if (!res.ok) throw new Error("Failed to load");
+        const data = await res.json();
+        setContractors(data.contractors ?? []);
       } catch (err) {
         console.error("Contractor load error:", err);
         setError("Could not load contractors. Check your connection and try again.");
