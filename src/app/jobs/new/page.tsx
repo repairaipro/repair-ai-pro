@@ -205,9 +205,13 @@ export default function NewJobPage() {
   const [preferredContractorId, setPreferredContractorId] = useState<string | null>(null);
   const [preferredContractorName, setPreferredContractorName] = useState<string | null>(null);
 
-  /* ?contractor= deep link (from directory/profile "Request a Quote") */
+  /* Deep links: ?contractor= (Request a Quote) and ?desc= (from /diagnose) */
   useEffect(() => {
-    const id = new URLSearchParams(window.location.search).get('contractor');
+    const sp = new URLSearchParams(window.location.search);
+    const desc = sp.get('desc');
+    if (desc) setDescription(desc);
+
+    const id = sp.get('contractor');
     if (!id) return;
     setPreferredContractorId(id);
     // Fetch the name so the banner is personal, not generic

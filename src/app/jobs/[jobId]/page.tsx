@@ -27,6 +27,7 @@ import MatchStatus from '@/components/MatchStatus';
 import ProgressLogger from '@/components/ProgressLogger';
 import ProgressDashboard from '@/components/ProgressDashboard';
 import WorkPhotoUpload from '@/components/WorkPhotoUpload';
+import BidPriceBand from '@/components/BidPriceBand';
 import FileDisputeModal from '@/components/FileDisputeModal';
 import { openDirections } from '@/lib/mapsIntegration';
 import VideoConsultationPanel from '@/components/VideoConsultationPanel';
@@ -973,6 +974,15 @@ export default function JobDetailPage() {
               </div>
             ) : hasBids ? (
               <div className="space-y-3">
+                {/* AI fair-price band — every bid shown against the data-driven range */}
+                {(job as any).estimatedCost?.low > 0 && (job as any).estimatedCost?.high > 0 && (
+                  <BidPriceBand
+                    low={(job as any).estimatedCost.low}
+                    typical={(job as any).estimatedCost.typical ?? Math.round(((job as any).estimatedCost.low + (job as any).estimatedCost.high) / 2)}
+                    high={(job as any).estimatedCost.high}
+                    bids={bids}
+                  />
+                )}
                 {/* Selected bid first */}
                 {selectedBid && (
                   <BidCard bid={selectedBid} isHomeowner={isHomeowner}

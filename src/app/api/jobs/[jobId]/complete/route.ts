@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { adminDb, adminAuth } from "@/lib/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
 import { sendJobCompletedEmail } from "@/lib/email";
+import { trackEvent } from "@/lib/funnel";
 import { sendSMS } from "@/lib/sms";
 
 /**
@@ -43,6 +44,8 @@ export async function POST(
       status:    "completed",
       updatedAt: FieldValue.serverTimestamp(),
     });
+
+    trackEvent("job_completed", { jobId, contractorId });
 
     // Create completion record
     await jobRef.collection("completion").doc("record").set({

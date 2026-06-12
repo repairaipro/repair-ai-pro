@@ -3,6 +3,7 @@ import { adminDb, adminAuth } from "@/lib/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
 import { sendSMS } from "@/lib/sms";
 import { createNotification } from "@/lib/notif";
+import { trackEvent } from "@/lib/funnel";
 
 /**
  * POST /api/jobs/[jobId]/bid
@@ -71,6 +72,8 @@ export async function POST(
     };
 
     await jobRef.collection("bids").doc(uid).set(bidData);
+
+    trackEvent("bid_submitted", { jobId, contractorId: uid, amount });
 
     /* ---------------- INCREMENT BID COUNT ---------------- */
     await jobRef.update({

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminDb, adminAuth } from "@/lib/firebaseAdmin";
 import { notifyContractorInvited } from "@/lib/notif";
+import { trackEvent } from "@/lib/funnel";
 import { scoreContractorMatch, type ContractorLike, type JobLocationInput } from "@/lib/matching";
 
 const INITIAL_WAVE_SIZE = 10;
@@ -117,6 +118,8 @@ export async function POST(req: Request) {
       matchedAt: new Date(),
       matchCount: ranked.length,
     });
+
+    trackEvent("contractors_invited", { jobId, count: ranked.length, wave: "initial" });
 
     // Notify (fire-and-forget)
     const locationStr =
