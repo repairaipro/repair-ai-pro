@@ -378,11 +378,11 @@ Reviews: ${reviews.slice(0, 5).map((r) => `${r.rating}★ — "${r.text}"`).join
               <Briefcase size={15} /> Hire {profile.name?.split(" ")[0] ?? "Contractor"}
             </Link>
             <Link
-              href={`/chat?contractor=${contractorId}`}
+              href={`/jobs/new?contractor=${contractorId}`}
               className="btn btn-secondary"
               style={{ justifyContent: 'center' }}
             >
-              <MessageSquare size={15} /> Message
+              <MessageSquare size={15} /> Request a Quote
             </Link>
           </div>
         </div>

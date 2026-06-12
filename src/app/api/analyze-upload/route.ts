@@ -1,9 +1,13 @@
+import { rateLimit, rateLimitResponse } from "@/lib/rateLimit";
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { analyzeJobInput } from "@/lib/analyzeJobInput";
 import { FieldValue } from "firebase-admin/firestore";
 
 export async function POST(req: Request) {
+  const rl = rateLimit(req, "analyze-upload", 15);
+  if (!rl.ok) return rateLimitResponse(rl);
+
   try {
     const body = await req.json();
 

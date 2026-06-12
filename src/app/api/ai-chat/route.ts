@@ -1,3 +1,4 @@
+import { rateLimit, rateLimitResponse } from "@/lib/rateLimit";
 import { NextResponse } from "next/server";
 import { openai, handleOpenAIError } from "@/lib/openaiClient";
 import { getTradeKnowledge } from "@/lib/diagnosticKnowledge";
@@ -34,6 +35,9 @@ Style: Clear and practical. Brief technical terms are fine but always define the
 }
 
 export async function POST(req: Request) {
+  const rl = rateLimit(req, "ai-chat", 30);
+  if (!rl.ok) return rateLimitResponse(rl);
+
   try {
     const { message, imageUrl, history, mode, trade } = await req.json();
 

@@ -1,15 +1,7 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import {
-  collection,
-  getDocs,
-  doc,
-  getDoc,
-  addDoc,
-  serverTimestamp,
-} from "firebase/firestore";
+import { adminDb, verifyAuthToken } from "@/lib/firebaseAdmin";
+import { FieldValue } from "firebase-admin/firestore";
 import { scoreContractorMatch } from "@/lib/matching";
-import { verifyAuthToken } from "@/lib/firebaseAdmin";
 
 export async function POST(req: Request) {
   try {
@@ -25,10 +17,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing jobId" }, { status: 400 });
     }
 
-    const jobRef = doc(db, "jobs", jobId);
-    const jobSnap = await getDoc(jobRef);
+    const jobSnap = await adminDb.collection("jobs").doc(jobId).get();
 
-    if (!jobSnap.exists()) {
+    if (!jobSnap.exists) {
       return NextResponse.json({ error: "Job not found" }, { status: 404 });
     }
 
@@ -47,7 +38,7 @@ export async function POST(req: Request) {
       lng: job.location?.lng,
     };
 
-    const usersSnap = await getDocs(collection(db, "users"));
+    const usersSnap = await adminDb.collection("users").limit(500).get();
     const ranked: any[] = [];
 
     usersSnap.forEach((userDoc) => {
@@ -81,27 +72,36 @@ export async function POST(req: Request) {
 
     const topRanked = ranked.slice(0, 25);
 
+    // Batched write: one inbox entry per contractor + a job event
+    const batch = adminDb.batch();
+
     for (const contractor of topRanked) {
-      await addDoc(collection(db, "users", contractor.contractorId, "jobInbox"), {
+      const inboxRef = adminDb
+        .collection("users").doc(contractor.contractorId)
+        .collection("jobInbox").doc();
+      batch.set(inboxRef, {
         jobId,
         trade,
         score: contractor.score,
         reason: contractor.reason,
         distanceMiles: contractor.distanceMiles ?? null,
-        createdAt: serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp(),
         status: "new",
       });
     }
 
-    await addDoc(collection(db, "jobs", jobId, "events"), {
+    const eventRef = adminDb.collection("jobs").doc(jobId).collection("events").doc();
+    batch.set(eventRef, {
       type: "job_broadcasted",
       actorId: "system",
       meta: {
         contractorCount: topRanked.length,
         trade,
       },
-      createdAt: serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
     });
+
+    await batch.commit();
 
     return NextResponse.json({
       success: true,

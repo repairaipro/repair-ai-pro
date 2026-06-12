@@ -1,3 +1,4 @@
+import { rateLimit, rateLimitResponse } from "@/lib/rateLimit";
 import { NextResponse } from "next/server";
 import { openai, handleOpenAIError } from "@/lib/openaiClient";
 
@@ -61,6 +62,9 @@ Always explain your reasoning in why_this_range.
 }
 
 export async function POST(req: Request) {
+  const rl = rateLimit(req, "estimate-job", 20);
+  if (!rl.ok) return rateLimitResponse(rl);
+
   try {
     const body = (await req.json()) as EstimateRequest;
 

@@ -24,6 +24,7 @@ type Contractor = {
   jobsCompleted?: number;
   qualityScore?: number;        // denormalized overall score (0-100)
   verifiedSpecialties?: number; // count of verified specializations
+  responseScore?: number;       // 0-100, higher = faster responder (>=75 ≈ under ~6h)
 };
 
 function ContractorCardSkeleton() {
@@ -46,6 +47,7 @@ export default function ContractorDirectory() {
   const [trade, setTrade] = useState("");
   const [city, setCity] = useState("");
   const [sort, setSort] = useState("relevance");
+  const [visibleCount, setVisibleCount] = useState(30);
 
   useEffect(() => {
     async function load() {
@@ -197,7 +199,7 @@ export default function ContractorDirectory() {
           </motion.div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {filtered.map((c, i) => (
+            {filtered.slice(0, visibleCount).map((c, i) => (
               <motion.div
                 key={c.id}
                 initial={{ opacity: 0, y: 20 }}
@@ -269,8 +271,8 @@ export default function ContractorDirectory() {
                   )}
                 </div>
 
-                {/* Quality score + verified specialties */}
-                {(c.qualityScore != null && c.qualityScore > 0) || (c.verifiedSpecialties != null && c.verifiedSpecialties > 0) ? (
+                {/* Quality score + verified specialties + responsiveness */}
+                {(c.qualityScore != null && c.qualityScore > 0) || (c.verifiedSpecialties != null && c.verifiedSpecialties > 0) || (c.responseScore != null && c.responseScore >= 75) ? (
                   <div className="flex items-center justify-center gap-2 mt-3 flex-wrap">
                     {c.qualityScore != null && c.qualityScore > 0 && (
                       <span
@@ -303,6 +305,14 @@ export default function ContractorDirectory() {
                         style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.2)' }}
                       >
                         ✓ {c.verifiedSpecialties} verified {c.verifiedSpecialties === 1 ? 'specialty' : 'specialties'}
+                      </span>
+                    )}
+                    {c.responseScore != null && c.responseScore >= 75 && (
+                      <span
+                        className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                        style={{ background: 'rgba(34,211,238,0.1)', color: '#22d3ee', border: '1px solid rgba(34,211,238,0.2)' }}
+                      >
+                        ⚡ Fast responder
                       </span>
                     )}
                   </div>
@@ -338,12 +348,24 @@ export default function ContractorDirectory() {
                   <Link href={`/contractor/${c.id}`} className="btn btn-primary btn-sm text-center">
                     View Profile <ChevronRight className="w-3.5 h-3.5" />
                   </Link>
-                  <Link href={`/chat?contractor=${c.id}`} className="btn btn-secondary btn-sm text-center">
-                    <MessageSquare className="w-3.5 h-3.5" /> Message / Quote
+                  <Link href={`/jobs/new?contractor=${c.id}`} className="btn btn-secondary btn-sm text-center">
+                    <MessageSquare className="w-3.5 h-3.5" /> Request a Quote
                   </Link>
                 </div>
               </motion.div>
             ))}
+          </div>
+        )}
+
+        {/* Show more */}
+        {!loading && filtered.length > visibleCount && (
+          <div className="flex justify-center pt-2">
+            <button
+              onClick={() => setVisibleCount((c) => c + 30)}
+              className="btn btn-secondary btn-sm"
+            >
+              Show more ({filtered.length - visibleCount} remaining)
+            </button>
           </div>
         )}
       </div>

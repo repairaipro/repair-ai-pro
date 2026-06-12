@@ -1,8 +1,12 @@
+import { rateLimit, rateLimitResponse } from "@/lib/rateLimit";
 
 import { NextResponse } from 'next/server';
 import { openai, handleOpenAIError } from '@/lib/openaiClient';
 
 export async function POST(req: Request) {
+  const rl = rateLimit(req, "openai-chat", 30);
+  if (!rl.ok) return rateLimitResponse(rl);
+
   try {
     const body = await req.json();
     const input: string = body.input || '';

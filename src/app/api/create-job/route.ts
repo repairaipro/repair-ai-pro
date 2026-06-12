@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
-import { verifyAuthToken } from "@/lib/firebaseAdmin";
+import { adminDb, verifyAuthToken } from "@/lib/firebaseAdmin";
+import { FieldValue } from "firebase-admin/firestore";
 
 export async function POST(req: Request) {
   try {
@@ -12,7 +11,7 @@ export async function POST(req: Request) {
 
     const body = await req.json();
 
-    const { description, location, aiDetectedTrade, aiSummary, urgency, isEmergency, emergencyFeeUsd, trade, questionnaireAnswers, smartEstimate, locationPrivacyMode } = body;
+    const { description, location, aiDetectedTrade, aiSummary, urgency, isEmergency, emergencyFeeUsd, trade, questionnaireAnswers, smartEstimate, locationPrivacyMode, preferredContractorId } = body;
 
     // userId always comes from the verified token — never from the request body
     const userId = decoded.uid;
@@ -25,7 +24,7 @@ export async function POST(req: Request) {
     }
 
     // ✅ CREATE JOB
-    const docRef = await addDoc(collection(db, "jobs"), {
+    const docRef = await adminDb.collection("jobs").add({
       userId,
       description,
       location,
@@ -43,6 +42,9 @@ export async function POST(req: Request) {
       // Location privacy mode (controls what contractors see)
       locationPrivacyMode: locationPrivacyMode ?? 'full',
 
+      // Homeowner picked this contractor via "Request a Quote" — invite first
+      preferredContractorId: preferredContractorId ?? null,
+
       // Questionnaire answers for better contractor matching
       questionnaireAnswers: questionnaireAnswers ?? null,
 
@@ -58,8 +60,8 @@ export async function POST(req: Request) {
         },
       } : {}),
 
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
     });
 
     const newJobId = docRef.id;

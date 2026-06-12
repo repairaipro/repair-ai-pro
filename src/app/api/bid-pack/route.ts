@@ -1,3 +1,4 @@
+import { rateLimit, rateLimitResponse } from "@/lib/rateLimit";
 import { NextResponse } from "next/server";
 import { openai, handleOpenAIError } from "@/lib/openaiClient";
 import type OpenAI from "openai";
@@ -39,6 +40,9 @@ Be clear, practical, and short.
 }
 
 export async function POST(req: Request) {
+  const rl = rateLimit(req, "bid-pack", 15);
+  if (!rl.ok) return rateLimitResponse(rl);
+
   try {
     const body = (await req.json()) as BidPackRequest;
 
