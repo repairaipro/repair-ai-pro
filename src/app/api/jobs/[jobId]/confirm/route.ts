@@ -3,6 +3,7 @@ import { adminDb, adminAuth } from "@/lib/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
 import { sendPayoutSentEmail } from "@/lib/email";
 import { sendSMS } from "@/lib/sms";
+import { trackEvent } from "@/lib/funnel";
 
 /** Fire-and-forget: record final price so future estimates are smarter */
 async function recordPricingHistory(
@@ -123,6 +124,12 @@ export async function POST(
     // Record pricing data async (does not block response)
     const origin = req.headers.get("origin") ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
     recordPricingHistory(jobId, job, origin, token);
+
+    trackEvent("job_confirmed", {
+      jobId,
+      contractorId: job.claimedBy ?? null,
+      amountUsd: job.paymentAmountUsd ?? null,
+    });
 
     return NextResponse.json({ success: true });
   } catch (e: any) {

@@ -162,8 +162,8 @@ export default function LandingPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.3 }}
             className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-10">
-            <Link href="/jobs/new" className="btn btn-primary btn-lg px-8 w-full sm:w-auto">
-              Describe Your Problem
+            <Link href="/diagnose" className="btn btn-primary btn-lg px-8 w-full sm:w-auto">
+              Diagnose It Free
               <ArrowRight className="w-4 h-4" />
             </Link>
             <Link

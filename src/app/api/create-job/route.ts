@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminDb, verifyAuthToken } from "@/lib/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
+import { trackEvent } from "@/lib/funnel";
 
 export async function POST(req: Request) {
   try {
@@ -65,6 +66,13 @@ export async function POST(req: Request) {
     });
 
     const newJobId = docRef.id;
+
+    trackEvent("job_posted", {
+      jobId: newJobId,
+      trade: trade ?? aiDetectedTrade ?? null,
+      urgency: urgency ?? "flexible",
+      hadPreferredContractor: !!preferredContractorId,
+    });
 
     // 🔥 AUTO INVITE (non-blocking, won't crash job creation)
     try {

@@ -3,6 +3,7 @@ import { getAuth } from "firebase-admin/auth";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
 import { sendJobMatchedEmail } from "@/lib/email";
+import { trackEvent } from "@/lib/funnel";
 import { sendSMS } from "@/lib/sms";
 
 /**
@@ -102,6 +103,8 @@ export async function POST(
       claimedAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     });
+
+    trackEvent("job_claimed", { jobId: params.jobId, contractorId });
 
     /* ---------------- AUDIT LOG ---------------- */
     await adminDb.collection("jobAcceptanceLogs").add({

@@ -114,6 +114,7 @@ export default function ContractorProfilePage({ params }: { params: { id?: strin
   const [aiSummary,      setAISummary]      = useState("");
   const [aiLoading,      setAILoading]      = useState(false);
   const [copied,         setCopied]         = useState(false);
+  const [embedCopied,    setEmbedCopied]    = useState(false);
   const [qualityScore,   setQualityScore]   = useState<any>(null);
   const [specs,          setSpecs]          = useState<any[]>([]);
 
@@ -194,6 +195,12 @@ Reviews: ${reviews.slice(0, 5).map((r) => `${r.rating}★ — "${r.text}"`).join
 
   function handleShare() {
     const url = window.location.href;
+    const title = `${profile?.name ?? 'Contractor'} on RepairAI Pro`;
+    // Native share sheet on mobile; clipboard fallback on desktop
+    if (navigator.share) {
+      navigator.share({ title, url }).catch(() => { /* user dismissed */ });
+      return;
+    }
     navigator.clipboard.writeText(url).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -421,6 +428,38 @@ Reviews: ${reviews.slice(0, 5).map((r) => `${r.rating}★ — "${r.text}"`).join
             </Link>
           </div>
         </div>
+
+        {/* ── Owner-only: embeddable badge for their own website ── */}
+        {user?.uid === contractorId && (
+          <div
+            className="rounded-2xl p-5"
+            style={{ background: 'var(--color-surface)', border: '1px solid rgba(99,102,241,0.25)' }}
+          >
+            <h2 className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: '#818cf8' }}>
+              Your embeddable badge
+            </h2>
+            <p className="text-xs mb-3" style={{ color: 'var(--color-text-4)' }}>
+              Put this on your website or social bio — it links customers straight to this profile.
+            </p>
+            <div className="flex items-center gap-4 flex-wrap">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={`/api/badge/${contractorId}`} alt="Your RepairAI badge" width={260} height={64} />
+              <button
+                onClick={() => {
+                  const origin = window.location.origin;
+                  const snippet = `<a href="${origin}/contractor/${contractorId}"><img src="${origin}/api/badge/${contractorId}" alt="${profile.name ?? 'Contractor'} — verified on RepairAI Pro" width="260" height="64" /></a>`;
+                  navigator.clipboard.writeText(snippet).then(() => {
+                    setEmbedCopied(true);
+                    setTimeout(() => setEmbedCopied(false), 2000);
+                  });
+                }}
+                className="btn btn-secondary btn-sm"
+              >
+                {embedCopied ? <><Check size={13} /> Copied!</> : <>Copy embed code</>}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* ── Bio ── */}
         {profile.bio && (
