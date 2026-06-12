@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/rebroadcast-stale",
+      "schedule": "0 14 * * *"
+    }
+  ]
+}

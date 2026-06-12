@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { db } from "@/lib/db";
 import { collection, query, onSnapshot, orderBy, limit } from "firebase/firestore";
+import { useAuth } from "@/lib/auth";
 import Link from "next/link";
 import { TRADES } from "@/lib/constants";
 import { Search, Plus, MapPin, Briefcase, X, SlidersHorizontal } from "lucide-react";
@@ -57,6 +58,8 @@ function JobCardSkeleton() {
 }
 
 export default function JobMarketplacePage() {
+  const { user } = useAuth();
+  const authLoading = user === undefined; // undefined = auth still resolving, null = signed out
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -66,6 +69,10 @@ export default function JobMarketplacePage() {
   const [visibleCount, setVisibleCount] = useState(30);
 
   useEffect(() => {
+    if (authLoading) return;
+    // Jobs contain personal details — Firestore rules require sign-in to read
+    if (!user) { setLoading(false); return; }
+
     const q = query(collection(db, "jobs"), orderBy("createdAt", "desc"), limit(150));
     const unsub = onSnapshot(q,
       (snap) => {
@@ -80,7 +87,31 @@ export default function JobMarketplacePage() {
       }
     );
     return () => unsub();
-  }, []);
+  }, [user, authLoading]);
+
+  /* Signed-out visitors get a sign-in gate instead of a permission error */
+  if (!authLoading && !user) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-5 px-6 text-center" style={{ background: 'var(--color-bg)' }}>
+        <div
+          className="w-16 h-16 rounded-2xl flex items-center justify-center"
+          style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)' }}
+        >
+          <Briefcase className="w-8 h-8" style={{ color: '#818cf8' }} />
+        </div>
+        <div>
+          <h1 className="text-xl font-bold mb-1" style={{ color: 'var(--color-text)' }}>Sign in to browse jobs</h1>
+          <p className="text-sm max-w-sm" style={{ color: 'var(--color-text-4)' }}>
+            Job posts include location details, so we keep them visible to signed-in members only.
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <Link href="/auth/signin" className="btn btn-primary btn-sm">Sign In</Link>
+          <Link href="/contractor" className="btn btn-secondary btn-sm">Browse Contractors</Link>
+        </div>
+      </div>
+    );
+  }
 
   const filtered = jobs.filter((job) => {
     const matchSearch =
