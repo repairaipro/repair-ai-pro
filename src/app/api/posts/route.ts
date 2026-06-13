@@ -82,14 +82,10 @@ export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const contractorId = url.searchParams.get("contractorId");
+    const followingOnly = url.searchParams.get("following") === "true";
     const limit = Math.min(50, Math.max(1, Number(url.searchParams.get("limit") ?? 30)));
 
-    let q: FirebaseFirestore.Query = adminDb.collection("posts");
-    if (contractorId) q = q.where("contractorId", "==", contractorId);
-    // Single orderBy after equality filter — auto-indexed
-    const snap = await q.orderBy("createdAt", "desc").limit(limit).get();
-
-    // Who's asking? (optional — enables likedByMe)
+    // Who's asking? (optional — enables likedByMe and the following feed)
     let viewerUid: string | null = null;
     const header = req.headers.get("authorization") ?? "";
     if (header.startsWith("Bearer ")) {
@@ -98,47 +94,83 @@ export async function GET(req: Request) {
       } catch { /* anonymous is fine */ }
     }
 
-    // likedByMe in one batched read
-    const likedSet = new Set<string>();
-    if (viewerUid && snap.size > 0) {
-      const likeRefs = snap.docs.map((d) =>
-        adminDb.collection("posts").doc(d.id).collection("likes").doc(viewerUid!)
-      );
-      const likeSnaps = await adminDb.getAll(...likeRefs);
-      likeSnaps.forEach((s, i) => { if (s.exists) likedSet.add(snap.docs[i].id); });
+    // Following feed: posts only from contractors the viewer follows
+    if (followingOnly) {
+      if (!viewerUid) {
+        return NextResponse.json({ error: "Sign in to see your following feed" }, { status: 401 });
+      }
+      const followingSnap = await adminDb
+        .collection("users").doc(viewerUid)
+        .collection("following")
+        .limit(30) // Firestore `in` cap
+        .get();
+      const followedIds = followingSnap.docs.map((d) => d.id);
+      if (followedIds.length === 0) {
+        return NextResponse.json({ success: true, posts: [], following: true, emptyReason: "not_following_anyone" });
+      }
+      const snap = await adminDb
+        .collection("posts")
+        .where("contractorId", "in", followedIds)
+        .orderBy("createdAt", "desc")
+        .limit(limit)
+        .get();
+      const posts = await hydratePosts(snap, viewerUid);
+      return NextResponse.json({ success: true, posts, following: true });
     }
 
-    // Merge contractor identity (cached per response)
-    const cCache = new Map<string, { name: string; photoUrl: string | null; city: string | null }>();
-    const posts = await Promise.all(
-      snap.docs.map(async (d) => {
-        const p = d.data();
-        const cid = p.contractorId as string;
-        if (!cCache.has(cid)) {
-          const cSnap = await adminDb.collection("contractors").doc(cid).get();
-          cCache.set(cid, {
-            name: cSnap.data()?.name ?? "Contractor",
-            photoUrl: cSnap.data()?.photoUrl ?? null,
-            city: cSnap.data()?.city ?? null,
-          });
-        }
-        return {
-          id: d.id,
-          caption: p.caption,
-          trade: p.trade,
-          photos: p.photos,
-          beforeAfter: p.beforeAfter ?? false,
-          likeCount: p.likeCount ?? 0,
-          likedByMe: likedSet.has(d.id),
-          createdAt: p.createdAt?.toDate?.()?.toISOString() ?? null,
-          contractor: { id: cid, ...cCache.get(cid)! },
-        };
-      })
-    );
+    let q: FirebaseFirestore.Query = adminDb.collection("posts");
+    if (contractorId) q = q.where("contractorId", "==", contractorId);
+    // Single orderBy after equality filter — auto-indexed
+    const snap = await q.orderBy("createdAt", "desc").limit(limit).get();
 
+    const posts = await hydratePosts(snap, viewerUid);
     return NextResponse.json({ success: true, posts });
   } catch (err: any) {
     console.error("List posts error:", err);
     return NextResponse.json({ error: "Failed to load posts" }, { status: 500 });
   }
+}
+
+/** Add likedByMe (for signed-in viewer) + merge contractor identity */
+async function hydratePosts(
+  snap: FirebaseFirestore.QuerySnapshot,
+  viewerUid: string | null
+) {
+  // likedByMe in one batched read
+  const likedSet = new Set<string>();
+  if (viewerUid && snap.size > 0) {
+    const likeRefs = snap.docs.map((d) =>
+      adminDb.collection("posts").doc(d.id).collection("likes").doc(viewerUid)
+    );
+    const likeSnaps = await adminDb.getAll(...likeRefs);
+    likeSnaps.forEach((s, i) => { if (s.exists) likedSet.add(snap.docs[i].id); });
+  }
+
+  // Merge contractor identity (cached per response)
+  const cCache = new Map<string, { name: string; photoUrl: string | null; city: string | null }>();
+  return Promise.all(
+    snap.docs.map(async (d) => {
+      const p = d.data();
+      const cid = p.contractorId as string;
+      if (!cCache.has(cid)) {
+        const cSnap = await adminDb.collection("contractors").doc(cid).get();
+        cCache.set(cid, {
+          name: cSnap.data()?.name ?? "Contractor",
+          photoUrl: cSnap.data()?.photoUrl ?? null,
+          city: cSnap.data()?.city ?? null,
+        });
+      }
+      return {
+        id: d.id,
+        caption: p.caption,
+        trade: p.trade,
+        photos: p.photos,
+        beforeAfter: p.beforeAfter ?? false,
+        likeCount: p.likeCount ?? 0,
+        likedByMe: likedSet.has(d.id),
+        createdAt: p.createdAt?.toDate?.()?.toISOString() ?? null,
+        contractor: { id: cid, ...cCache.get(cid)! },
+      };
+    })
+  );
 }

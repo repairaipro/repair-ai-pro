@@ -24,7 +24,9 @@ export type NotifType =
   | "review_received"
   | "payout_failed"
   | "video_consultation_requested"
-  | "video_consultation_approved";
+  | "video_consultation_approved"
+  | "new_follower"
+  | "post_liked";
 
 export type NotifPayload = {
   recipientId: string;
@@ -217,6 +219,48 @@ export function notifyReviewReceived(
     sendEmail(contractorId, { type: "review_received", rating, jobId }),
     sendPush(contractorId, { title, body, href, jobId, type: "review_received" }),
   ]).then(() => undefined);
+}
+
+/* ── Social layer (in-app bell; light push for follows, none for likes) ── */
+
+export function notifyNewFollower(
+  contractorId: string,
+  followerName: string,
+  followerId: string
+) {
+  const title = "You have a new follower";
+  const body  = `${followerName} started following your work.`;
+  const href  = `/contractor/${contractorId}`;
+  return Promise.all([
+    createNotification({
+      recipientId: contractorId,
+      type: "new_follower",
+      title,
+      body,
+      href,
+      actorId: followerId,
+      actorName: followerName,
+    }),
+    sendPush(contractorId, { title, body, href, type: "new_follower" }),
+  ]).then(() => undefined).catch(() => undefined);
+}
+
+export function notifyPostLiked(
+  contractorId: string,
+  likerName: string,
+  likerId: string,
+  postId: string
+) {
+  // In-app only — likes are high-frequency; no email/SMS/push spam.
+  return createNotification({
+    recipientId: contractorId,
+    type: "post_liked",
+    title: "Someone liked your work",
+    body:  `${likerName} liked one of your posts.`,
+    href:  `/contractor/${contractorId}`,
+    actorId: likerId,
+    actorName: likerName,
+  }).catch(() => undefined);
 }
 
 export function notifyPayoutFailed(
