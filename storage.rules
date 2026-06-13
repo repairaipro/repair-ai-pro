@@ -43,6 +43,30 @@ service firebase.storage {
         && request.resource.contentType.matches('image/.*');
     }
 
+    /* ================= JOB WORK PHOTOS ================= */
+    // Path: jobs/{jobId}/work-photos/{filename}
+    // Contractors document work progress; homeowners upload dispute evidence.
+    // Access control happens at the API level (workPhotos Firestore docs).
+
+    match /jobs/{jobId}/work-photos/{filename} {
+      allow read: if signedIn();
+      allow write: if signedIn()
+        && underSizeLimit()
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    /* ================= WORK SHOWCASE POSTS ================= */
+    // Path: posts/{contractorId}/{filename}
+    // Public-facing feed content — only the contractor writes to their folder.
+
+    match /posts/{contractorId}/{filename} {
+      allow read: if true;
+      allow write: if signedIn()
+        && request.auth.uid == contractorId
+        && underSizeLimit()
+        && request.resource.contentType.matches('image/.*');
+    }
+
     /* ================= DEFAULT DENY ================= */
 
     match /{allPaths=**} {

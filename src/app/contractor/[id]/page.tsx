@@ -10,6 +10,7 @@ import {
   Star, MapPin, Briefcase, Clock, CheckCircle2, Award,
   Share2, ChevronLeft, Brain, Loader2, MessageSquare,
   Shield, Zap, ChevronRight, Copy, Check, TrendingUp, Wrench,
+  UserPlus, UserCheck,
 } from "lucide-react";
 import { ProfileGallery } from "@/components/ProfileGallery";
 import { ServiceAreaMap } from "@/components/ServiceAreaMap";
@@ -115,6 +116,10 @@ export default function ContractorProfilePage({ params }: { params: { id?: strin
   const [aiLoading,      setAILoading]      = useState(false);
   const [copied,         setCopied]         = useState(false);
   const [embedCopied,    setEmbedCopied]    = useState(false);
+  const [following,      setFollowing]      = useState(false);
+  const [followerCount,  setFollowerCount]  = useState(0);
+  const [followBusy,     setFollowBusy]     = useState(false);
+  const [posts,          setPosts]          = useState<any[]>([]);
   const [qualityScore,   setQualityScore]   = useState<any>(null);
   const [specs,          setSpecs]          = useState<any[]>([]);
 
@@ -191,6 +196,53 @@ Reviews: ${reviews.slice(0, 5).map((r) => `${r.rating}★ — "${r.text}"`).join
       setAISummary("Analysis unavailable. Please try again.");
     }
     setAILoading(false);
+  }
+
+  /* Recent work posts */
+  useEffect(() => {
+    if (!contractorId) return;
+    fetch(`/api/posts?contractorId=${contractorId}&limit=6`)
+      .then((r) => (r.ok ? r.json() : { posts: [] }))
+      .then((d) => setPosts(d.posts ?? []))
+      .catch(() => {});
+  }, [contractorId]);
+
+  /* Follow state (anonymous gets just the count) */
+  useEffect(() => {
+    if (!contractorId) return;
+    (async () => {
+      try {
+        const headers: Record<string, string> = {};
+        if (user) headers.Authorization = `Bearer ${await user.getIdToken()}`;
+        const res = await fetch(`/api/contractors/${contractorId}/follow`, { headers });
+        if (!res.ok) return;
+        const d = await res.json();
+        setFollowing(d.following ?? false);
+        setFollowerCount(d.followerCount ?? 0);
+      } catch { /* non-blocking */ }
+    })();
+  }, [contractorId, user]);
+
+  async function toggleFollow() {
+    if (!user) { window.location.href = '/auth/signin'; return; }
+    if (followBusy) return;
+    setFollowBusy(true);
+    // Optimistic
+    setFollowing((f) => !f);
+    setFollowerCount((c) => c + (following ? -1 : 1));
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/contractors/${contractorId}/follow`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const d = await res.json();
+      if (res.ok) {
+        setFollowing(d.following);
+        setFollowerCount(d.followerCount);
+      }
+    } catch { /* optimistic state stands */ }
+    finally { setFollowBusy(false); }
   }
 
   function handleShare() {
@@ -344,6 +396,20 @@ Reviews: ${reviews.slice(0, 5).map((r) => `${r.rating}★ — "${r.text}"`).join
                     />
                   )}
                   <TrustBadge score={profile.trustScore ?? 0} plan={profile.subscriptionPlan} />
+                  {user?.uid !== contractorId && (
+                    <button
+                      onClick={toggleFollow}
+                      disabled={followBusy}
+                      className="h-8 px-3 rounded-xl flex items-center gap-1.5 text-xs font-semibold transition-all"
+                      style={following
+                        ? { background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.35)', color: '#818cf8' }
+                        : { background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', border: '1px solid transparent', color: '#fff' }}
+                    >
+                      {following ? <UserCheck size={13} /> : <UserPlus size={13} />}
+                      {following ? 'Following' : 'Follow'}
+                      {followerCount > 0 && <span style={{ opacity: 0.75 }}>· {followerCount}</span>}
+                    </button>
+                  )}
                   <button
                     onClick={handleShare}
                     className="w-8 h-8 rounded-xl flex items-center justify-center transition-all"
@@ -472,6 +538,59 @@ Reviews: ${reviews.slice(0, 5).map((r) => `${r.rating}★ — "${r.text}"`).join
               {profile.bio}
             </p>
           </div>
+        )}
+
+        {/* ── Recent Work Posts ── */}
+        {posts.length > 0 && (
+          <div
+            className="rounded-2xl p-5"
+            style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-4)' }}>
+                Recent Work
+              </h2>
+              <Link href="/work" className="text-xs hover:underline" style={{ color: '#818cf8' }}>
+                See feed →
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {posts.slice(0, 6).map((p) => (
+                <div key={p.id} className="relative group rounded-xl overflow-hidden" style={{ border: '1px solid var(--color-border)' }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={p.photos?.[0]} alt={p.caption || 'Work post'} className="w-full h-28 object-cover" loading="lazy" />
+                  {(p.likeCount ?? 0) > 0 && (
+                    <span className="absolute bottom-1.5 right-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5"
+                      style={{ background: 'rgba(0,0,0,0.65)', color: '#f87171' }}>
+                      ♥ {p.likeCount}
+                    </span>
+                  )}
+                  {p.caption && (
+                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-1.5"
+                      style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.75), transparent)' }}>
+                      <p className="text-[10px] text-white leading-snug line-clamp-2">{p.caption}</p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            {user?.uid === contractorId && (
+              <Link href="/work/post" className="btn btn-secondary btn-sm w-full mt-3" style={{ justifyContent: 'center' }}>
+                + Share new work
+              </Link>
+            )}
+          </div>
+        )}
+
+        {/* Owner with no posts yet — nudge to seed their feed */}
+        {posts.length === 0 && user?.uid === contractorId && (
+          <Link
+            href="/work/post"
+            className="block rounded-2xl p-4 text-center text-sm font-medium"
+            style={{ background: 'rgba(99,102,241,0.06)', border: '1px dashed rgba(99,102,241,0.3)', color: '#818cf8' }}
+          >
+            📸 Share photos of your work — posts show here and on the public feed
+          </Link>
         )}
 
         {/* ── Portfolio Gallery ── */}

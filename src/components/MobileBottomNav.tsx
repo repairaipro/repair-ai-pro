@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/auth';
 import { useEffect, useState } from 'react';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/db';
-import { LayoutDashboard, Briefcase, Plus, Inbox, Clock } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Plus, Inbox, Camera } from 'lucide-react';
 
 /**
  * Sticky bottom navigation bar for mobile — only shown on small screens.
@@ -61,10 +61,10 @@ export default function MobileBottomNav() {
       badge:  pendingInvites,
     },
     {
-      href:   '/history',
-      label:  'History',
-      icon:   Clock,
-      active: pathname?.startsWith('/history'),
+      href:   '/work',
+      label:  'Feed',
+      icon:   Camera,
+      active: pathname?.startsWith('/work'),
     },
   ];
 
