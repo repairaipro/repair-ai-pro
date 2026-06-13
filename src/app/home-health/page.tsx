@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth";
 import {
   Brain, BarChart2, DollarSign, TrendingUp, RefreshCw,
-  Home, Plus, AlertTriangle, Loader2,
+  Home, Plus, AlertTriangle, Loader2, CalendarClock, ArrowRight,
 } from "lucide-react";
 
 /* ── Types ── */
@@ -18,6 +18,24 @@ type HomeHealthData = {
   completedJobs: number;
   tradeBreakdown: Record<string, number>;
   insights: string[];
+};
+
+type Suggestion = {
+  id: string;
+  title: string;
+  why: string;
+  trade: string;
+  emoji: string;
+  priority: "high" | "medium" | "low";
+  prefill: string;
+  seasonal: boolean;
+};
+
+type SuggestionsData = {
+  season: string;
+  month: string;
+  suggestions: Suggestion[];
+  isNewHomeowner: boolean;
 };
 
 /* ── Score helpers ── */
@@ -376,10 +394,101 @@ function SpendingSection({
   );
 }
 
+/* ── Seasonal Maintenance (the proactive retention engine) ── */
+const PRIORITY_STYLE: Record<string, { color: string; label: string }> = {
+  high:   { color: "#f87171", label: "Recommended now" },
+  medium: { color: "#fbbf24", label: "Worth scheduling" },
+  low:    { color: "#60a5fa", label: "When convenient" },
+};
+
+function SeasonalMaintenance({
+  data,
+  loading,
+}: {
+  data: SuggestionsData | null;
+  loading: boolean;
+}) {
+  if (loading) {
+    return (
+      <section>
+        <div className="flex items-center gap-2 mb-4">
+          <CalendarClock size={16} style={{ color: "var(--color-brand)" }} />
+          <h2 className="text-sm font-bold uppercase tracking-widest" style={{ color: "var(--color-text)" }}>
+            Seasonal Maintenance
+          </h2>
+        </div>
+        <div className="space-y-3">
+          {[72, 90].map((w, i) => <Skeleton key={i} style={{ width: `${w}%`, height: 76 }} />)}
+        </div>
+      </section>
+    );
+  }
+
+  if (!data || data.suggestions.length === 0) return null;
+
+  return (
+    <section>
+      <div className="flex items-center gap-2 mb-1">
+        <CalendarClock size={16} style={{ color: "var(--color-brand)" }} />
+        <h2 className="text-sm font-bold uppercase tracking-widest" style={{ color: "var(--color-text)" }}>
+          Seasonal Maintenance
+        </h2>
+      </div>
+      <p className="text-xs mb-4" style={{ color: "var(--color-text-4)" }}>
+        It&apos;s {data.month} — here&apos;s what keeps your home ahead of the next breakdown.
+      </p>
+
+      <div className="space-y-3">
+        {data.suggestions.map((s) => {
+          const p = PRIORITY_STYLE[s.priority] ?? PRIORITY_STYLE.low;
+          return (
+            <Link
+              key={s.id}
+              href={`/jobs/new?desc=${encodeURIComponent(s.prefill)}`}
+              className="flex items-start gap-3 rounded-2xl p-4 transition-all group"
+              style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)" }}
+            >
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
+                style={{ background: "var(--color-surface-2)" }}
+              >
+                {s.emoji}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-semibold" style={{ color: "var(--color-text)" }}>
+                    {s.title}
+                  </span>
+                  <span
+                    className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                    style={{ background: `${p.color}1a`, color: p.color }}
+                  >
+                    {p.label}
+                  </span>
+                </div>
+                <p className="text-xs mt-1 leading-relaxed" style={{ color: "var(--color-text-4)" }}>
+                  {s.why}
+                </p>
+                <span
+                  className="inline-flex items-center gap-1 text-xs font-medium mt-2 transition-transform group-hover:translate-x-0.5"
+                  style={{ color: "var(--color-brand)" }}
+                >
+                  Get a quote for this <ArrowRight size={12} />
+                </span>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 /* ── Main Page ── */
 export default function HomeHealthPage() {
   const { user } = useAuth();
   const [data,    setData]    = useState<HomeHealthData | null>(null);
+  const [suggestions, setSuggestions] = useState<SuggestionsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState<string | null>(null);
 
@@ -389,13 +498,18 @@ export default function HomeHealthPage() {
     setError(null);
     try {
       const token = await user.getIdToken();
-      const res   = await fetch("/api/homeowner/home-health", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error(`Request failed: ${res.status}`);
-      const json = await res.json();
+      const [healthRes, sugRes] = await Promise.all([
+        fetch("/api/homeowner/home-health", { headers: { Authorization: `Bearer ${token}` } }),
+        fetch("/api/homeowner/maintenance-suggestions", { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
+      if (!healthRes.ok) throw new Error(`Request failed: ${healthRes.status}`);
+      const json = await healthRes.json();
       if (json.error) throw new Error(json.error);
       setData(json);
+      if (sugRes.ok) {
+        const sug = await sugRes.json();
+        if (sug.success) setSuggestions(sug);
+      }
     } catch (err: any) {
       setError(err.message ?? "Failed to load Home Health data");
     } finally {
@@ -523,6 +637,9 @@ export default function HomeHealthPage() {
 
         {/* ── Hero ring ── */}
         <ScoreRing score={score} loading={loading} />
+
+        {/* ── Seasonal maintenance (proactive, tappable) ── */}
+        <SeasonalMaintenance data={suggestions} loading={loading} />
 
         {/* ── Spending cards ── */}
         <SpendingSection data={data} loading={loading} />
