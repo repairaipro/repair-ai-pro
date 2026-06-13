@@ -1,6 +1,20 @@
 import { NextResponse } from "next/server";
 import { adminDb, adminAuth } from "@/lib/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
+import { notifyNewFollower } from "@/lib/notif";
+
+/** Best-effort display name for a uid (user doc → contractor doc → fallback) */
+async function displayName(uid: string, fallbackEmail?: string): Promise<string> {
+  try {
+    const u = await adminDb.collection("users").doc(uid).get();
+    if (u.exists && (u.data()?.displayName || u.data()?.name)) {
+      return u.data()!.displayName ?? u.data()!.name;
+    }
+    const c = await adminDb.collection("contractors").doc(uid).get();
+    if (c.exists && c.data()?.name) return c.data()!.name;
+  } catch { /* ignore */ }
+  return fallbackEmail?.split("@")[0] ?? "Someone";
+}
 
 /**
  * The identity graph of the social layer.
@@ -48,6 +62,13 @@ export async function POST(
       tx.update(contractorRef, { followerCount: current + 1 });
       return { following: true, followerCount: current + 1 };
     });
+
+    // Notify the contractor on a NEW follow only (fire-and-forget)
+    if (result.following) {
+      displayName(uid, decoded.email).then((name) =>
+        notifyNewFollower(contractorId, name, uid)
+      );
+    }
 
     return NextResponse.json({ success: true, ...result });
   } catch (err: any) {

@@ -41,12 +41,37 @@ export default function WorkFeedPage() {
   const [loading, setLoading] = useState(true);
   const [tradeFilter, setTradeFilter] = useState<string>('all');
   const [likeBusy, setLikeBusy] = useState<string | null>(null);
+  const [view, setView] = useState<'discover' | 'following'>('discover');
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const headers: Record<string, string> = {};
       if (user) headers.Authorization = `Bearer ${await user.getIdToken()}`;
+
+      // Following view: posts from followed pros only (no verified-job feed mix)
+      if (view === 'following') {
+        if (!user) { setItems([]); setLoading(false); return; }
+        const res = await fetch('/api/posts?following=true', { headers });
+        const data = await res.json();
+        const postItems: FeedItem[] = (data.posts ?? []).map((p: any) => ({
+          key: `post_${p.id}`,
+          kind: 'post' as const,
+          id: p.id,
+          trade: p.trade,
+          city: p.contractor?.city ?? null,
+          caption: p.caption ?? '',
+          photos: (p.photos ?? []).map((url: string) => ({ url })),
+          beforeAfter: p.beforeAfter ?? false,
+          likeCount: p.likeCount ?? 0,
+          likedByMe: p.likedByMe ?? false,
+          contractor: p.contractor,
+          at: p.createdAt,
+        }));
+        setItems(postItems);
+        setLoading(false);
+        return;
+      }
 
       const [jobsRes, postsRes] = await Promise.all([
         fetch('/api/public/work-feed').then((r) => (r.ok ? r.json() : { items: [] })),
@@ -89,7 +114,7 @@ export default function WorkFeedPage() {
       setItems(merged);
     } catch { /* keep whatever rendered */ }
     finally { setLoading(false); }
-  }, [user]);
+  }, [user, view]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -146,8 +171,26 @@ export default function WorkFeedPage() {
           </Link>
         </div>
 
+        {/* Discover / Following toggle */}
+        <div className="flex justify-center">
+          <div className="flex rounded-xl overflow-hidden" style={{ border: '1px solid var(--color-border)' }}>
+            {(['discover', 'following'] as const).map((v) => (
+              <button
+                key={v}
+                onClick={() => { setView(v); setTradeFilter('all'); }}
+                className="px-5 py-2 text-sm font-medium capitalize transition-all"
+                style={view === v
+                  ? { background: 'var(--color-brand)', color: '#fff' }
+                  : { background: 'var(--color-surface)', color: 'var(--color-text-3)' }}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Trade filter pills */}
-        {trades.length > 1 && (
+        {view === 'discover' && trades.length > 1 && (
           <div className="flex gap-2 flex-wrap justify-center">
             {['all', ...trades].map((t) => (
               <button
@@ -173,8 +216,33 @@ export default function WorkFeedPage() {
           </div>
         )}
 
-        {/* Empty */}
-        {!loading && filtered.length === 0 && (
+        {/* Empty — following view */}
+        {!loading && view === 'following' && filtered.length === 0 && (
+          <div className="flex flex-col items-center gap-4 py-20 text-center">
+            <div
+              className="w-16 h-16 rounded-2xl flex items-center justify-center"
+              style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+            >
+              <Heart className="w-8 h-8" style={{ color: 'var(--color-text-4)' }} />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold" style={{ color: 'var(--color-text)' }}>
+                {user ? 'Follow pros to fill this feed' : 'Sign in to follow pros'}
+              </h3>
+              <p className="text-sm mt-1 max-w-xs" style={{ color: 'var(--color-text-4)' }}>
+                {user
+                  ? 'Tap Follow on any contractor’s profile and their new work shows up here.'
+                  : 'Sign in, then follow contractors whose work you love.'}
+              </p>
+            </div>
+            <button onClick={() => setView('discover')} className="btn btn-primary btn-sm">
+              Discover pros
+            </button>
+          </div>
+        )}
+
+        {/* Empty — discover view */}
+        {!loading && view === 'discover' && filtered.length === 0 && (
           <div className="flex flex-col items-center gap-4 py-20 text-center">
             <div
               className="w-16 h-16 rounded-2xl flex items-center justify-center"
