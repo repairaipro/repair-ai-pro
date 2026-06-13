@@ -289,11 +289,13 @@ export async function getPricingTrends(
   lastUpdated: Date;
 }> {
   try {
-    const snapshots = await adminDb
+    // Empty zipCode = trade-wide trends (used by SEO landing pages)
+    let trendQuery: FirebaseFirestore.Query = adminDb
       .collection('pricingHistory')
-      .where('trade', '==', trade.toLowerCase())
-      .where('zipCode', '==', zipCode)
-      .get();
+      .where('trade', '==', trade.toLowerCase());
+    if (zipCode) trendQuery = trendQuery.where('zipCode', '==', zipCode);
+
+    const snapshots = await trendQuery.limit(500).get();
     const prices = snapshots.docs.map(doc => (doc.data() as PricingData).finalPrice);
 
     const stats = calculatePriceStats(prices);
