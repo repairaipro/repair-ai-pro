@@ -4,12 +4,13 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { LayoutDashboard, Briefcase, AlertTriangle, Users, HardHat, ChevronRight } from "lucide-react";
+import { LayoutDashboard, Briefcase, AlertTriangle, Users, HardHat, ChevronRight, TrendingUp } from "lucide-react";
 
 const ADMIN_UIDS = (process.env.NEXT_PUBLIC_ADMIN_UIDS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 
 const NAV = [
   { href: "/admin",             label: "Overview",    icon: LayoutDashboard },
+  { href: "/admin/funnel",      label: "Funnel",      icon: TrendingUp },
   { href: "/admin/jobs",        label: "Jobs",        icon: Briefcase },
   { href: "/admin/disputes",    label: "Disputes",    icon: AlertTriangle },
   { href: "/admin/contractors", label: "Contractors", icon: HardHat },
