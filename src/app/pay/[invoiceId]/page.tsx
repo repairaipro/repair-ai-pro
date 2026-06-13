@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import FinancingOption from '@/components/FinancingOption';
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '');
 
@@ -328,6 +329,13 @@ export default function PayInvoicePage() {
             </div>
           )}
         </motion.div>
+
+        {/* Financing — only on unpaid, big-ticket invoices */}
+        {!isPaid && !isCancelled && (
+          <div style={{ marginBottom: 24 }}>
+            <FinancingOption total={invoice.total} variant="card" />
+          </div>
+        )}
 
         {/* Payment Section */}
         {isPaid ? (
