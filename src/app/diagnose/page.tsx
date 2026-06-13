@@ -8,6 +8,7 @@ import {
   Brain, Camera, X, Loader2, AlertTriangle, CheckCircle,
   ArrowRight, Share2, Check, DollarSign, Wrench, Sparkles,
 } from 'lucide-react';
+import FinancingOption from '@/components/FinancingOption';
 
 type Diagnosis = {
   trade: string;
@@ -284,6 +285,9 @@ Respond with ONLY a JSON object:
                             {estimate.why_this_range}
                           </p>
                         )}
+                        <div className="mt-2">
+                          <FinancingOption total={estimate.price_typical_usd} variant="inline" />
+                        </div>
                       </>
                     )}
                   </div>
