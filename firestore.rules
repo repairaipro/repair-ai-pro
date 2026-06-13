@@ -652,6 +652,23 @@ service cloud.firestore {
       }
     }
 
+    /* ================= NOTIFICATIONS (in-app bell) ================= */
+    // Path: notifications/{userId}/items/{itemId}
+    // Written by server (admin SDK via createNotification). Each user reads
+    // and marks-read only their own notifications.
+    match /notifications/{userId}/items/{itemId} {
+      allow read: if signedIn() && uid() == userId;
+
+      // Client may only flip the `read` flag (mark-as-read) — nothing else.
+      allow update: if signedIn()
+        && uid() == userId
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly(["read"]);
+
+      // Created server-side only; users may delete their own notifications.
+      allow create: if false;
+      allow delete: if signedIn() && uid() == userId;
+    }
+
     /* ================= DEFAULT DENY ================= */
 
     match /{document=**} {
