@@ -36,6 +36,7 @@ const TYPE_ICON: Record<string, string> = {
   job_cancelled:      "❌",
   new_follower:       "👤",
   post_liked:         "❤️",
+  post_commented:     "💬",
 };
 
 function timeAgo(ts: Notif["createdAt"]): string {

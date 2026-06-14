@@ -9,6 +9,7 @@ import {
   ArrowRight, Share2, Check, DollarSign, Wrench, Sparkles,
 } from 'lucide-react';
 import FinancingOption from '@/components/FinancingOption';
+import TrustBar from '@/components/TrustBar';
 
 type Diagnosis = {
   trade: string;
@@ -303,9 +304,9 @@ Respond with ONLY a JSON object:
                   <CheckCircle className="w-4 h-4" /> Get matched with a verified pro
                   <ArrowRight className="w-4 h-4" />
                 </Link>
-                <p className="text-[11px] text-center mt-2" style={{ color: 'var(--color-text-4)' }}>
-                  Free to post · pros respond fast · pay only when the job is done
-                </p>
+                <div className="mt-3">
+                  <TrustBar compact />
+                </div>
               </div>
             </motion.div>
           )}
