@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Zap, Brain, Star, MessageSquare, MapPin, Shield, ArrowRight, CheckCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
+import TrustBar from '@/components/TrustBar';
 
 const STEPS = [
   {
@@ -227,6 +228,11 @@ export default function LandingPage() {
                 <div className="text-xs" style={{ color: 'var(--color-text-4)' }}>{label}</div>
               </div>
             ))}
+          </div>
+
+          {/* Trust band */}
+          <div className="max-w-3xl mx-auto mt-10">
+            <TrustBar />
           </div>
         </div>
       </section>
