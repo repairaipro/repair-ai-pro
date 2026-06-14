@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Zap, Brain, Star, MessageSquare, MapPin, Shield, ArrowRight, CheckCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import TrustBar from '@/components/TrustBar';
+import HeroShowcase from '@/components/HeroShowcase';
 
 const STEPS = [
   {
@@ -202,9 +203,18 @@ export default function LandingPage() {
             </span>
           </div>
 
-          <p className="text-xs" style={{ color: 'var(--color-text-4)' }}>
+          <p className="text-xs mb-12" style={{ color: 'var(--color-text-4)' }}>
             No credit card required &nbsp;·&nbsp; Free to post &nbsp;·&nbsp; Service pros join free
           </p>
+
+          {/* Product-story showcase */}
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.4 }}
+          >
+            <HeroShowcase />
+          </motion.div>
         </div>
       </section>
 

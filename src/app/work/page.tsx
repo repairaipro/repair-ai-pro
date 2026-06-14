@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/lib/auth';
 import {
-  Hammer, MapPin, Loader2, Sparkles, ArrowRight, Camera, Heart, BadgeCheck, MessageCircle,
+  MapPin, Loader2, Sparkles, ArrowRight, Camera, Heart, BadgeCheck, MessageCircle,
 } from 'lucide-react';
+import EmptyArt from '@/components/EmptyArt';
 
 type Contractor = { id: string; name: string; photoUrl: string | null; city?: string | null };
 
@@ -248,12 +249,7 @@ export default function WorkFeedPage() {
         {/* Empty — discover view */}
         {!loading && view === 'discover' && filtered.length === 0 && (
           <div className="flex flex-col items-center gap-4 py-20 text-center">
-            <div
-              className="w-16 h-16 rounded-2xl flex items-center justify-center"
-              style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
-            >
-              <Hammer className="w-8 h-8" style={{ color: 'var(--color-text-4)' }} />
-            </div>
+            <EmptyArt variant="feed" />
             <div>
               <h3 className="text-lg font-semibold" style={{ color: 'var(--color-text)' }}>
                 Be the first to post
