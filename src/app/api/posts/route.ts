@@ -167,6 +167,7 @@ async function hydratePosts(
         photos: p.photos,
         beforeAfter: p.beforeAfter ?? false,
         likeCount: p.likeCount ?? 0,
+        commentCount: p.commentCount ?? 0,
         likedByMe: likedSet.has(d.id),
         createdAt: p.createdAt?.toDate?.()?.toISOString() ?? null,
         contractor: { id: cid, ...cCache.get(cid)! },

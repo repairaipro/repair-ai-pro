@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/lib/auth';
 import {
-  Hammer, MapPin, Loader2, Sparkles, ArrowRight, Camera, Heart, BadgeCheck,
+  Hammer, MapPin, Loader2, Sparkles, ArrowRight, Camera, Heart, BadgeCheck, MessageCircle,
 } from 'lucide-react';
 
 type Contractor = { id: string; name: string; photoUrl: string | null; city?: string | null };
@@ -20,6 +20,7 @@ type FeedItem = {
   photos: { url: string; caption?: string }[];
   beforeAfter: boolean;
   likeCount: number;
+  commentCount: number;
   likedByMe: boolean;
   contractor: Contractor | null;
   at: string | null;
@@ -64,6 +65,7 @@ export default function WorkFeedPage() {
           photos: (p.photos ?? []).map((url: string) => ({ url })),
           beforeAfter: p.beforeAfter ?? false,
           likeCount: p.likeCount ?? 0,
+          commentCount: p.commentCount ?? 0,
           likedByMe: p.likedByMe ?? false,
           contractor: p.contractor,
           at: p.createdAt,
@@ -88,6 +90,7 @@ export default function WorkFeedPage() {
         photos: j.photos ?? [],
         beforeAfter: (j.photos?.length ?? 0) > 1,
         likeCount: 0,
+        commentCount: 0,
         likedByMe: false,
         contractor: j.contractor,
         at: j.completedAt,
@@ -103,6 +106,7 @@ export default function WorkFeedPage() {
         photos: (p.photos ?? []).map((url: string) => ({ url })),
         beforeAfter: p.beforeAfter ?? false,
         likeCount: p.likeCount ?? 0,
+        commentCount: p.commentCount ?? 0,
         likedByMe: p.likedByMe ?? false,
         contractor: p.contractor,
         at: p.createdAt,
@@ -275,25 +279,32 @@ export default function WorkFeedPage() {
               transition={{ duration: 0.4, delay: (i % 6) * 0.05 }}
               className="card overflow-hidden flex flex-col"
             >
-              {/* Photos — side-by-side for before/after */}
-              <div className={`relative grid ${item.photos.length > 1 ? 'grid-cols-2 gap-0.5' : 'grid-cols-1'}`}>
-                {item.photos.slice(0, 2).map((p, pi) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    key={pi}
-                    src={p.url}
-                    alt={item.caption || `${item.trade} work`}
-                    className="w-full h-44 object-cover"
-                    loading="lazy"
-                  />
-                ))}
-                {item.beforeAfter && item.photos.length > 1 && (
-                  <>
-                    <span className="absolute top-2 left-2 text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(0,0,0,0.65)', color: '#fff' }}>BEFORE</span>
-                    <span className="absolute top-2 right-2 text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(0,0,0,0.65)', color: '#fff' }}>AFTER</span>
-                  </>
-                )}
-              </div>
+              {/* Photos — side-by-side for before/after. Posts open their permalink. */}
+              {(() => {
+                const PhotoInner = (
+                  <div className={`relative grid ${item.photos.length > 1 ? 'grid-cols-2 gap-0.5' : 'grid-cols-1'}`}>
+                    {item.photos.slice(0, 2).map((p, pi) => (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        key={pi}
+                        src={p.url}
+                        alt={item.caption || `${item.trade} work`}
+                        className="w-full h-44 object-cover"
+                        loading="lazy"
+                      />
+                    ))}
+                    {item.beforeAfter && item.photos.length > 1 && (
+                      <>
+                        <span className="absolute top-2 left-2 text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(0,0,0,0.65)', color: '#fff' }}>BEFORE</span>
+                        <span className="absolute top-2 right-2 text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(0,0,0,0.65)', color: '#fff' }}>AFTER</span>
+                      </>
+                    )}
+                  </div>
+                );
+                return item.kind === 'post'
+                  ? <Link href={`/work/${item.id}`} className="block">{PhotoInner}</Link>
+                  : PhotoInner;
+              })()}
 
               <div className="p-4 flex flex-col gap-2 flex-1">
                 {/* Trade + verified + time */}
@@ -352,15 +363,26 @@ export default function WorkFeedPage() {
                       </span>
                     )}
                     {item.kind === 'post' && (
-                      <button
-                        onClick={() => toggleLike(item)}
-                        className="flex items-center gap-1 text-[11px] font-semibold transition-transform active:scale-110"
-                        style={{ color: item.likedByMe ? '#f87171' : 'var(--color-text-4)' }}
-                        aria-label={item.likedByMe ? 'Unlike' : 'Like'}
-                      >
-                        <Heart className="w-3.5 h-3.5" fill={item.likedByMe ? '#f87171' : 'none'} />
-                        {item.likeCount > 0 && item.likeCount}
-                      </button>
+                      <>
+                        <Link
+                          href={`/work/${item.id}`}
+                          className="flex items-center gap-1 text-[11px] font-semibold"
+                          style={{ color: 'var(--color-text-4)' }}
+                          aria-label="Comments"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5" />
+                          {item.commentCount > 0 && item.commentCount}
+                        </Link>
+                        <button
+                          onClick={() => toggleLike(item)}
+                          className="flex items-center gap-1 text-[11px] font-semibold transition-transform active:scale-110"
+                          style={{ color: item.likedByMe ? '#f87171' : 'var(--color-text-4)' }}
+                          aria-label={item.likedByMe ? 'Unlike' : 'Like'}
+                        >
+                          <Heart className="w-3.5 h-3.5" fill={item.likedByMe ? '#f87171' : 'none'} />
+                          {item.likeCount > 0 && item.likeCount}
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>

@@ -1,0 +1,283 @@
+'use client';
+
+import { useEffect, useState, useCallback } from 'react';
+import { useParams } from 'next/navigation';
+import Link from 'next/link';
+import { motion } from 'framer-motion';
+import { useAuth } from '@/lib/auth';
+import {
+  Heart, MessageCircle, Share2, Check, ArrowLeft, MapPin,
+  BadgeCheck, Loader2, Send, Sparkles,
+} from 'lucide-react';
+
+type Author = { id: string; name: string; photoUrl: string | null; isContractor?: boolean };
+type Comment = { id: string; text: string; createdAt: string | null; author: Author };
+type Post = {
+  id: string;
+  caption: string;
+  trade: string;
+  photos: string[];
+  beforeAfter: boolean;
+  likeCount: number;
+  commentCount: number;
+  likedByMe: boolean;
+  createdAt: string | null;
+  contractor: { id: string; name: string; photoUrl: string | null; city: string | null; trade: string | null };
+};
+
+function timeAgo(iso: string | null): string {
+  if (!iso) return '';
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h`;
+  const d = Math.floor(h / 24);
+  if (d < 30) return `${d}d`;
+  return `${Math.floor(d / 30)}mo`;
+}
+
+export default function PostDetailPage() {
+  const { postId } = useParams<{ postId: string }>();
+  const { user } = useAuth();
+
+  const [post, setPost] = useState<Post | null>(null);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+  const [activePhoto, setActivePhoto] = useState(0);
+  const [likeBusy, setLikeBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [posting, setPosting] = useState(false);
+
+  const load = useCallback(async () => {
+    if (!postId) return;
+    setLoading(true);
+    try {
+      const headers: Record<string, string> = {};
+      if (user) headers.Authorization = `Bearer ${await user.getIdToken()}`;
+      const [pRes, cRes] = await Promise.all([
+        fetch(`/api/posts/${postId}`, { headers }),
+        fetch(`/api/posts/${postId}/comments`),
+      ]);
+      if (pRes.status === 404) { setNotFound(true); return; }
+      const pData = await pRes.json();
+      if (pData.success) setPost(pData.post);
+      const cData = await cRes.json();
+      if (cData.success) setComments(cData.comments);
+    } catch { /* ignore */ }
+    finally { setLoading(false); }
+  }, [postId, user]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function toggleLike() {
+    if (!user) { window.location.href = '/auth/signin'; return; }
+    if (!post || likeBusy) return;
+    setLikeBusy(true);
+    setPost((p) => p && ({ ...p, likedByMe: !p.likedByMe, likeCount: p.likeCount + (p.likedByMe ? -1 : 1) }));
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/posts/${postId}/like`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+      const d = await res.json();
+      if (res.ok) setPost((p) => p && ({ ...p, likedByMe: d.liked, likeCount: d.likeCount }));
+    } catch { /* optimistic stands */ }
+    finally { setLikeBusy(false); }
+  }
+
+  function share() {
+    const url = window.location.href;
+    const title = post ? `${post.contractor.name}'s ${post.trade} work on RepairAI Pro` : 'RepairAI Pro';
+    if (navigator.share) { navigator.share({ title, url }).catch(() => {}); return; }
+    navigator.clipboard.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
+  }
+
+  async function submitComment() {
+    if (!user) { window.location.href = '/auth/signin'; return; }
+    if (!draft.trim() || posting) return;
+    setPosting(true);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/posts/${postId}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ text: draft.trim() }),
+      });
+      if (res.ok) {
+        setDraft('');
+        await load();
+      }
+    } catch { /* ignore */ }
+    finally { setPosting(false); }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex justify-center pt-20" style={{ background: 'var(--color-bg)' }}>
+        <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--color-brand)' }} />
+      </div>
+    );
+  }
+
+  if (notFound || !post) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-4" style={{ background: 'var(--color-bg)' }}>
+        <p className="text-lg font-semibold" style={{ color: 'var(--color-text)' }}>Post not found</p>
+        <Link href="/work" className="btn btn-primary btn-sm">Back to feed</Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen animate-fade-in" style={{ background: 'var(--color-bg)' }}>
+      <div className="max-w-xl mx-auto px-4 py-6 space-y-4">
+
+        <Link href="/work" className="inline-flex items-center gap-1.5 text-sm" style={{ color: 'var(--color-text-4)' }}>
+          <ArrowLeft className="w-4 h-4" /> Work feed
+        </Link>
+
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="card overflow-hidden"
+        >
+          {/* Author header */}
+          <div className="flex items-center gap-3 p-4">
+            <Link href={`/contractor/${post.contractor.id}`}>
+              <div
+                className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center text-sm font-bold"
+                style={{ background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff' }}
+              >
+                {post.contractor.photoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={post.contractor.photoUrl} alt="" className="w-full h-full object-cover" />
+                ) : post.contractor.name[0]?.toUpperCase()}
+              </div>
+            </Link>
+            <div className="flex-1 min-w-0">
+              <Link href={`/contractor/${post.contractor.id}`} className="text-sm font-semibold hover:underline" style={{ color: 'var(--color-text)' }}>
+                {post.contractor.name}
+              </Link>
+              <p className="text-xs flex items-center gap-1.5" style={{ color: 'var(--color-text-4)' }}>
+                <span>{post.trade}</span>
+                {post.contractor.city && <><span>·</span><MapPin className="w-2.5 h-2.5" />{post.contractor.city}</>}
+                <span>·</span><span>{timeAgo(post.createdAt)}</span>
+              </p>
+            </div>
+            <button onClick={share} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'var(--color-surface-2)', color: 'var(--color-text-4)' }}>
+              {copied ? <Check className="w-3.5 h-3.5" style={{ color: '#22c55e' }} /> : <Share2 className="w-3.5 h-3.5" />}
+            </button>
+          </div>
+
+          {/* Photo viewer */}
+          <div className="relative" style={{ background: '#000' }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={post.photos[activePhoto]} alt={post.caption || 'Work'} className="w-full max-h-[70vh] object-contain" />
+            {post.beforeAfter && (
+              <span className="absolute top-3 left-3 text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(0,0,0,0.7)', color: '#fff' }}>
+                {activePhoto === 0 ? 'BEFORE' : activePhoto === 1 ? 'AFTER' : `${activePhoto + 1}`}
+              </span>
+            )}
+            {post.photos.length > 1 && (
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+                {post.photos.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setActivePhoto(i)}
+                    className="w-2 h-2 rounded-full transition-all"
+                    style={{ background: i === activePhoto ? '#fff' : 'rgba(255,255,255,0.4)' }}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center gap-4 px-4 pt-3">
+            <button onClick={toggleLike} className="flex items-center gap-1.5 transition-transform active:scale-110" style={{ color: post.likedByMe ? '#f87171' : 'var(--color-text-3)' }}>
+              <Heart className="w-5 h-5" fill={post.likedByMe ? '#f87171' : 'none'} />
+              <span className="text-sm font-semibold">{post.likeCount}</span>
+            </button>
+            <div className="flex items-center gap-1.5" style={{ color: 'var(--color-text-3)' }}>
+              <MessageCircle className="w-5 h-5" />
+              <span className="text-sm font-semibold">{post.commentCount}</span>
+            </div>
+          </div>
+
+          {/* Caption */}
+          {post.caption && (
+            <p className="px-4 pt-2 pb-4 text-sm leading-relaxed" style={{ color: 'var(--color-text-2)' }}>
+              <Link href={`/contractor/${post.contractor.id}`} className="font-semibold" style={{ color: 'var(--color-text)' }}>{post.contractor.name}</Link>{' '}
+              {post.caption}
+            </p>
+          )}
+        </motion.div>
+
+        {/* Hire CTA */}
+        <Link
+          href={`/jobs/new?contractor=${post.contractor.id}`}
+          className="flex items-center justify-center gap-2 rounded-2xl p-3.5 text-sm font-semibold"
+          style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: '#818cf8' }}
+        >
+          <Sparkles className="w-4 h-4" /> Want work like this? Request a quote from {post.contractor.name.split(' ')[0]}
+        </Link>
+
+        {/* Comments */}
+        <div className="space-y-3">
+          <h2 className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-4)' }}>
+            {post.commentCount > 0 ? `${post.commentCount} comment${post.commentCount === 1 ? '' : 's'}` : 'Comments'}
+          </h2>
+
+          {/* Composer */}
+          <div className="flex items-center gap-2">
+            <input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') submitComment(); }}
+              placeholder={user ? 'Add a comment…' : 'Sign in to comment'}
+              disabled={!user || posting}
+              className="input text-sm flex-1"
+            />
+            <button onClick={submitComment} disabled={!draft.trim() || posting} className="btn btn-primary btn-sm" style={{ opacity: draft.trim() ? 1 : 0.5 }}>
+              {posting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+            </button>
+          </div>
+
+          {/* List */}
+          {comments.length === 0 ? (
+            <p className="text-sm text-center py-6" style={{ color: 'var(--color-text-4)' }}>
+              Be the first to comment.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {comments.map((c) => (
+                <div key={c.id} className="flex items-start gap-2.5">
+                  <Link href={c.author.isContractor ? `/contractor/${c.author.id}` : '#'}>
+                    <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center text-[11px] font-bold flex-shrink-0" style={{ background: 'var(--color-surface-2)', color: 'var(--color-text-3)' }}>
+                      {c.author.photoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={c.author.photoUrl} alt="" className="w-full h-full object-cover" />
+                      ) : c.author.name[0]?.toUpperCase()}
+                    </div>
+                  </Link>
+                  <div className="flex-1 min-w-0">
+                    <div className="rounded-2xl px-3 py-2" style={{ background: 'var(--color-surface)' }}>
+                      <span className="text-xs font-semibold flex items-center gap-1" style={{ color: 'var(--color-text)' }}>
+                        {c.author.name}
+                        {c.author.isContractor && <BadgeCheck className="w-3 h-3" style={{ color: '#22c55e' }} />}
+                      </span>
+                      <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-2)' }}>{c.text}</p>
+                    </div>
+                    <span className="text-[10px] ml-3" style={{ color: 'var(--color-text-4)' }}>{timeAgo(c.createdAt)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

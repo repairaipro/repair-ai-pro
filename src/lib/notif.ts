@@ -26,7 +26,8 @@ export type NotifType =
   | "video_consultation_requested"
   | "video_consultation_approved"
   | "new_follower"
-  | "post_liked";
+  | "post_liked"
+  | "post_commented";
 
 export type NotifPayload = {
   recipientId: string;
@@ -257,10 +258,35 @@ export function notifyPostLiked(
     type: "post_liked",
     title: "Someone liked your work",
     body:  `${likerName} liked one of your posts.`,
-    href:  `/contractor/${contractorId}`,
+    href:  `/work/${postId}`,
     actorId: likerId,
     actorName: likerName,
   }).catch(() => undefined);
+}
+
+export function notifyPostCommented(
+  contractorId: string,
+  commenterName: string,
+  commenterId: string,
+  postId: string,
+  preview: string
+) {
+  const title = "New comment on your work";
+  const body  = `${commenterName}: "${preview}"`;
+  const href  = `/work/${postId}`;
+  // Comments are meaningful engagement → in-app + light push.
+  return Promise.all([
+    createNotification({
+      recipientId: contractorId,
+      type: "post_commented",
+      title,
+      body,
+      href,
+      actorId: commenterId,
+      actorName: commenterName,
+    }),
+    sendPush(contractorId, { title, body, href, type: "post_commented" }),
+  ]).then(() => undefined).catch(() => undefined);
 }
 
 export function notifyPayoutFailed(
