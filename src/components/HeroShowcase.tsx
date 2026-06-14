@@ -1,81 +1,151 @@
 'use client';
 
+import { motion } from 'framer-motion';
+import { Sparkles, MapPin, Star, ShieldCheck } from 'lucide-react';
+
 /**
- * Hero showcase illustration: the product story in one graphic —
- * a problem photo → AI diagnosis → matched verified pro. Pure inline SVG,
- * brand gradient, subtle motion. No image assets, scales crisply anywhere.
+ * Premium hero showcase — a single device mockup showing the real product
+ * (an AI diagnosis result), floating on a soft glow. One cohesive focal
+ * object instead of a wireframe diagram.
  */
 export default function HeroShowcase() {
   return (
-    <div className="w-full max-w-3xl mx-auto" aria-hidden>
-      <svg viewBox="0 0 720 260" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-auto">
-        <defs>
-          <linearGradient id="hsBrand" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#6366f1" />
-            <stop offset="100%" stopColor="#8b5cf6" />
-          </linearGradient>
-          <linearGradient id="hsGreen" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#22c55e" />
-            <stop offset="100%" stopColor="#34d399" />
-          </linearGradient>
-          <filter id="hsGlow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="4" result="b" />
-            <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
-          </filter>
-        </defs>
+    <div className="relative w-full max-w-sm mx-auto" aria-hidden>
+      {/* Ambient glow */}
+      <div
+        className="absolute inset-0 -z-10 blur-3xl opacity-50"
+        style={{ background: 'radial-gradient(circle at 50% 40%, rgba(99,102,241,0.45), transparent 70%)' }}
+      />
 
-        {/* Connector line with travelling dot */}
-        <line x1="190" y1="130" x2="300" y2="130" stroke="var(--color-border)" strokeWidth="2" strokeDasharray="4 5" />
-        <line x1="420" y1="130" x2="530" y2="130" stroke="var(--color-border)" strokeWidth="2" strokeDasharray="4 5" />
-        <circle r="4" fill="url(#hsBrand)">
-          <animateMotion dur="2.4s" repeatCount="indefinite" path="M190,130 L300,130" />
-        </circle>
-        <circle r="4" fill="url(#hsGreen)">
-          <animateMotion dur="2.4s" begin="1.2s" repeatCount="indefinite" path="M420,130 L530,130" />
-        </circle>
+      {/* Floating accent chips */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.6, duration: 0.6 }}
+        className="absolute -left-6 top-20 z-20 hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-2xl"
+        style={{ background: 'rgba(20,16,31,0.9)', border: '1px solid rgba(99,102,241,0.3)', backdropFilter: 'blur(8px)', boxShadow: '0 12px 40px rgba(0,0,0,0.4)' }}
+      >
+        <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg,#22c55e,#34d399)' }}>
+          <ShieldCheck className="w-4 h-4 text-white" />
+        </div>
+        <div>
+          <div className="text-[10px] font-bold" style={{ color: '#fff' }}>Payment protected</div>
+          <div className="text-[9px]" style={{ color: '#9ca3af' }}>Held in escrow</div>
+        </div>
+      </motion.div>
 
-        {/* ── Node 1: problem photo ── */}
-        <g>
-          <rect x="40" y="62" width="150" height="136" rx="16" fill="var(--color-surface)" stroke="var(--color-border)" />
-          <rect x="56" y="78" width="118" height="74" rx="9" fill="rgba(99,102,241,0.10)" />
-          {/* a "leak/pipe" motif */}
-          <path d="M82 96 h40 a8 8 0 0 1 8 8 v22" stroke="url(#hsBrand)" strokeWidth="5" strokeLinecap="round" fill="none" />
-          <circle cx="130" cy="138" r="3.5" fill="#60a5fa" />
-          <circle cx="118" cy="146" r="2.5" fill="#60a5fa" opacity="0.7" />
-          <rect x="56" y="162" width="80" height="8" rx="4" fill="var(--color-surface-2)" />
-          <rect x="56" y="176" width="54" height="8" rx="4" fill="var(--color-surface-2)" />
-          <text x="115" y="216" textAnchor="middle" fontSize="13" fontWeight="700" fill="var(--color-text-4)" fontFamily="sans-serif">Snap a photo</text>
-        </g>
+      <motion.div
+        initial={{ opacity: 0, y: -12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.8, duration: 0.6 }}
+        className="absolute -right-4 bottom-28 z-20 hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-2xl"
+        style={{ background: 'rgba(20,16,31,0.9)', border: '1px solid rgba(251,191,36,0.3)', backdropFilter: 'blur(8px)', boxShadow: '0 12px 40px rgba(0,0,0,0.4)' }}
+      >
+        <Star className="w-4 h-4" style={{ color: '#fbbf24', fill: '#fbbf24' }} />
+        <span className="text-[11px] font-bold" style={{ color: '#fff' }}>4.9</span>
+        <span className="text-[10px]" style={{ color: '#9ca3af' }}>· 2,400 reviews</span>
+      </motion.div>
 
-        {/* ── Node 2: AI diagnosis orb ── */}
-        <g transform="translate(360,130)">
-          <circle r="52" fill="none" stroke="url(#hsBrand)" strokeWidth="1.5" opacity="0.25">
-            <animate attributeName="r" values="44;58;44" dur="3s" repeatCount="indefinite" />
-            <animate attributeName="opacity" values="0.35;0;0.35" dur="3s" repeatCount="indefinite" />
-          </circle>
-          <circle r="40" fill="url(#hsBrand)" opacity="0.12" />
-          <circle r="40" fill="none" stroke="url(#hsBrand)" strokeWidth="2" />
-          <text x="0" y="9" textAnchor="middle" fontSize="30" filter="url(#hsGlow)">⚡</text>
-          <text x="0" y="74" textAnchor="middle" fontSize="13" fontWeight="700" fill="var(--color-text-4)" fontFamily="sans-serif">AI diagnoses it</text>
-        </g>
+      {/* Device frame */}
+      <motion.div
+        initial={{ opacity: 0, y: 30, rotateX: 8 }}
+        animate={{ opacity: 1, y: 0, rotateX: 0 }}
+        transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+        className="relative rounded-[2.2rem] p-2.5"
+        style={{
+          background: 'linear-gradient(160deg, #1c1830, #0d0b16)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          boxShadow: '0 40px 90px -20px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.06)',
+        }}
+      >
+        {/* Screen */}
+        <div className="rounded-[1.7rem] overflow-hidden" style={{ background: '#0a0b11', border: '1px solid rgba(255,255,255,0.05)' }}>
+          {/* Notch */}
+          <div className="flex justify-center pt-2.5 pb-1">
+            <div className="w-20 h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.12)' }} />
+          </div>
 
-        {/* ── Node 3: matched pro ── */}
-        <g>
-          <rect x="530" y="62" width="150" height="136" rx="16" fill="var(--color-surface)" stroke="var(--color-border)" />
-          <circle cx="566" cy="100" r="20" fill="url(#hsGreen)" opacity="0.9" />
-          <text x="566" y="106" textAnchor="middle" fontSize="18" fontWeight="800" fill="#fff" fontFamily="sans-serif">P</text>
-          {/* verified check */}
-          <circle cx="582" cy="114" r="9" fill="var(--color-surface)" />
-          <path d="M577 114 l3.5 3.5 l6 -7" stroke="url(#hsGreen)" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-          <rect x="596" y="90" width="70" height="8" rx="4" fill="var(--color-surface-2)" />
-          <rect x="596" y="104" width="48" height="8" rx="4" fill="var(--color-surface-2)" />
-          {/* stars */}
-          <text x="546" y="150" fontSize="13" fill="#fbbf24" fontFamily="sans-serif">★★★★★</text>
-          <rect x="546" y="162" width="118" height="22" rx="11" fill="url(#hsBrand)" opacity="0.15" />
-          <text x="605" y="177" textAnchor="middle" fontSize="11" fontWeight="700" fill="#a5b4fc" fontFamily="sans-serif">Matched &amp; on the way</text>
-          <text x="605" y="216" textAnchor="middle" fontSize="13" fontWeight="700" fill="var(--color-text-4)" fontFamily="sans-serif">Verified pro arrives</text>
-        </g>
-      </svg>
+          <div className="px-4 pb-5 pt-2 space-y-3.5">
+            {/* App bar */}
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center text-sm" style={{ background: 'linear-gradient(135deg,#6366f1,#8b5cf6)' }}>⚡</div>
+              <span className="text-sm font-bold" style={{ color: '#fff' }}>RepairAI</span>
+              <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full font-semibold" style={{ background: 'rgba(99,102,241,0.18)', color: '#a5b4fc' }}>Diagnosing…</span>
+            </div>
+
+            {/* Problem photo with scan sweep */}
+            <div className="relative h-28 rounded-2xl overflow-hidden" style={{ background: 'linear-gradient(135deg, #1e293b, #0f172a)' }}>
+              {/* pipe/leak motif */}
+              <svg viewBox="0 0 200 110" className="w-full h-full" preserveAspectRatio="xMidYMid slice">
+                <path d="M40 30 h70 a14 14 0 0 1 14 14 v40" stroke="#475569" strokeWidth="9" fill="none" strokeLinecap="round" />
+                <path d="M40 30 h70 a14 14 0 0 1 14 14 v40" stroke="#64748b" strokeWidth="3" fill="none" strokeLinecap="round" />
+                <circle cx="124" cy="92" r="3" fill="#60a5fa" />
+                <circle cx="118" cy="100" r="2" fill="#60a5fa" opacity="0.7" />
+              </svg>
+              {/* scan line */}
+              <motion.div
+                className="absolute inset-x-0 h-12"
+                style={{ background: 'linear-gradient(180deg, transparent, rgba(99,102,241,0.35), transparent)' }}
+                initial={{ top: '-30%' }}
+                animate={{ top: '110%' }}
+                transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
+              />
+              <div className="absolute bottom-2 left-2 text-[10px] px-2 py-0.5 rounded-md font-medium" style={{ background: 'rgba(0,0,0,0.55)', color: '#cbd5e1' }}>Your photo</div>
+            </div>
+
+            {/* Diagnosis result card */}
+            <div className="rounded-2xl p-3.5 space-y-2.5" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div className="flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5" style={{ color: '#818cf8' }} />
+                <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: '#818cf8' }}>AI Diagnosis</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(99,102,241,0.18)', color: '#a5b4fc' }}>Plumbing</span>
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(251,146,60,0.16)', color: '#fb923c' }}>Moderate</span>
+              </div>
+              <p className="text-[11px] leading-snug" style={{ color: '#cbd5e1' }}>
+                Likely a worn supply-line seal under the sink — common and quick to fix.
+              </p>
+              <div className="flex items-end justify-between pt-1">
+                <div>
+                  <div className="text-[9px]" style={{ color: '#64748b' }}>Fair price in your area</div>
+                  <div className="text-lg font-extrabold" style={{ color: '#34d399' }}>$140–$190</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-[9px]" style={{ color: '#64748b' }}>or from</div>
+                  <div className="text-xs font-bold" style={{ color: '#fff' }}>$13/mo</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Matched pro row */}
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1, duration: 0.5 }}
+              className="flex items-center gap-2.5 rounded-2xl p-2.5"
+              style={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.10), rgba(16,185,129,0.05))', border: '1px solid rgba(34,197,94,0.2)' }}
+            >
+              <div className="relative">
+                <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold" style={{ background: 'linear-gradient(135deg,#22c55e,#34d399)', color: '#fff' }}>M</div>
+                <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full flex items-center justify-center" style={{ background: '#0a0b11' }}>
+                  <ShieldCheck className="w-3 h-3" style={{ color: '#34d399' }} />
+                </div>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1">
+                  <span className="text-xs font-bold" style={{ color: '#fff' }}>Mike R.</span>
+                  <span className="text-[9px] flex items-center gap-0.5" style={{ color: '#fbbf24' }}><Star className="w-2.5 h-2.5" style={{ fill: '#fbbf24' }} /> 5.0</span>
+                </div>
+                <div className="flex items-center gap-1 text-[10px]" style={{ color: '#94a3b8' }}>
+                  <MapPin className="w-2.5 h-2.5" /> 1.2 mi · arrives ~30 min
+                </div>
+              </div>
+              <span className="text-[10px] font-bold px-2.5 py-1.5 rounded-xl" style={{ background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff' }}>Matched</span>
+            </motion.div>
+          </div>
+        </div>
+      </motion.div>
     </div>
   );
 }
