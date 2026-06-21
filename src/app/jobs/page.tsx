@@ -6,10 +6,35 @@ import { collection, query, onSnapshot, orderBy, limit } from "firebase/firestor
 import { useAuth } from "@/lib/auth";
 import Link from "next/link";
 import { TRADES } from "@/lib/constants";
-import { Search, Plus, MapPin, Briefcase, X, SlidersHorizontal } from "lucide-react";
+import { Search, Plus, MapPin, Briefcase, X, SlidersHorizontal, Clock, Zap, TrendingUp, ArrowUpRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { GridSkeletonLoader } from "@/components/AnimatedSkeleton";
 import { ScrollReveal } from "@/components/ScrollReveal";
+
+const TRADE_EMOJI: Record<string, string> = {
+  plumbing: '🔧', electrical: '⚡', hvac: '❄️', carpentry: '🪚', roofing: '🏠',
+  landscaping: '🌿', painting: '🎨', appliance: '🔌', 'appliance repair': '🔌',
+  handyman: '🔨', general: '🔨', 'auto mechanic': '🚗', flooring: '🪵',
+  cleaning: '🧽', masonry: '🧱', 'pest control': '🐛', 'pool & spa': '🏊',
+};
+
+function tradeEmoji(trade?: string): string {
+  return TRADE_EMOJI[(trade ?? '').toLowerCase()] ?? '🛠️';
+}
+
+function timeAgo(ts: any): string {
+  try {
+    const d = ts?.toDate ? ts.toDate() : ts ? new Date(ts) : null;
+    if (!d) return '';
+    const mins = Math.floor((Date.now() - d.getTime()) / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const h = Math.floor(mins / 60);
+    if (h < 24) return `${h}h ago`;
+    const days = Math.floor(h / 24);
+    return days < 30 ? `${days}d ago` : `${Math.floor(days / 30)}mo ago`;
+  } catch { return ''; }
+}
 
 const STATUSES = ["open","triaged","matched","accepted","in_progress","completed","confirmed","disputed","cancelled","closed"];
 
@@ -35,6 +60,11 @@ type Job = {
   status: string;
   images?: string[];
   createdAt?: unknown;
+  urgency?: string;
+  isEmergency?: boolean;
+  bidCount?: number;
+  estimatedCost?: { low?: number; high?: number; typical?: number };
+  aiDetectedTrade?: string;
 };
 
 function getCity(location: Job["location"], privacyMode?: string): string {
@@ -273,47 +303,103 @@ export default function JobMarketplacePage() {
                 >
                   <Link
                     href={`/jobs/${job.id}`}
-                    className="card p-4 flex flex-col gap-3 transition-all duration-200 group"
+                    className="job-card group relative flex flex-col rounded-2xl overflow-hidden h-full"
+                    style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', transition: 'transform .2s ease, border-color .2s ease, box-shadow .2s ease' }}
                     onMouseEnter={e => {
-                      (e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.3)';
-                      (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)';
+                      const el = e.currentTarget as HTMLElement;
+                      el.style.borderColor = 'rgba(99,102,241,0.45)';
+                      el.style.transform = 'translateY(-3px)';
+                      el.style.boxShadow = '0 18px 40px -16px rgba(99,102,241,0.35)';
                     }}
                     onMouseLeave={e => {
-                      (e.currentTarget as HTMLElement).style.borderColor = 'var(--color-border)';
-                      (e.currentTarget as HTMLElement).style.transform = 'translateY(0)';
+                      const el = e.currentTarget as HTMLElement;
+                      el.style.borderColor = 'var(--color-border)';
+                      el.style.transform = 'translateY(0)';
+                      el.style.boxShadow = 'none';
                     }}
                   >
-                  {Array.isArray(job.images) && job.images[0] && (
-                    <img
-                      src={job.images[0]}
-                      alt="Job preview"
-                      className="w-full h-36 object-cover rounded-xl"
-                      style={{ border: '1px solid var(--color-border)' }}
-                    />
-                  )}
+                    {/* Media / gradient header */}
+                    <div className="relative h-40 overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.18), rgba(139,92,246,0.10))' }}>
+                      {Array.isArray(job.images) && job.images[0] ? (
+                        <>
+                          <img
+                            src={job.images[0]}
+                            alt="Job preview"
+                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          />
+                          <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(10,11,17,0.85), transparent 60%)' }} />
+                        </>
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <span style={{ fontSize: 56, opacity: 0.9, filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.3))' }}>{tradeEmoji(job.trade ?? job.aiDetectedTrade)}</span>
+                        </div>
+                      )}
 
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="font-semibold text-sm" style={{ color: 'var(--color-text)' }}>
-                      {job.trade ?? "General"} Repair
-                    </h3>
-                    <span
-                      className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
-                      style={{ background: s.bg, border: `1px solid ${s.border}`, color: s.color }}
-                    >
-                      {s.label}
-                    </span>
-                  </div>
+                      {/* Status pill (top-left) */}
+                      <span
+                        className="absolute top-3 left-3 inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full backdrop-blur"
+                        style={{ background: 'rgba(10,11,17,0.55)', border: `1px solid ${s.border}`, color: s.color }}
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: s.color }} />
+                        {s.label}
+                      </span>
 
-                  <p className="text-sm line-clamp-2 flex-1" style={{ color: 'var(--color-text-4)' }}>
-                    {job.description}
-                  </p>
+                      {/* Emergency flag (top-right) */}
+                      {(job.isEmergency || job.urgency === 'emergency') && (
+                        <span className="absolute top-3 right-3 inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full" style={{ background: 'rgba(239,68,68,0.9)', color: '#fff' }}>
+                          <Zap className="w-2.5 h-2.5" /> Emergency
+                        </span>
+                      )}
 
-                  {city && (
-                    <div className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-text-4)' }}>
-                      <MapPin className="w-3 h-3" />
-                      {city}
+                      {/* Title overlaid on media */}
+                      {Array.isArray(job.images) && job.images[0] && (
+                        <h3 className="absolute bottom-2.5 left-3 right-3 font-bold text-sm flex items-center gap-1.5" style={{ color: '#fff' }}>
+                          <span>{tradeEmoji(job.trade ?? job.aiDetectedTrade)}</span>
+                          {job.trade ?? job.aiDetectedTrade ?? 'General'} Repair
+                        </h3>
+                      )}
                     </div>
-                  )}
+
+                    {/* Body */}
+                    <div className="p-4 flex flex-col gap-2.5 flex-1">
+                      {!(Array.isArray(job.images) && job.images[0]) && (
+                        <h3 className="font-bold text-sm flex items-center gap-1.5" style={{ color: 'var(--color-text)' }}>
+                          {job.trade ?? job.aiDetectedTrade ?? 'General'} Repair
+                        </h3>
+                      )}
+
+                      <p className="text-[13px] leading-relaxed line-clamp-2 flex-1" style={{ color: 'var(--color-text-3)' }}>
+                        {job.description}
+                      </p>
+
+                      {/* Estimate chip */}
+                      {job.estimatedCost?.low && job.estimatedCost?.high && (
+                        <div className="inline-flex items-center gap-1.5 text-xs font-semibold w-fit px-2 py-1 rounded-lg" style={{ background: 'rgba(16,185,129,0.1)', color: '#34d399' }}>
+                          <TrendingUp className="w-3 h-3" />
+                          Est. ${job.estimatedCost.low}–${job.estimatedCost.high}
+                        </div>
+                      )}
+
+                      {/* Footer meta */}
+                      <div className="flex items-center gap-3 pt-2 mt-auto text-[11px]" style={{ borderTop: '1px solid var(--color-border)', color: 'var(--color-text-4)' }}>
+                        {city && (
+                          <span className="flex items-center gap-1 min-w-0">
+                            <MapPin className="w-3 h-3 flex-shrink-0" /> <span className="truncate">{city}</span>
+                          </span>
+                        )}
+                        {job.createdAt != null && (
+                          <span className="flex items-center gap-1 flex-shrink-0">
+                            <Clock className="w-3 h-3" /> {timeAgo(job.createdAt)}
+                          </span>
+                        )}
+                        <span className="ml-auto flex items-center gap-0.5 font-semibold flex-shrink-0 transition-colors group-hover:text-[var(--color-brand)]" style={{ color: 'var(--color-text-3)' }}>
+                          {typeof job.bidCount === 'number' && job.bidCount > 0
+                            ? `${job.bidCount} bid${job.bidCount === 1 ? '' : 's'}`
+                            : 'View'}
+                          <ArrowUpRight className="w-3 h-3" />
+                        </span>
+                      </div>
+                    </div>
                   </Link>
                 </motion.div>
               );
