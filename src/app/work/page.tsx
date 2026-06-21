@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/lib/auth';
 import {
-  MapPin, Loader2, Sparkles, ArrowRight, Camera, Heart, BadgeCheck, MessageCircle,
+  MapPin, Loader2, Sparkles, ArrowRight, Camera, Heart, BadgeCheck, MessageCircle, Play,
 } from 'lucide-react';
 import EmptyArt from '@/components/EmptyArt';
 
@@ -20,6 +20,8 @@ type FeedItem = {
   caption: string;
   photos: { url: string; caption?: string }[];
   beforeAfter: boolean;
+  video: string | null;
+  poster: string | null;
   likeCount: number;
   commentCount: number;
   likedByMe: boolean;
@@ -65,6 +67,8 @@ export default function WorkFeedPage() {
           caption: p.caption ?? '',
           photos: (p.photos ?? []).map((url: string) => ({ url })),
           beforeAfter: p.beforeAfter ?? false,
+          video: p.video ?? null,
+          poster: p.poster ?? null,
           likeCount: p.likeCount ?? 0,
           commentCount: p.commentCount ?? 0,
           likedByMe: p.likedByMe ?? false,
@@ -90,6 +94,8 @@ export default function WorkFeedPage() {
         caption: j.photos?.[0]?.caption ?? '',
         photos: j.photos ?? [],
         beforeAfter: (j.photos?.length ?? 0) > 1,
+        video: null,
+        poster: null,
         likeCount: 0,
         commentCount: 0,
         likedByMe: false,
@@ -106,6 +112,8 @@ export default function WorkFeedPage() {
         caption: p.caption ?? '',
         photos: (p.photos ?? []).map((url: string) => ({ url })),
         beforeAfter: p.beforeAfter ?? false,
+          video: p.video ?? null,
+          poster: p.poster ?? null,
         likeCount: p.likeCount ?? 0,
         commentCount: p.commentCount ?? 0,
         likedByMe: p.likedByMe ?? false,
@@ -275,9 +283,21 @@ export default function WorkFeedPage() {
               transition={{ duration: 0.4, delay: (i % 6) * 0.05 }}
               className="card overflow-hidden flex flex-col"
             >
-              {/* Photos — side-by-side for before/after. Posts open their permalink. */}
+              {/* Media — video, or photos (side-by-side for before/after). Posts open their permalink. */}
               {(() => {
-                const PhotoInner = (
+                const Inner = item.video ? (
+                  <div className="relative" style={{ background: '#000' }}>
+                    <video
+                      src={item.video}
+                      poster={item.poster ?? undefined}
+                      className="w-full h-44 object-cover"
+                      muted loop playsInline autoPlay preload="metadata"
+                    />
+                    <span className="absolute top-2 right-2 text-[9px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5" style={{ background: 'rgba(0,0,0,0.65)', color: '#fff' }}>
+                      <Play className="w-2.5 h-2.5" /> Video
+                    </span>
+                  </div>
+                ) : (
                   <div className={`relative grid ${item.photos.length > 1 ? 'grid-cols-2 gap-0.5' : 'grid-cols-1'}`}>
                     {item.photos.slice(0, 2).map((p, pi) => (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -298,8 +318,8 @@ export default function WorkFeedPage() {
                   </div>
                 );
                 return item.kind === 'post'
-                  ? <Link href={`/work/${item.id}`} className="block">{PhotoInner}</Link>
-                  : PhotoInner;
+                  ? <Link href={`/work/${item.id}`} className="block">{Inner}</Link>
+                  : Inner;
               })()}
 
               <div className="p-4 flex flex-col gap-2 flex-1">

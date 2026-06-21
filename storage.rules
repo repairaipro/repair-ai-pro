@@ -64,7 +64,8 @@ service firebase.storage {
       allow write: if signedIn()
         && request.auth.uid == contractorId
         && underSizeLimit()
-        && request.resource.contentType.matches('image/.*');
+        && (request.resource.contentType.matches('image/.*')
+            || request.resource.contentType.matches('video/.*'));
     }
 
     /* ================= DEFAULT DENY ================= */
