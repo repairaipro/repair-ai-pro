@@ -7,7 +7,7 @@ import { motion } from 'framer-motion';
 import { useAuth } from '@/lib/auth';
 import {
   Heart, MessageCircle, Share2, Check, ArrowLeft, MapPin,
-  BadgeCheck, Loader2, Send, Sparkles,
+  BadgeCheck, Loader2, Send, Sparkles, Download, Copy, Megaphone, Film,
 } from 'lucide-react';
 
 type Author = { id: string; name: string; photoUrl: string | null; isContractor?: boolean };
@@ -17,6 +17,9 @@ type Post = {
   caption: string;
   trade: string;
   photos: string[];
+  video: string | null;
+  poster: string | null;
+  hasVideo: boolean;
   beforeAfter: boolean;
   likeCount: number;
   commentCount: number;
@@ -171,16 +174,25 @@ export default function PostDetailPage() {
             </button>
           </div>
 
-          {/* Photo viewer */}
+          {/* Media viewer — video or photo carousel */}
           <div className="relative" style={{ background: '#000' }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={post.photos[activePhoto]} alt={post.caption || 'Work'} className="w-full max-h-[70vh] object-contain" />
-            {post.beforeAfter && (
+            {post.video ? (
+              <video
+                src={post.video}
+                poster={post.poster ?? undefined}
+                className="w-full max-h-[72vh] object-contain"
+                controls autoPlay muted loop playsInline
+              />
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={post.photos[activePhoto]} alt={post.caption || 'Work'} className="w-full max-h-[70vh] object-contain" />
+            )}
+            {!post.video && post.beforeAfter && (
               <span className="absolute top-3 left-3 text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(0,0,0,0.7)', color: '#fff' }}>
                 {activePhoto === 0 ? 'BEFORE' : activePhoto === 1 ? 'AFTER' : `${activePhoto + 1}`}
               </span>
             )}
-            {post.photos.length > 1 && (
+            {!post.video && post.photos.length > 1 && (
               <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
                 {post.photos.map((_, i) => (
                   <button
@@ -214,6 +226,11 @@ export default function PostDetailPage() {
             </p>
           )}
         </motion.div>
+
+        {/* Owner: one-tap social export (the distribution engine) */}
+        {user?.uid === post.contractor.id && (
+          <SocialExport post={post} />
+        )}
 
         {/* Hire CTA */}
         <Link
@@ -277,6 +294,80 @@ export default function PostDetailPage() {
             </div>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── One-tap social export — the syndication engine ── */
+function SocialExport({ post }: { post: Post }) {
+  const [copied, setCopied] = useState(false);
+  const [origin, setOrigin] = useState('');
+  useEffect(() => { setOrigin(window.location.origin); }, []);
+
+  const link = `${origin}/work/${post.id}`;
+  const tradeTag = '#' + (post.trade || 'homerepair').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const cityTag = post.contractor.city ? ' #' + post.contractor.city.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+  const caption = `${post.caption || `${post.trade} work, done right.`}\n\n${post.beforeAfter ? 'Before & after 👇 ' : ''}Booked through RepairAI Pro — get a fair AI price + a verified local pro in minutes.\n${link}\n\n${tradeTag} #beforeandafter #homerepair${cityTag} #satisfying`;
+
+  function copyCaption() {
+    navigator.clipboard.writeText(caption).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2200); });
+  }
+  function shareTo(network: 'facebook' | 'twitter' | 'whatsapp') {
+    const u = encodeURIComponent(link);
+    const t = encodeURIComponent(caption);
+    const urls = {
+      facebook: `https://www.facebook.com/sharer/sharer.php?u=${u}`,
+      twitter: `https://twitter.com/intent/tweet?url=${u}&text=${encodeURIComponent(post.caption || post.trade + ' work')}`,
+      whatsapp: `https://wa.me/?text=${t}`,
+    };
+    window.open(urls[network], '_blank', 'noopener,noreferrer,width=600,height=560');
+  }
+
+  return (
+    <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid rgba(99,102,241,0.25)' }}>
+      <div className="p-4" style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.12), rgba(139,92,246,0.06))' }}>
+        <div className="flex items-center gap-2">
+          <Megaphone className="w-4 h-4" style={{ color: '#818cf8' }} />
+          <h3 className="text-sm font-bold" style={{ color: 'var(--color-text)' }}>Share this to grow your business</h3>
+        </div>
+        <p className="text-xs mt-1" style={{ color: 'var(--color-text-4)' }}>
+          {post.video ? 'Post this clip to Reels, TikTok & your Facebook page.' : 'Post this to your Facebook page, Instagram & Nextdoor.'} The caption&apos;s written for you — booking link included.
+        </p>
+      </div>
+
+      <div className="p-4 space-y-3" style={{ background: 'var(--color-surface)' }}>
+        {/* Pre-written caption */}
+        <div className="rounded-xl p-3 text-xs whitespace-pre-wrap leading-relaxed" style={{ background: 'var(--color-surface-2)', color: 'var(--color-text-3)', maxHeight: 120, overflow: 'auto' }}>
+          {caption}
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <button onClick={copyCaption} className="btn btn-secondary btn-sm">
+            {copied ? <><Check className="w-3.5 h-3.5" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy caption</>}
+          </button>
+          {post.video ? (
+            <a href={post.video} download className="btn btn-secondary btn-sm" style={{ justifyContent: 'center' }}>
+              <Download className="w-3.5 h-3.5" /> Download video
+            </a>
+          ) : post.photos[0] ? (
+            <a href={post.photos[0]} download className="btn btn-secondary btn-sm" style={{ justifyContent: 'center' }}>
+              <Download className="w-3.5 h-3.5" /> Download photo
+            </a>
+          ) : <span />}
+        </div>
+
+        <div className="grid grid-cols-3 gap-2">
+          <button onClick={() => shareTo('facebook')} className="flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold text-white" style={{ background: '#1877f2' }}><Share2 className="w-3 h-3" /> Facebook</button>
+          <button onClick={() => shareTo('twitter')} className="flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold text-white" style={{ background: '#0f172a' }}><Share2 className="w-3 h-3" /> X</button>
+          <button onClick={() => shareTo('whatsapp')} className="flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold text-white" style={{ background: '#25d366' }}><Share2 className="w-3 h-3" /> WhatsApp</button>
+        </div>
+
+        {post.video && (
+          <p className="text-[11px] flex items-center gap-1.5" style={{ color: 'var(--color-text-4)' }}>
+            <Film className="w-3 h-3" /> Tip: download the clip, then upload to TikTok/Reels with the copied caption for maximum local reach.
+          </p>
+        )}
       </div>
     </div>
   );

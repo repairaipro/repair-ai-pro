@@ -42,8 +42,12 @@ export async function POST(req: Request) {
       .slice(0, 4);
     const beforeAfter = body.beforeAfter === true && photos.length >= 2;
 
-    if (photos.length === 0) {
-      return NextResponse.json({ error: "At least one photo is required" }, { status: 400 });
+    // Optional video (the highest-performing social format)
+    const video  = typeof body.video === "string" && /^https?:\/\//.test(body.video) ? body.video : null;
+    const poster = typeof body.poster === "string" && /^https?:\/\//.test(body.poster) ? body.poster : (photos[0] ?? null);
+
+    if (photos.length === 0 && !video) {
+      return NextResponse.json({ error: "Add at least one photo or a video" }, { status: 400 });
     }
 
     const post = {
@@ -51,6 +55,9 @@ export async function POST(req: Request) {
       caption,
       trade,
       photos,
+      video,
+      poster,
+      hasVideo: !!video,
       beforeAfter,
       likeCount: 0,
       createdAt: FieldValue.serverTimestamp(),
@@ -165,6 +172,9 @@ async function hydratePosts(
         caption: p.caption,
         trade: p.trade,
         photos: p.photos,
+        video: p.video ?? null,
+        poster: p.poster ?? null,
+        hasVideo: !!p.video,
         beforeAfter: p.beforeAfter ?? false,
         likeCount: p.likeCount ?? 0,
         commentCount: p.commentCount ?? 0,

@@ -7,17 +7,21 @@ import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/
 import { useAuth } from '@/lib/auth';
 import { TRADES } from '@/lib/constants';
 import {
-  Camera, X, Loader2, Send, ArrowLeft, AlertCircle, ImagePlus, Sparkles,
+  Camera, X, Loader2, Send, ArrowLeft, AlertCircle, ImagePlus, Sparkles, Video, Film,
 } from 'lucide-react';
 
 type Slot = { file: File; preview: string };
+const MAX_VIDEO_MB = 60;
 
 export default function NewWorkPostPage() {
   const { user } = useAuth();
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLInputElement>(null);
 
   const [slots, setSlots]         = useState<Slot[]>([]);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [caption, setCaption]     = useState('');
   const [trade, setTrade]         = useState('');
   const [beforeAfter, setBeforeAfter] = useState(false);
@@ -37,35 +41,58 @@ export default function NewWorkPostPage() {
     if (fileRef.current) fileRef.current.value = '';
   }
 
+  function addVideo(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('video/')) { setError('Please choose a video file.'); return; }
+    if (file.size > MAX_VIDEO_MB * 1024 * 1024) { setError(`Video must be under ${MAX_VIDEO_MB} MB.`); return; }
+    setError('');
+    setVideoFile(file);
+    setVideoPreview(URL.createObjectURL(file));
+    if (videoRef.current) videoRef.current.value = '';
+  }
+
+  const hasContent = slots.length > 0 || !!videoFile;
+
   async function handleSubmit() {
-    if (!user || slots.length === 0) return;
+    if (!user || !hasContent) return;
     setSubmitting(true);
     setError('');
     try {
-      // Upload photos to Firebase Storage
       const storage = getStorage();
+
+      async function upload(file: File, key: string): Promise<string> {
+        const sRef = ref(storage, `posts/${user!.uid}/${Date.now()}_${key}_${file.name}`);
+        const task = uploadBytesResumable(sRef, file);
+        return new Promise<string>((resolve, reject) => {
+          task.on('state_changed',
+            (snap) => setProgress(`Uploading ${key}… ${Math.round((snap.bytesTransferred / snap.totalBytes) * 100)}%`),
+            reject,
+            async () => resolve(await getDownloadURL(task.snapshot.ref)));
+        });
+      }
+
+      // Photos
       const urls: string[] = [];
       for (let i = 0; i < slots.length; i++) {
-        setProgress(`Uploading photo ${i + 1} of ${slots.length}…`);
-        const sRef = ref(storage, `posts/${user.uid}/${Date.now()}_${i}_${slots[i].file.name}`);
-        const task = uploadBytesResumable(sRef, slots[i].file);
-        const url = await new Promise<string>((resolve, reject) => {
-          task.on('state_changed', () => {}, reject, async () => resolve(await getDownloadURL(task.snapshot.ref)));
-        });
-        urls.push(url);
+        urls.push(await upload(slots[i].file, `photo${i + 1}`));
       }
+
+      // Video
+      let videoUrl: string | null = null;
+      if (videoFile) videoUrl = await upload(videoFile, 'video');
 
       setProgress('Publishing…');
       const token = await user.getIdToken();
       const res = await fetch('/api/posts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ caption: caption.trim(), trade, photos: urls, beforeAfter }),
+        body: JSON.stringify({ caption: caption.trim(), trade, photos: urls, video: videoUrl, beforeAfter }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Failed to publish');
 
-      router.push('/work');
+      router.push(data.postId ? `/work/${data.postId}` : '/work');
     } catch (e: any) {
       setError(e.message ?? 'Something went wrong');
       setSubmitting(false);
@@ -144,6 +171,34 @@ export default function NewWorkPostPage() {
             <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={addFiles} />
           </div>
 
+          {/* Video (best for reach) */}
+          <div>
+            <label className="text-xs font-semibold block mb-2 flex items-center gap-1.5" style={{ color: 'var(--color-text-3)' }}>
+              <Film className="w-3.5 h-3.5" style={{ color: '#818cf8' }} /> Video <span style={{ color: 'var(--color-text-4)' }}>· optional, gets the most reach</span>
+            </label>
+            {videoPreview ? (
+              <div className="relative rounded-xl overflow-hidden" style={{ border: '1px solid var(--color-border)' }}>
+                <video src={videoPreview} className="w-full max-h-56 object-contain bg-black" controls playsInline />
+                <button
+                  onClick={() => { setVideoFile(null); setVideoPreview(null); }}
+                  className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center"
+                  style={{ background: 'rgba(0,0,0,0.7)' }}
+                >
+                  <X className="w-4 h-4 text-white" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => videoRef.current?.click()}
+                className="w-full flex items-center justify-center gap-2 py-4 rounded-xl"
+                style={{ border: '1.5px dashed var(--color-border)', background: 'var(--color-surface-2)', color: 'var(--color-text-3)' }}
+              >
+                <Video className="w-4 h-4" /> <span className="text-sm">Add a before/after video</span>
+              </button>
+            )}
+            <input ref={videoRef} type="file" accept="video/*" className="hidden" onChange={addVideo} />
+          </div>
+
           {/* Before/after toggle */}
           {slots.length >= 2 && (
             <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--color-text-2)' }}>
@@ -181,9 +236,9 @@ export default function NewWorkPostPage() {
 
           <button
             onClick={handleSubmit}
-            disabled={submitting || slots.length === 0}
+            disabled={submitting || !hasContent}
             className="btn btn-primary btn-full"
-            style={{ opacity: slots.length === 0 ? 0.5 : 1 }}
+            style={{ opacity: !hasContent ? 0.5 : 1 }}
           >
             {submitting ? (
               <><Loader2 className="w-4 h-4 animate-spin" /> {progress || 'Publishing…'}</>
