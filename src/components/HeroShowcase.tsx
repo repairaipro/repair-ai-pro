@@ -70,28 +70,38 @@ export default function HeroShowcase() {
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-lg flex items-center justify-center text-sm" style={{ background: 'linear-gradient(135deg,#6366f1,#8b5cf6)' }}>⚡</div>
               <span className="text-sm font-bold" style={{ color: '#fff' }}>RepairAI</span>
-              <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full font-semibold" style={{ background: 'rgba(99,102,241,0.18)', color: '#a5b4fc' }}>Diagnosing…</span>
+              <span className="ml-auto inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-semibold" style={{ background: 'rgba(34,197,94,0.15)', color: '#34d399' }}>
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#34d399' }} /> Live
+              </span>
             </div>
 
-            {/* Problem photo with scan sweep */}
-            <div className="relative h-28 rounded-2xl overflow-hidden" style={{ background: 'linear-gradient(135deg, #1e293b, #0f172a)' }}>
-              {/* pipe/leak motif */}
-              <svg viewBox="0 0 200 110" className="w-full h-full" preserveAspectRatio="xMidYMid slice">
-                <path d="M40 30 h70 a14 14 0 0 1 14 14 v40" stroke="#475569" strokeWidth="9" fill="none" strokeLinecap="round" />
-                <path d="M40 30 h70 a14 14 0 0 1 14 14 v40" stroke="#64748b" strokeWidth="3" fill="none" strokeLinecap="round" />
-                <circle cx="124" cy="92" r="3" fill="#60a5fa" />
-                <circle cx="118" cy="100" r="2" fill="#60a5fa" opacity="0.7" />
-              </svg>
-              {/* scan line */}
+            {/* The user describes the problem — chat bubble (no fake photo) */}
+            <div className="flex justify-end">
               <motion.div
-                className="absolute inset-x-0 h-12"
-                style={{ background: 'linear-gradient(180deg, transparent, rgba(99,102,241,0.35), transparent)' }}
-                initial={{ top: '-30%' }}
-                animate={{ top: '110%' }}
-                transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
-              />
-              <div className="absolute bottom-2 left-2 text-[10px] px-2 py-0.5 rounded-md font-medium" style={{ background: 'rgba(0,0,0,0.55)', color: '#cbd5e1' }}>Your photo</div>
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2, duration: 0.45 }}
+                className="max-w-[82%] px-3.5 py-2.5 rounded-2xl"
+                style={{ background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', borderBottomRightRadius: 6, boxShadow: '0 8px 22px -8px rgba(99,102,241,0.6)' }}
+              >
+                <p className="text-[11.5px] leading-snug" style={{ color: '#fff' }}>
+                  Water&apos;s dripping from the pipe under my kitchen sink and the cabinet floor is wet
+                </p>
+              </motion.div>
             </div>
+
+            {/* AI thinking → ready */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.45 }}
+              className="flex items-center gap-1.5 px-1"
+            >
+              <div className="w-5 h-5 rounded-md flex items-center justify-center" style={{ background: 'linear-gradient(135deg,#6366f1,#8b5cf6)' }}>
+                <Sparkles className="w-3 h-3 text-white" />
+              </div>
+              <span className="text-[10px] font-medium" style={{ color: '#818cf8' }}>RepairAI analyzed your problem</span>
+            </motion.div>
 
             {/* Diagnosis result card */}
             <div className="rounded-2xl p-3.5 space-y-2.5" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
