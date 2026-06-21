@@ -13,7 +13,7 @@ import { PushNotificationBanner } from '@/components/PushNotificationBanner';
 import {
   Inbox, Settings, DollarSign, Star, Briefcase, CheckCircle2,
   Clock, Zap, ArrowRight, TrendingUp, User, Wrench, MapPin,
-  ChevronRight, AlertTriangle, Trophy,
+  ChevronRight, AlertTriangle, Trophy, Sparkles,
 } from 'lucide-react';
 
 /* ── Types ── */
@@ -254,6 +254,22 @@ export default function ContractorDashboard() {
             </Link>
           </div>
         </div>
+
+        {/* ── Contractor Studio entry ── */}
+        <Link
+          href="/studio"
+          className="flex items-center gap-3 rounded-2xl p-4 transition-transform hover:-translate-y-0.5"
+          style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.14), rgba(139,92,246,0.07))', border: '1px solid rgba(99,102,241,0.3)' }}
+        >
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg,#6366f1,#8b5cf6)' }}>
+            <Sparkles size={18} color="#fff" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold" style={{ color: 'var(--color-text)' }}>Open Contractor Studio</p>
+            <p className="text-xs" style={{ color: 'var(--color-text-4)' }}>Money, leads, reputation &amp; grow-your-business tools in one place</p>
+          </div>
+          <ArrowRight size={16} style={{ color: '#818cf8' }} />
+        </Link>
 
         {/* ── Push notification opt-in ── */}
         <PushNotificationBanner />
