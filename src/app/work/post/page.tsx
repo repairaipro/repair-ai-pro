@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
@@ -24,10 +24,14 @@ export default function NewWorkPostPage() {
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [caption, setCaption]     = useState('');
   const [trade, setTrade]         = useState('');
-  const [beforeAfter, setBeforeAfter] = useState(false);
+    const [beforeAfter, setBeforeAfter] = useState(false);
   const [submitting, setSubmitting]   = useState(false);
   const [progress, setProgress]   = useState('');
   const [error, setError]         = useState('');
+
+  // Cross-post to connected platforms
+  const [crossPost, setCrossPost] = useState<{ instagram: boolean; tiktok: boolean }>({ instagram: false, tiktok: false });
+  const [connectedPlatforms, setConnectedPlatforms] = useState<{ instagram?: boolean; tiktok?: boolean }>({});
 
   function addFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []).slice(0, 4 - slots.length);
@@ -53,6 +57,24 @@ export default function NewWorkPostPage() {
   }
 
   const hasContent = slots.length > 0 || !!videoFile;
+
+  // Load connected platforms on mount
+  useEffect(() => {
+    if (!user) return;
+    user.getIdToken().then(async (token: string) => {
+      try {
+        const res = await fetch(`/api/contractors/${user.uid}/social-handles`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        // We don't expose connection status from handles endpoint — just check if handles exist
+        const d = await res.json();
+        setConnectedPlatforms({
+          instagram: !!d.handles?.instagram,
+          tiktok:    !!d.handles?.tiktok,
+        });
+      } catch { /* ignore */ }
+    });
+  }, [user]);
 
   async function handleSubmit() {
     if (!user || !hasContent) return;
@@ -92,7 +114,36 @@ export default function NewWorkPostPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Failed to publish');
 
-      router.push(data.postId ? `/work/${data.postId}` : '/work');
+      const postId = data.postId;
+
+      // Cross-post to connected platforms in parallel (fire-and-forget)
+      if (postId) {
+        const publishes: Promise<any>[] = [];
+        if (crossPost.instagram) {
+          publishes.push(
+            fetch('/api/social/instagram/publish', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+              body: JSON.stringify({ postId }),
+            }).catch(() => {})
+          );
+        }
+        if (crossPost.tiktok) {
+          publishes.push(
+            fetch('/api/social/tiktok/publish', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+              body: JSON.stringify({ postId }),
+            }).catch(() => {})
+          );
+        }
+        if (publishes.length) {
+          setProgress('Publishing to social media…');
+          await Promise.allSettled(publishes);
+        }
+      }
+
+      router.push(postId ? `/work/${postId}` : '/work');
     } catch (e: any) {
       setError(e.message ?? 'Something went wrong');
       setSubmitting(false);
@@ -227,6 +278,31 @@ export default function NewWorkPostPage() {
               {TRADES.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
+
+          {/* Cross-post to social media */}
+          {(connectedPlatforms.instagram || connectedPlatforms.tiktok) && (
+            <div className="rounded-xl p-3 space-y-2" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border)' }}>
+              <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-4)' }}>Also post to</p>
+              {connectedPlatforms.instagram && (
+                <label className="flex items-center gap-2.5 cursor-pointer">
+                  <input type="checkbox" checked={crossPost.instagram} onChange={e => setCrossPost(p => ({ ...p, instagram: e.target.checked }))} className="rounded" />
+                  <span className="text-sm" style={{ color: 'var(--color-text-2)' }}>
+                    <span style={{ marginRight: 6 }}>📸</span> Instagram
+                    {videoFile ? ' (Reels)' : ' (Post)'}
+                  </span>
+                </label>
+              )}
+              {connectedPlatforms.tiktok && (
+                <label className="flex items-center gap-2.5 cursor-pointer">
+                  <input type="checkbox" checked={crossPost.tiktok} onChange={e => setCrossPost(p => ({ ...p, tiktok: e.target.checked }))} className="rounded" />
+                  <span className="text-sm" style={{ color: 'var(--color-text-2)' }}>
+                    <span style={{ marginRight: 6 }}>🎵</span> TikTok
+                    {videoFile ? ' (Video)' : ' (Photo post)'}
+                  </span>
+                </label>
+              )}
+            </div>
+          )}
 
           {error && (
             <div className="flex items-center gap-2 text-xs rounded-lg px-3 py-2" style={{ background: 'rgba(239,68,68,0.08)', color: '#f87171' }}>

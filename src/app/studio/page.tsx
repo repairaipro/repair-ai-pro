@@ -9,7 +9,8 @@ import {
   DollarSign, Clock, TrendingUp, Star, ShieldCheck, Zap, Inbox,
   Briefcase, CheckCircle2, Users, Heart, Eye, Share2, Check, Copy,
   ArrowRight, ArrowUpRight, Loader2, Settings, Camera, BarChart2,
-  Sparkles, Wallet, ChevronRight,
+  Sparkles, Wallet, ChevronRight, Link2, Instagram, AtSign, Globe,
+  Youtube, Unlink, ExternalLink, Edit3, Save, X,
 } from 'lucide-react';
 
 type Summary = {
@@ -30,7 +31,16 @@ export default function ContractorStudio() {
   const [available, setAvailable] = useState(false);
   const [savingAvail, setSavingAvail] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [bioCopied, setBioCopied] = useState(false);
   const [origin, setOrigin] = useState('');
+
+  // Social media connections
+  const [socialHandles, setSocialHandles] = useState<Record<string, string>>({});
+  const [socialConnections, setSocialConnections] = useState<Record<string, { connected: boolean; username?: string }>>({});
+  const [editingHandles, setEditingHandles] = useState(false);
+  const [handleDraft, setHandleDraft] = useState<Record<string, string>>({});
+  const [savingHandles, setSavingHandles] = useState(false);
+  const [socialToast, setSocialToast] = useState<string | null>(null);
 
   useEffect(() => { setOrigin(window.location.origin); }, []);
 
@@ -47,6 +57,64 @@ export default function ContractorStudio() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Load social handles + check OAuth callback result
+  useEffect(() => {
+    if (!user) return;
+    user.getIdToken().then(async (token: string) => {
+      const res = await fetch(`/api/contractors/${user.uid}/social-handles`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const d = await res.json();
+      if (d.handles) { setSocialHandles(d.handles); setHandleDraft(d.handles); }
+    }).catch(() => {});
+
+    // Check for OAuth callback params
+    const params = new URLSearchParams(window.location.search);
+    const social = params.get('social');
+    const status = params.get('status');
+    const username = params.get('username');
+    if (social && status) {
+      if (status === 'connected') {
+        setSocialToast(`✓ ${social.charAt(0).toUpperCase() + social.slice(1)} connected${username ? ` as @${username}` : ''}!`);
+        if (social === 'instagram' && username) setSocialConnections(p => ({ ...p, instagram: { connected: true, username } }));
+        if (social === 'tiktok' && username) setSocialConnections(p => ({ ...p, tiktok: { connected: true, username } }));
+      } else if (status === 'error') {
+        setSocialToast(`⚠ Could not connect ${social}. Try again.`);
+      }
+      // Clean URL
+      window.history.replaceState({}, '', '/studio');
+      setTimeout(() => setSocialToast(null), 5000);
+    }
+  }, [user]);
+
+  async function saveHandles() {
+    if (!user) return;
+    setSavingHandles(true);
+    try {
+      const token = await user.getIdToken();
+      await fetch(`/api/contractors/${user.uid}/social-handles`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(handleDraft),
+      });
+      setSocialHandles({ ...handleDraft });
+      setEditingHandles(false);
+    } catch { /* ignore */ }
+    finally { setSavingHandles(false); }
+  }
+
+  async function connectInstagram() {
+    if (!user) return;
+    const token = await user.getIdToken();
+    window.location.href = `/api/social/instagram/connect?token=${token}`;
+  }
+
+  async function connectTikTok() {
+    if (!user) return;
+    const token = await user.getIdToken();
+    window.location.href = `/api/social/tiktok/connect?token=${token}`;
+  }
+
   async function toggleAvailability() {
     if (!user || savingAvail) return;
     const next = !available;
@@ -62,6 +130,7 @@ export default function ContractorStudio() {
   }
 
   const profileUrl = user ? `${origin}/contractor/${user.uid}` : '';
+  const bioLinkUrl = user ? `${origin}/pro/${user.uid}` : '';
 
   function copyLink() {
     navigator.clipboard.writeText(profileUrl).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
@@ -206,21 +275,27 @@ export default function ContractorStudio() {
                 </div>
               </div>
 
-              {/* Storefront link + share */}
+              {/* Bio link (for Instagram/TikTok bio) */}
               <div className="p-4 space-y-3" style={{ background: 'var(--color-surface)' }}>
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'var(--color-text-4)' }}>Your storefront link</p>
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <Link2 className="w-3.5 h-3.5" style={{ color: '#818cf8' }} />
+                    <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-4)' }}>Your social bio link</p>
+                  </div>
                   <div className="flex items-center gap-2">
                     <div className="flex-1 min-w-0 px-3 py-2 rounded-xl text-xs truncate" style={{ background: 'var(--color-surface-2)', color: 'var(--color-text-3)', border: '1px solid var(--color-border)' }}>
-                      {profileUrl.replace(/^https?:\/\//, '')}
+                      {bioLinkUrl.replace(/^https?:\/\//, '')}
                     </div>
-                    <button onClick={copyLink} className="btn btn-secondary btn-sm flex-shrink-0">
-                      {copied ? <><Check className="w-3.5 h-3.5" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
+                    <button onClick={() => { navigator.clipboard.writeText(bioLinkUrl); setBioCopied(true); setTimeout(() => setBioCopied(false), 2000); }} className="btn btn-secondary btn-sm flex-shrink-0">
+                      {bioCopied ? <><Check className="w-3.5 h-3.5" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
                     </button>
                   </div>
                   <p className="text-[10px] mt-1.5" style={{ color: 'var(--color-text-4)' }}>
-                    Put it in your truck wrap, Instagram bio, and Facebook page — it unfurls into a branded card.
+                    Paste this in your Instagram and TikTok bio — it opens a beautiful booking page with your work, reviews, and hire button.
                   </p>
+                  <a href={bioLinkUrl} target="_blank" rel="noopener noreferrer" className="text-[11px] flex items-center gap-1 mt-1" style={{ color: '#818cf8', textDecoration: 'none' }}>
+                    Preview your page <ExternalLink className="w-3 h-3" />
+                  </a>
                 </div>
 
                 {/* Share buttons */}
@@ -239,6 +314,98 @@ export default function ContractorStudio() {
                     Pros who post weekly get 3× more profile visits. Start with one job you&apos;re proud of.
                   </p>
                 )}
+              </div>
+            </div>
+
+            {/* ── Social media connections ── */}
+            <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div className="flex items-center justify-between p-4" style={{ background: 'var(--color-surface)' }}>
+                <div className="flex items-center gap-2">
+                  <AtSign className="w-4 h-4" style={{ color: '#818cf8' }} />
+                  <h2 className="text-sm font-bold" style={{ color: 'var(--color-text)' }}>Social Media Accounts</h2>
+                </div>
+                {!editingHandles
+                  ? <button onClick={() => { setHandleDraft({ ...socialHandles }); setEditingHandles(true); }} className="text-xs flex items-center gap-1" style={{ color: '#818cf8' }}><Edit3 className="w-3 h-3" /> Edit handles</button>
+                  : <div className="flex gap-2">
+                      <button onClick={() => setEditingHandles(false)} className="text-xs" style={{ color: 'var(--color-text-4)' }}><X className="w-3.5 h-3.5" /></button>
+                      <button onClick={saveHandles} disabled={savingHandles} className="text-xs flex items-center gap-1 font-semibold" style={{ color: '#22c55e' }}>
+                        {savingHandles ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />} Save
+                      </button>
+                    </div>
+                }
+              </div>
+
+              <div className="p-4 space-y-3" style={{ background: 'var(--color-bg-2)' }}>
+                {socialToast && (
+                  <div className="rounded-xl px-3 py-2 text-xs font-medium" style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', color: '#4ade80' }}>
+                    {socialToast}
+                  </div>
+                )}
+
+                {/* Instagram */}
+                <SocialRow
+                  icon={<IgIcon />}
+                  label="Instagram"
+                  handle={socialConnections.instagram?.username ?? socialHandles.instagram}
+                  connected={socialConnections.instagram?.connected}
+                  editing={editingHandles}
+                  draftValue={handleDraft.instagram ?? ''}
+                  placeholder="your_username"
+                  onDraft={v => setHandleDraft(p => ({ ...p, instagram: v }))}
+                  onConnect={connectInstagram}
+                  profileUrl={socialHandles.instagram ? `https://instagram.com/${socialHandles.instagram}` : undefined}
+                />
+
+                {/* TikTok */}
+                <SocialRow
+                  icon={<TtIcon />}
+                  label="TikTok"
+                  handle={socialConnections.tiktok?.username ?? socialHandles.tiktok}
+                  connected={socialConnections.tiktok?.connected}
+                  editing={editingHandles}
+                  draftValue={handleDraft.tiktok ?? ''}
+                  placeholder="your_username"
+                  onDraft={v => setHandleDraft(p => ({ ...p, tiktok: v }))}
+                  onConnect={connectTikTok}
+                  profileUrl={socialHandles.tiktok ? `https://tiktok.com/@${socialHandles.tiktok}` : undefined}
+                />
+
+                {/* Facebook */}
+                <SocialRow
+                  icon={<span style={{ fontSize: 18 }}>📘</span>}
+                  label="Facebook"
+                  handle={socialHandles.facebook}
+                  editing={editingHandles}
+                  draftValue={handleDraft.facebook ?? ''}
+                  placeholder="facebook.com/yourpage"
+                  onDraft={v => setHandleDraft(p => ({ ...p, facebook: v }))}
+                />
+
+                {/* YouTube */}
+                <SocialRow
+                  icon={<span style={{ fontSize: 18 }}>▶️</span>}
+                  label="YouTube"
+                  handle={socialHandles.youtube}
+                  editing={editingHandles}
+                  draftValue={handleDraft.youtube ?? ''}
+                  placeholder="@yourchannel"
+                  onDraft={v => setHandleDraft(p => ({ ...p, youtube: v }))}
+                />
+
+                {/* Website */}
+                <SocialRow
+                  icon={<Globe className="w-[18px] h-[18px]" style={{ color: '#94a3b8' }} />}
+                  label="Website"
+                  handle={socialHandles.website}
+                  editing={editingHandles}
+                  draftValue={handleDraft.website ?? ''}
+                  placeholder="yourwebsite.com"
+                  onDraft={v => setHandleDraft(p => ({ ...p, website: v }))}
+                />
+
+                <p className="text-[10px] pt-1" style={{ color: 'var(--color-text-4)' }}>
+                  These links appear on your social bio page and contractor profile so customers can find you everywhere.
+                </p>
               </div>
             </div>
 
@@ -338,5 +505,74 @@ function QuickLink({ href, icon, label }: { href: string; icon: React.ReactNode;
       <span style={{ color: 'var(--color-text-4)' }}>{icon}</span>
       <span className="text-sm font-medium">{label}</span>
     </Link>
+  );
+}
+
+function SocialRow({
+  icon, label, handle, connected, editing, draftValue, placeholder, onDraft, onConnect, profileUrl,
+}: {
+  icon: React.ReactNode; label: string; handle?: string; connected?: boolean;
+  editing: boolean; draftValue: string; placeholder: string;
+  onDraft: (v: string) => void; onConnect?: () => void; profileUrl?: string;
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <div className="w-8 h-8 flex items-center justify-center flex-shrink-0">{icon}</div>
+      <div className="flex-1 min-w-0">
+        <p className="text-[11px] font-semibold" style={{ color: 'var(--color-text-4)' }}>{label}</p>
+        {editing ? (
+          <input
+            value={draftValue}
+            onChange={e => onDraft(e.target.value)}
+            placeholder={placeholder}
+            className="w-full mt-0.5 px-2 py-1 rounded-lg text-xs outline-none"
+            style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
+          />
+        ) : handle ? (
+          <div className="flex items-center gap-1.5 mt-0.5">
+            {connected && <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#22c55e', flexShrink: 0 }} />}
+            {profileUrl
+              ? <a href={profileUrl} target="_blank" rel="noopener noreferrer" className="text-xs" style={{ color: '#818cf8', textDecoration: 'none' }}>@{handle}</a>
+              : <span className="text-xs" style={{ color: 'var(--color-text-3)' }}>@{handle}</span>
+            }
+            {connected && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ background: 'rgba(34,197,94,0.12)', color: '#4ade80' }}>Auto-post ON</span>}
+          </div>
+        ) : (
+          <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-4)' }}>Not connected</p>
+        )}
+      </div>
+      {!editing && onConnect && (
+        connected
+          ? <span className="text-[10px] font-semibold px-2 py-1 rounded-lg" style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.25)', color: '#4ade80' }}>✓ Connected</span>
+          : <button onClick={onConnect} className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg whitespace-nowrap" style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: '#818cf8' }}>
+              Connect
+            </button>
+      )}
+    </div>
+  );
+}
+
+function IgIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+      <defs>
+        <linearGradient id="ig2" x1="0%" y1="100%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor="#f09433"/>
+          <stop offset="50%" stopColor="#dc2743"/>
+          <stop offset="100%" stopColor="#bc1888"/>
+        </linearGradient>
+      </defs>
+      <rect x="2" y="2" width="20" height="20" rx="5" stroke="url(#ig2)" strokeWidth="2"/>
+      <circle cx="12" cy="12" r="4" stroke="url(#ig2)" strokeWidth="2"/>
+      <circle cx="17.5" cy="6.5" r="1" fill="url(#ig2)"/>
+    </svg>
+  );
+}
+
+function TtIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
+      <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05A6.34 6.34 0 0 0 3.15 15.3a6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34v-6.9a8.18 8.18 0 0 0 4.78 1.52V6.49a4.85 4.85 0 0 1-1.02-.2z"/>
+    </svg>
   );
 }

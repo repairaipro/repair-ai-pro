@@ -36,5 +36,7 @@ export function sanitizeContractor(id: string, data: Record<string, any>) {
     licenseVerified:     data.licenseVerified ?? false,
     insuranceVerified:   data.insuranceVerified ?? false,
     stripeConnectVerified: data.stripeConnectVerified ?? false,
+    socialHandles:       data.socialHandles ?? {},
+    // socialConnections (OAuth tokens) intentionally excluded
   };
 }
