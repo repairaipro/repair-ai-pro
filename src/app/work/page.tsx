@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/lib/auth';
 import {
-  MapPin, Loader2, Sparkles, ArrowRight, Camera, Heart, BadgeCheck, MessageCircle, Play,
+  MapPin, Loader2, Sparkles, ArrowRight, Camera, Heart, BadgeCheck, MessageCircle, Play, Flame, TrendingUp,
 } from 'lucide-react';
 import EmptyArt from '@/components/EmptyArt';
 
@@ -27,6 +27,7 @@ type FeedItem = {
   likedByMe: boolean;
   contractor: Contractor | null;
   at: string | null;
+  trendScore?: number;
 };
 
 function timeAgo(iso: string | null): string {
@@ -45,13 +46,32 @@ export default function WorkFeedPage() {
   const [loading, setLoading] = useState(true);
   const [tradeFilter, setTradeFilter] = useState<string>('all');
   const [likeBusy, setLikeBusy] = useState<string | null>(null);
-  const [view, setView] = useState<'discover' | 'following'>('discover');
+  const [view, setView] = useState<'discover' | 'trending' | 'following'>('discover');
+  const [topPosts, setTopPosts] = useState<FeedItem[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const headers: Record<string, string> = {};
       if (user) headers.Authorization = `Bearer ${await user.getIdToken()}`;
+
+      // Trending view
+      if (view === 'trending') {
+        const res = await fetch('/api/posts?sort=trending&limit=30', { headers });
+        const data = await res.json();
+        const postItems: FeedItem[] = (data.posts ?? []).map((p: any) => ({
+          key: `post_${p.id}`, kind: 'post' as const, id: p.id,
+          trade: p.trade, city: p.contractor?.city ?? null,
+          caption: p.caption ?? '', photos: (p.photos ?? []).map((url: string) => ({ url })),
+          beforeAfter: p.beforeAfter ?? false, video: p.video ?? null, poster: p.poster ?? null,
+          likeCount: p.likeCount ?? 0, commentCount: p.commentCount ?? 0,
+          likedByMe: p.likedByMe ?? false, contractor: p.contractor, at: p.createdAt,
+          trendScore: p.trendScore,
+        }));
+        setItems(postItems);
+        setLoading(false);
+        return;
+      }
 
       // Following view: posts from followed pros only (no verified-job feed mix)
       if (view === 'following') {
@@ -125,6 +145,21 @@ export default function WorkFeedPage() {
         (a, b) => new Date(b.at ?? 0).getTime() - new Date(a.at ?? 0).getTime()
       );
       setItems(merged);
+
+      // Fetch top 5 trending posts for the "Top This Week" strip
+      try {
+        const tRes = await fetch('/api/posts?sort=trending&limit=5', { headers });
+        const tData = await tRes.json();
+        setTopPosts((tData.posts ?? []).map((p: any) => ({
+          key: `top_${p.id}`, kind: 'post' as const, id: p.id,
+          trade: p.trade, city: p.contractor?.city ?? null,
+          caption: p.caption ?? '', photos: (p.photos ?? []).map((url: string) => ({ url })),
+          beforeAfter: p.beforeAfter ?? false, video: p.video ?? null, poster: p.poster ?? null,
+          likeCount: p.likeCount ?? 0, commentCount: p.commentCount ?? 0,
+          likedByMe: p.likedByMe ?? false, contractor: p.contractor, at: p.createdAt,
+          trendScore: p.trendScore,
+        })));
+      } catch { /* strip is non-critical */ }
     } catch { /* keep whatever rendered */ }
     finally { setLoading(false); }
   }, [user, view]);
@@ -184,23 +219,103 @@ export default function WorkFeedPage() {
           </Link>
         </div>
 
-        {/* Discover / Following toggle */}
+        {/* Discover / Trending / Following tabs */}
         <div className="flex justify-center">
           <div className="flex rounded-xl overflow-hidden" style={{ border: '1px solid var(--color-border)' }}>
-            {(['discover', 'following'] as const).map((v) => (
+            {([
+              { v: 'discover',  label: 'Discover' },
+              { v: 'trending',  label: '🔥 Trending' },
+              { v: 'following', label: 'Following' },
+            ] as const).map(({ v, label }) => (
               <button
                 key={v}
-                onClick={() => { setView(v); setTradeFilter('all'); }}
-                className="px-5 py-2 text-sm font-medium capitalize transition-all"
+                onClick={() => { setView(v as any); setTradeFilter('all'); }}
+                className="px-4 py-2 text-sm font-medium transition-all"
                 style={view === v
                   ? { background: 'var(--color-brand)', color: '#fff' }
                   : { background: 'var(--color-surface)', color: 'var(--color-text-3)' }}
               >
-                {v}
+                {label}
               </button>
             ))}
           </div>
         </div>
+
+        {/* ── Top This Week strip (Discover only) ── */}
+        {view === 'discover' && topPosts.length > 0 && (
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <Flame className="w-4 h-4" style={{ color: '#f97316' }} />
+              <h2 className="text-sm font-bold" style={{ color: 'var(--color-text)' }}>Top This Week</h2>
+              <button
+                onClick={() => { setView('trending'); setTradeFilter('all'); }}
+                className="ml-auto text-xs flex items-center gap-1"
+                style={{ color: 'var(--color-brand)' }}
+              >
+                See all <TrendingUp className="w-3 h-3" />
+              </button>
+            </div>
+            <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 4 }}>
+              {topPosts.map((p, i) => (
+                <Link
+                  key={p.id}
+                  href={`/work/${p.id}`}
+                  style={{
+                    flexShrink: 0, width: 160, borderRadius: 14, overflow: 'hidden',
+                    background: 'var(--color-surface)', border: '1px solid var(--color-border)',
+                    textDecoration: 'none', display: 'block',
+                  }}
+                >
+                  {/* Thumbnail */}
+                  <div style={{ position: 'relative', height: 110, background: '#0e1117' }}>
+                    {(p.photos[0]?.url || p.poster) ? (
+                      <img
+                        src={p.photos[0]?.url ?? p.poster ?? ''}
+                        alt=""
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    ) : (
+                      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28 }}>
+                        {p.trade === 'Plumbing' ? '🔧' : p.trade === 'Electrical' ? '⚡' : '🔨'}
+                      </div>
+                    )}
+                    {/* Rank badge */}
+                    <div style={{
+                      position: 'absolute', top: 8, left: 8,
+                      width: 22, height: 22, borderRadius: '50%',
+                      background: i === 0 ? '#f59e0b' : i === 1 ? '#94a3b8' : '#cd7c2f',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 11, fontWeight: 800, color: '#fff',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+                    }}>
+                      {i + 1}
+                    </div>
+                    {p.video && (
+                      <div style={{ position: 'absolute', bottom: 6, right: 6, background: 'rgba(0,0,0,0.7)', borderRadius: 4, padding: '2px 5px', fontSize: 9, color: '#fff' }}>▶ Video</div>
+                    )}
+                    {p.beforeAfter && (
+                      <div style={{ position: 'absolute', bottom: 6, left: 6, background: 'rgba(99,102,241,0.85)', borderRadius: 4, padding: '2px 5px', fontSize: 9, color: '#fff' }}>B/A</div>
+                    )}
+                  </div>
+                  {/* Info */}
+                  <div style={{ padding: '8px 10px' }}>
+                    <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-3)', marginBottom: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {p.contractor?.name ?? p.trade}
+                    </p>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <span style={{ fontSize: 11, color: '#f472b6', display: 'flex', alignItems: 'center', gap: 3 }}>
+                        <Heart style={{ width: 10, height: 10 }} /> {p.likeCount}
+                      </span>
+                      <span style={{ fontSize: 11, color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 3 }}>
+                        <MessageCircle style={{ width: 10, height: 10 }} /> {p.commentCount}
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Trade filter pills */}
         {view === 'discover' && trades.length > 1 && (
@@ -272,6 +387,35 @@ export default function WorkFeedPage() {
           </div>
         )}
 
+        {/* Trending view header */}
+        {view === 'trending' && !loading && (
+          <div className="flex items-center gap-2 pb-1" style={{ borderBottom: '1px solid var(--color-border)' }}>
+            <Flame className="w-4 h-4" style={{ color: '#f97316' }} />
+            <h2 className="text-sm font-bold" style={{ color: 'var(--color-text)' }}>
+              Trending this week in Houston
+            </h2>
+            <span className="text-xs ml-auto" style={{ color: 'var(--color-text-4)' }}>
+              {filtered.length} post{filtered.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+        )}
+
+        {/* Empty — trending view */}
+        {!loading && view === 'trending' && filtered.length === 0 && (
+          <div className="flex flex-col items-center gap-4 py-20 text-center">
+            <Flame className="w-10 h-10" style={{ color: '#f97316', opacity: 0.4 }} />
+            <div>
+              <h3 className="text-lg font-semibold" style={{ color: 'var(--color-text)' }}>Nothing trending yet</h3>
+              <p className="text-sm mt-1 max-w-xs" style={{ color: 'var(--color-text-4)' }}>
+                Post a before/after and get likes to appear here.
+              </p>
+            </div>
+            <Link href="/work/post" className="btn btn-primary btn-sm">
+              <Camera className="w-3.5 h-3.5" /> Post work
+            </Link>
+          </div>
+        )}
+
         {/* Feed grid */}
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((item, i) => (
@@ -337,6 +481,14 @@ export default function WorkFeedPage() {
                       style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.25)' }}
                     >
                       <BadgeCheck className="w-2.5 h-2.5" /> Verified job
+                    </span>
+                  )}
+                  {item.trendScore !== undefined && item.trendScore > 2 && (
+                    <span
+                      className="text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5"
+                      style={{ background: 'rgba(249,115,22,0.1)', color: '#f97316', border: '1px solid rgba(249,115,22,0.25)' }}
+                    >
+                      🔥 Trending
                     </span>
                   )}
                   <span className="text-[10px] ml-auto" style={{ color: 'var(--color-text-4)' }}>

@@ -125,6 +125,33 @@ export async function GET(req: Request) {
       return NextResponse.json({ success: true, posts, following: true });
     }
 
+    const sort = url.searchParams.get("sort"); // "trending" | null
+
+    if (sort === "trending") {
+      // Fetch last 7 days of posts, score client-side, return sorted
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      let tq: FirebaseFirestore.Query = adminDb.collection("posts")
+        .where("createdAt", ">=", sevenDaysAgo)
+        .orderBy("createdAt", "desc")
+        .limit(100);
+      if (contractorId) tq = adminDb.collection("posts")
+        .where("contractorId", "==", contractorId)
+        .where("createdAt", ">=", sevenDaysAgo)
+        .orderBy("createdAt", "desc")
+        .limit(100);
+
+      const tSnap = await tq.get();
+      const posts = await hydratePosts(tSnap, viewerUid);
+
+      // Score & sort
+      const scored = posts.map(p => ({
+        ...p,
+        trendScore: trendingScore(p),
+      })).sort((a, b) => b.trendScore - a.trendScore);
+
+      return NextResponse.json({ success: true, posts: scored.slice(0, limit) });
+    }
+
     let q: FirebaseFirestore.Query = adminDb.collection("posts");
     if (contractorId) q = q.where("contractorId", "==", contractorId);
     // Single orderBy after equality filter — auto-indexed
@@ -136,6 +163,22 @@ export async function GET(req: Request) {
     console.error("List posts error:", err);
     return NextResponse.json({ error: "Failed to load posts" }, { status: 500 });
   }
+}
+
+/**
+ * Trending score formula:
+ *   base  = likes×3 + comments×5 + views×0.5
+ *   decay = e^(-0.08 × hoursSincePost)   — halves every ~8.6 hours
+ *   bonus × 1.3 for before/after, × 1.2 for video
+ */
+function trendingScore(p: { likeCount: number; commentCount: number; createdAt: string | null; beforeAfter: boolean; hasVideo?: boolean }): number {
+  const base = (p.likeCount ?? 0) * 3 + (p.commentCount ?? 0) * 5;
+  const hours = p.createdAt
+    ? (Date.now() - new Date(p.createdAt).getTime()) / 3_600_000
+    : 168;
+  const decay = Math.exp(-0.08 * hours);
+  const formatBonus = (p.beforeAfter ? 1.3 : 1) * (p.hasVideo ? 1.2 : 1);
+  return (base + 1) * decay * formatBonus; // +1 prevents all-zero posts from scoring 0
 }
 
 /** Add likedByMe (for signed-in viewer) + merge contractor identity */
