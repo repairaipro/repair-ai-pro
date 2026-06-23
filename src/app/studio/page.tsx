@@ -12,6 +12,7 @@ import {
   Sparkles, Wallet, ChevronRight, Link2, Instagram, AtSign, Globe,
   Youtube, Unlink, ExternalLink, Edit3, Save, X,
 } from 'lucide-react';
+import StudioAssistant from '@/components/StudioAssistant';
 
 type Summary = {
   profile: { name: string | null; photoUrl: string | null; trade: string | null; availability: string; verificationStatus: string; stripeConnectVerified: boolean };
@@ -408,6 +409,9 @@ export default function ContractorStudio() {
                 </p>
               </div>
             </div>
+
+            {/* ── AI Business Advisor ── */}
+            <StudioAssistant />
 
             {/* ── Reputation ── */}
             <div className="rounded-2xl p-4" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
