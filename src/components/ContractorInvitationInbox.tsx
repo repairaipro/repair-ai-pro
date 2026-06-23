@@ -44,6 +44,11 @@ type BidState = {
   submitted: boolean;
   submittedAmount?: number;
   error?: string;
+  // AI draft state
+  aiDrafting?: boolean;
+  aiDrafted?: boolean;
+  aiReasoning?: string;
+  aiConfidence?: 'high' | 'medium' | 'low';
 };
 
 type InboxEntry = InboxItem & {
@@ -113,6 +118,10 @@ function defaultBid(): BidState {
     etaDays: "2",
     submitting: false,
     submitted: false,
+    aiDrafting: false,
+    aiDrafted: false,
+    aiReasoning: undefined,
+    aiConfidence: undefined,
   };
 }
 
@@ -313,6 +322,49 @@ export default function ContractorInvitationInbox() {
       updateBid(entry.jobId, {
         submitting: false,
         error: err.message ?? "Something went wrong",
+      });
+    }
+  }
+
+  /* ── AI bid drafter ─────────────────────────────────────────────────── */
+  async function draftBidWithAI(entry: InboxEntry) {
+    if (!user) return;
+    updateBid(entry.jobId, { aiDrafting: true, error: undefined });
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch('/api/ai/bid-writer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ jobId: entry.jobId }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error ?? 'AI unavailable');
+
+      // Map etaDays to nearest ETA_OPTIONS value string
+      const etaMap: Record<number, string> = { 1: '1', 3: '2', 7: '7', 14: '10' };
+      const etaStr = etaMap[data.etaDays] ?? '2';
+
+      updateBid(entry.jobId, {
+        amount:      String(data.amount),
+        message:     data.message,
+        etaDays:     etaStr,
+        aiDrafting:  false,
+        aiDrafted:   true,
+        aiReasoning: data.reasoning,
+        aiConfidence: data.confidence,
+        error:       undefined,
+      });
+
+      addToast({
+        type:  'bid',
+        title: '✨ AI drafted your bid',
+        body:  `Suggested $${data.amount} · review and submit when ready.`,
+        duration: 4000,
+      });
+    } catch (err: any) {
+      updateBid(entry.jobId, {
+        aiDrafting: false,
+        error: err.message ?? 'Could not generate AI draft',
       });
     }
   }
@@ -678,6 +730,80 @@ export default function ContractorInvitationInbox() {
                     marginBottom: 12,
                   }}
                 >
+                  {/* ── AI Draft button ── */}
+                  <div style={{ marginBottom: 14 }}>
+                    {!bid.aiDrafted ? (
+                      <button
+                        onClick={() => draftBidWithAI(entry)}
+                        disabled={bid.aiDrafting}
+                        style={{
+                          width: '100%',
+                          padding: '11px 0',
+                          borderRadius: 10,
+                          border: '1px solid rgba(139,92,246,0.4)',
+                          background: bid.aiDrafting
+                            ? 'rgba(139,92,246,0.05)'
+                            : 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.15))',
+                          color: '#a78bfa',
+                          fontWeight: 700,
+                          fontSize: 14,
+                          cursor: bid.aiDrafting ? 'not-allowed' : 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 8,
+                          transition: 'all 0.15s',
+                        }}
+                      >
+                        {bid.aiDrafting ? (
+                          <>
+                            <span style={{
+                              width: 14, height: 14,
+                              border: '2px solid rgba(167,139,250,0.4)',
+                              borderTopColor: '#a78bfa',
+                              borderRadius: '50%',
+                              display: 'inline-block',
+                              animation: 'spin 0.6s linear infinite',
+                            }} />
+                            Writing your bid…
+                          </>
+                        ) : (
+                          <>✨ AI Draft My Bid</>
+                        )}
+                      </button>
+                    ) : (
+                      <div style={{
+                        padding: '10px 14px',
+                        borderRadius: 10,
+                        background: 'rgba(34,197,94,0.07)',
+                        border: '1px solid rgba(34,197,94,0.2)',
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: 10,
+                      }}>
+                        <span style={{ fontSize: 16, flexShrink: 0 }}>✨</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontSize: 12, fontWeight: 700, color: '#4ade80', marginBottom: 2 }}>
+                            AI draft applied
+                            {bid.aiConfidence === 'high' && ' · High confidence'}
+                            {bid.aiConfidence === 'medium' && ' · Medium confidence'}
+                          </p>
+                          {bid.aiReasoning && (
+                            <p style={{ fontSize: 11, color: 'var(--color-text-4)', lineHeight: 1.5 }}>
+                              {bid.aiReasoning}
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => draftBidWithAI(entry)}
+                          style={{ fontSize: 11, color: '#818cf8', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0 }}
+                        >
+                          Redraft
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
                   <p
                     style={{
                       fontSize: 12,
@@ -688,7 +814,7 @@ export default function ContractorInvitationInbox() {
                       marginBottom: 12,
                     }}
                   >
-                    Your Bid
+                    {bid.aiDrafted ? 'Review & Edit' : 'Your Bid'}
                   </p>
 
                   <div className="space-y-3">
@@ -735,13 +861,19 @@ export default function ContractorInvitationInbox() {
                             paddingTop: 10,
                             paddingBottom: 10,
                             background: "var(--color-surface)",
-                            border: "1px solid var(--color-border)",
+                            border: bid.aiDrafted && bid.amount
+                              ? "1px solid rgba(139,92,246,0.5)"
+                              : "1px solid var(--color-border)",
+                            boxShadow: bid.aiDrafted && bid.amount
+                              ? "0 0 0 3px rgba(139,92,246,0.1)"
+                              : "none",
                             borderRadius: 8,
                             color: "var(--color-text)",
                             fontSize: 15,
                             fontWeight: 600,
                             outline: "none",
                             boxSizing: "border-box",
+                            transition: "border 0.2s, box-shadow 0.2s",
                           }}
                         />
                       </div>
@@ -808,7 +940,12 @@ export default function ContractorInvitationInbox() {
                           width: "100%",
                           padding: "10px 12px",
                           background: "var(--color-surface)",
-                          border: "1px solid var(--color-border)",
+                          border: bid.aiDrafted && bid.message
+                            ? "1px solid rgba(139,92,246,0.5)"
+                            : "1px solid var(--color-border)",
+                          boxShadow: bid.aiDrafted && bid.message
+                            ? "0 0 0 3px rgba(139,92,246,0.1)"
+                            : "none",
                           borderRadius: 8,
                           color: "var(--color-text)",
                           fontSize: 13,
@@ -816,6 +953,7 @@ export default function ContractorInvitationInbox() {
                           resize: "vertical",
                           outline: "none",
                           boxSizing: "border-box",
+                          transition: "border 0.2s, box-shadow 0.2s",
                         }}
                       />
                     </div>
@@ -921,25 +1059,31 @@ export default function ContractorInvitationInbox() {
                     >
                       🎯 Place Bid
                     </button>
-                    {/* AI Bid Pack helper */}
+                    {/* AI Draft button — opens form AND starts draft in one tap */}
                     {entry.job && (
                       <button
-                        onClick={() => setBidPackEntry(entry)}
-                        title="Generate AI bid pack"
+                        onClick={async () => {
+                          updateBid(entry.jobId, { open: true });
+                          await draftBidWithAI(entry);
+                        }}
+                        title="Let AI write your bid"
                         style={{
-                          padding: "10px 12px",
-                          background: "rgba(99,102,241,0.1)",
-                          color: "#818cf8",
-                          border: "1px solid rgba(99,102,241,0.25)",
+                          padding: "10px 14px",
+                          background: "linear-gradient(135deg, rgba(99,102,241,0.2), rgba(139,92,246,0.2))",
+                          color: "#a78bfa",
+                          border: "1px solid rgba(139,92,246,0.4)",
                           borderRadius: 8,
                           fontSize: 13,
+                          fontWeight: 700,
                           cursor: "pointer",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
+                          gap: 5,
+                          whiteSpace: "nowrap",
                         }}
                       >
-                        ✨
+                        ✨ AI Draft
                       </button>
                     )}
                     <button
