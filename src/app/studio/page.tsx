@@ -410,6 +410,22 @@ export default function ContractorStudio() {
               </div>
             </div>
 
+            {/* ── Wrapped promo ── */}
+            <Link href="/studio/wrapped" style={{ textDecoration: 'none', display: 'block' }}>
+              <div className="rounded-2xl p-4 flex items-center gap-4" style={{ background: 'linear-gradient(135deg, #0f0c29, #302b63)', border: '1px solid rgba(99,102,241,0.3)', cursor: 'pointer' }}>
+                <div style={{ fontSize: 32, flexShrink: 0 }}>🎁</div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold" style={{ color: '#e2e8f0' }}>
+                    Your {new Date().getFullYear()} {new Date().getMonth() < 11 ? 'Mid-Year' : 'Year-End'} Wrapped is ready
+                  </p>
+                  <p className="text-xs mt-0.5" style={{ color: '#818cf8' }}>
+                    See your jobs, earnings, top post, and milestones — shareable card included.
+                  </p>
+                </div>
+                <ArrowRight className="w-4 h-4 flex-shrink-0" style={{ color: '#818cf8' }} />
+              </div>
+            </Link>
+
             {/* ── AI Business Advisor ── */}
             <StudioAssistant />
 
@@ -432,7 +448,7 @@ export default function ContractorStudio() {
             {/* ── Quick links ── */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <QuickLink href="/studio/analytics" icon={<BarChart2 className="w-4 h-4" />} label="Analytics" />
-              <QuickLink href="/dashboard/contractor/jobs" icon={<Briefcase className="w-4 h-4" />} label="My jobs" />
+              <QuickLink href="/studio/wrapped" icon={<Sparkles className="w-4 h-4" />} label="My Wrapped" />
               <QuickLink href="/contractor-profile" icon={<Settings className="w-4 h-4" />} label="Profile" />
               <QuickLink href="/dashboard/contractor/settings" icon={<Wallet className="w-4 h-4" />} label="Payouts" />
             </div>
