@@ -11,7 +11,11 @@ import {
 } from 'lucide-react';
 
 type Author = { id: string; name: string; photoUrl: string | null; isContractor?: boolean };
-type Comment = { id: string; text: string; createdAt: string | null; author: Author };
+type Reply = { id: string; text: string; createdAt: string | null; author: Author; mentions?: string[] };
+type Comment = {
+  id: string; text: string; createdAt: string | null; author: Author;
+  replies?: Reply[]; replyCount?: number; mentions?: string[];
+};
 type Post = {
   id: string;
   caption: string;
@@ -54,6 +58,10 @@ export default function PostDetailPage() {
   const [copied, setCopied] = useState(false);
   const [draft, setDraft] = useState('');
   const [posting, setPosting] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<{ commentId: string; authorName: string; authorId: string } | null>(null);
+  const [expandedReplies, setExpandedReplies] = useState<Set<string>>(new Set());
+  const [loadingReplies, setLoadingReplies] = useState<string | null>(null);
+  const [allReplies, setAllReplies] = useState<Record<string, Reply[]>>({});
 
   const load = useCallback(async () => {
     if (!postId) return;
@@ -110,17 +118,44 @@ export default function PostDetailPage() {
     setPosting(true);
     try {
       const token = await user.getIdToken();
+      const body: Record<string, any> = { text: draft.trim() };
+      if (replyingTo) {
+        body.parentCommentId = replyingTo.commentId;
+        body.mentionedUid    = replyingTo.authorId;
+      }
       const res = await fetch(`/api/posts/${postId}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ text: draft.trim() }),
+        body: JSON.stringify(body),
       });
       if (res.ok) {
         setDraft('');
+        setReplyingTo(null);
         await load();
       }
     } catch { /* ignore */ }
     finally { setPosting(false); }
+  }
+
+  async function loadMoreReplies(commentId: string) {
+    if (loadingReplies === commentId) return;
+    setLoadingReplies(commentId);
+    try {
+      const res = await fetch(`/api/posts/${postId}/comments?parentId=${commentId}`);
+      const data = await res.json();
+      if (data.replies) {
+        setAllReplies(prev => ({ ...prev, [commentId]: data.replies }));
+        setExpandedReplies(prev => new Set([...prev, commentId]));
+      }
+    } catch { /* ignore */ }
+    finally { setLoadingReplies(null); }
+  }
+
+  function startReply(commentId: string, authorName: string, authorId: string) {
+    setReplyingTo({ commentId, authorName, authorId });
+    setDraft(`@${authorName} `);
+    // Scroll to composer
+    setTimeout(() => document.getElementById('comment-input')?.focus(), 50);
   }
 
   if (loading) {
@@ -257,10 +292,11 @@ export default function PostDetailPage() {
           {/* Composer */}
           <div className="flex items-center gap-2">
             <input
+              id="comment-input"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') submitComment(); }}
-              placeholder={user ? 'Add a comment…' : 'Sign in to comment'}
+              placeholder={replyingTo ? `Reply to @${replyingTo.authorName}…` : user ? 'Add a comment…' : 'Sign in to comment'}
               disabled={!user || posting}
               className="input text-sm flex-1"
             />
@@ -270,35 +306,131 @@ export default function PostDetailPage() {
           </div>
 
           {/* List */}
+          {/* Reply indicator */}
+          {replyingTo && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs mb-1" style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)' }}>
+              <MessageCircle className="w-3 h-3" style={{ color: '#818cf8' }} />
+              <span style={{ color: '#818cf8' }}>Replying to <strong>{replyingTo.authorName}</strong></span>
+              <button onClick={() => { setReplyingTo(null); setDraft(''); }} className="ml-auto text-xs" style={{ color: 'var(--color-text-4)' }}>✕ Cancel</button>
+            </div>
+          )}
+
           {comments.length === 0 ? (
             <p className="text-sm text-center py-6" style={{ color: 'var(--color-text-4)' }}>
               Be the first to comment.
             </p>
           ) : (
-            <div className="space-y-3">
-              {comments.map((c) => (
-                <div key={c.id} className="flex items-start gap-2.5">
-                  <Link href={c.author.isContractor ? `/contractor/${c.author.id}` : '#'}>
-                    <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center text-[11px] font-bold flex-shrink-0" style={{ background: 'var(--color-surface-2)', color: 'var(--color-text-3)' }}>
-                      {c.author.photoUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={c.author.photoUrl} alt="" className="w-full h-full object-cover" />
-                      ) : c.author.name[0]?.toUpperCase()}
-                    </div>
-                  </Link>
-                  <div className="flex-1 min-w-0">
-                    <div className="rounded-2xl px-3 py-2" style={{ background: 'var(--color-surface)' }}>
-                      <span className="text-xs font-semibold flex items-center gap-1" style={{ color: 'var(--color-text)' }}>
-                        {c.author.name}
-                        {c.author.isContractor && <BadgeCheck className="w-3 h-3" style={{ color: '#22c55e' }} />}
-                      </span>
-                      <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-2)' }}>{c.text}</p>
-                    </div>
-                    <span className="text-[10px] ml-3" style={{ color: 'var(--color-text-4)' }}>{timeAgo(c.createdAt)}</span>
+            <div className="space-y-4">
+              {comments.map((c) => {
+                const expanded = expandedReplies.has(c.id);
+                const replies  = expanded ? (allReplies[c.id] ?? c.replies ?? []) : (c.replies ?? []);
+                const hasMore  = (c.replyCount ?? 0) > 3 && !expanded;
+                return (
+                  <div key={c.id}>
+                    {/* Top-level comment */}
+                    <CommentBubble
+                      comment={c}
+                      size="md"
+                      onReply={() => startReply(c.id, c.author.name, c.author.id)}
+                      showReply={!!user}
+                    />
+
+                    {/* Replies */}
+                    {replies.length > 0 && (
+                      <div className="ml-10 mt-2 space-y-2">
+                        {replies.map(r => (
+                          <CommentBubble
+                            key={r.id}
+                            comment={r}
+                            size="sm"
+                            onReply={() => startReply(c.id, r.author.name, r.author.id)}
+                            showReply={!!user}
+                          />
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Load more replies */}
+                    {hasMore && (
+                      <button
+                        onClick={() => loadMoreReplies(c.id)}
+                        disabled={loadingReplies === c.id}
+                        className="ml-10 mt-1.5 flex items-center gap-1.5 text-xs font-semibold"
+                        style={{ color: '#818cf8', background: 'none', border: 'none', cursor: 'pointer' }}
+                      >
+                        {loadingReplies === c.id
+                          ? <Loader2 className="w-3 h-3 animate-spin" />
+                          : '↩'}
+                        {loadingReplies === c.id ? 'Loading…' : `View ${(c.replyCount ?? 0) - 3} more repl${(c.replyCount ?? 0) - 3 === 1 ? 'y' : 'ies'}`}
+                      </button>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Comment bubble ── */
+function CommentBubble({
+  comment, size, onReply, showReply,
+}: {
+  comment: { id: string; text: string; createdAt: string | null; author: Author; mentions?: string[] };
+  size: 'md' | 'sm';
+  onReply: () => void;
+  showReply: boolean;
+}) {
+  const avatarSize = size === 'md' ? 32 : 24;
+  const fontSize   = size === 'md' ? 13 : 12;
+
+  // Highlight @mentions in the text
+  const renderText = (text: string) => {
+    const parts = text.split(/(@\S+)/g);
+    return parts.map((p, i) =>
+      p.startsWith('@')
+        ? <span key={i} style={{ color: '#818cf8', fontWeight: 600 }}>{p}</span>
+        : <span key={i}>{p}</span>
+    );
+  };
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+      <Link href={comment.author.isContractor ? `/contractor/${comment.author.id}` : '#'} style={{ flexShrink: 0 }}>
+        <div style={{
+          width: avatarSize, height: avatarSize, borderRadius: '50%', overflow: 'hidden',
+          background: 'var(--color-surface-2)', color: 'var(--color-text-3)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: size === 'md' ? 11 : 9, fontWeight: 700,
+        }}>
+          {comment.author.photoUrl
+            // eslint-disable-next-line @next/next/no-img-element
+            ? <img src={comment.author.photoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            : comment.author.name[0]?.toUpperCase()}
+        </div>
+      </Link>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ borderRadius: 16, padding: '8px 12px', background: 'var(--color-surface)', display: 'inline-block', maxWidth: '100%' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text)', display: 'flex', alignItems: 'center', gap: 4 }}>
+            {comment.author.name}
+            {comment.author.isContractor && <BadgeCheck style={{ width: 10, height: 10, color: '#22c55e' }} />}
+          </span>
+          <p style={{ fontSize, marginTop: 2, color: 'var(--color-text-2)', lineHeight: 1.5 }}>
+            {renderText(comment.text)}
+          </p>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 3, paddingLeft: 4 }}>
+          <span style={{ fontSize: 10, color: 'var(--color-text-4)' }}>{timeAgo(comment.createdAt)}</span>
+          {showReply && (
+            <button
+              onClick={onReply}
+              style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-text-4)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+            >
+              Reply
+            </button>
           )}
         </div>
       </div>
