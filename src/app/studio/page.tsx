@@ -427,7 +427,7 @@ export default function ContractorStudio() {
 
             {/* ── Quick links ── */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <QuickLink href="/dashboard/contractor/earnings" icon={<BarChart2 className="w-4 h-4" />} label="Earnings" />
+              <QuickLink href="/studio/analytics" icon={<BarChart2 className="w-4 h-4" />} label="Analytics" />
               <QuickLink href="/dashboard/contractor/jobs" icon={<Briefcase className="w-4 h-4" />} label="My jobs" />
               <QuickLink href="/contractor-profile" icon={<Settings className="w-4 h-4" />} label="Profile" />
               <QuickLink href="/dashboard/contractor/settings" icon={<Wallet className="w-4 h-4" />} label="Payouts" />

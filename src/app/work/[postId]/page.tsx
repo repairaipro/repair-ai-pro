@@ -76,6 +76,13 @@ export default function PostDetailPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Fire-and-forget view count — runs once per page load
+  useEffect(() => {
+    const id = (window.location.pathname.split('/').pop() ?? '');
+    if (!id) return;
+    fetch(`/api/posts/${id}/view`, { method: 'POST' }).catch(() => {});
+  }, []);
+
   async function toggleLike() {
     if (!user) { window.location.href = '/auth/signin'; return; }
     if (!post || likeBusy) return;
