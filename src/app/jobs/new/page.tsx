@@ -246,6 +246,7 @@ export default function NewJobPage() {
   const [aiLoading, setAiLoading] = useState(false);
   const [estimateLoading, setEstimateLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [useInstantBook, setUseInstantBook] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fileRef = useRef<HTMLInputElement>(null);
@@ -443,7 +444,15 @@ CRITICAL: If you're not confident, ask clarifying questions rather than guessing
       });
       const data = await res.json();
       if (!res.ok || !data.jobId) throw new Error(data.error ?? "Failed to create job");
-      // Go to job detail — shows progress tracker + live bid updates
+
+      // Instant Book — fire-and-forget (non-blocking)
+      if (useInstantBook) {
+        fetch(`/api/jobs/${data.jobId}/instant-book`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${await user.getIdToken()}` },
+        }).catch(() => {});
+      }
+
       router.push(`/jobs/${data.jobId}`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to post job. Please try again.";
@@ -1039,6 +1048,71 @@ CRITICAL: If you're not confident, ask clarifying questions rather than guessing
                 </div>
               )}
             </div>
+
+            {/* ── Instant Book toggle (shown when estimate < $500) ── */}
+            {estimate && estimate.price_typical_usd <= 500 && (
+              <div className="card overflow-hidden">
+                {/* Header */}
+                <div className="p-4" style={{ background: useInstantBook ? 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.1))' : 'var(--color-surface)', borderBottom: '1px solid var(--color-border)' }}>
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-lg" style={{ background: 'rgba(99,102,241,0.12)' }}>⚡</div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-bold" style={{ color: 'var(--color-text)' }}>Instant Book</h3>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8' }}>NEW</span>
+                      </div>
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-4)' }}>
+                        Skip bidding — get a confirmed contractor in under 30 minutes.
+                      </p>
+                    </div>
+                    {/* Toggle */}
+                    <button
+                      onClick={() => setUseInstantBook(p => !p)}
+                      style={{
+                        width: 44, height: 24, borderRadius: 12, flexShrink: 0,
+                        background: useInstantBook ? '#6366f1' : 'var(--color-surface-2)',
+                        border: '1px solid var(--color-border)',
+                        cursor: 'pointer', position: 'relative', transition: 'background 0.2s',
+                      }}
+                    >
+                      <span style={{
+                        position: 'absolute', top: 3,
+                        left: useInstantBook ? 22 : 3,
+                        width: 16, height: 16, borderRadius: '50%',
+                        background: '#fff', transition: 'left 0.2s',
+                      }} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Details */}
+                <div className="p-4 space-y-3" style={{ background: 'var(--color-bg-2)' }}>
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    {[
+                      { icon: '⚡', label: 'Confirmed', sub: 'in < 30 min' },
+                      { icon: '💰', label: `$${estimate.price_typical_usd}`, sub: 'fixed price' },
+                      { icon: '🛡', label: 'Protected', sub: 'by escrow' },
+                    ].map(item => (
+                      <div key={item.label} className="rounded-xl p-2.5" style={{ background: 'var(--color-surface)' }}>
+                        <div style={{ fontSize: 18 }}>{item.icon}</div>
+                        <p className="text-xs font-bold mt-1" style={{ color: 'var(--color-text)' }}>{item.label}</p>
+                        <p className="text-[10px]" style={{ color: 'var(--color-text-4)' }}>{item.sub}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {useInstantBook ? (
+                    <div className="rounded-xl p-3 text-xs" style={{ background: 'rgba(34,197,94,0.07)', border: '1px solid rgba(34,197,94,0.2)', color: '#4ade80' }}>
+                      ✓ Instant Book on — AI will match you with the best available {detectedTrade ?? 'contractor'} in your area. You'll be notified the moment they accept.
+                    </div>
+                  ) : (
+                    <p className="text-xs text-center" style={{ color: 'var(--color-text-4)' }}>
+                      Or keep regular bidding — contractors compete and you choose the best offer.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Parts Finder card */}
             <div className="card p-6">

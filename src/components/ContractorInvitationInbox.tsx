@@ -213,6 +213,7 @@ export default function ContractorInvitationInbox() {
   const [search,      setSearch]      = useState("");
   const [sortBy,      setSortBy]      = useState<"newest" | "oldest" | "value">("newest");
   const [bidPackEntry, setBidPackEntry] = useState<InboxEntry | null>(null);
+  const [instantResponding, setInstantResponding] = useState<Record<string, boolean>>({});
 
   /* ── Load inbox + hydrate job data ─────────────────────────────────── */
   useEffect(() => {
@@ -366,6 +367,44 @@ export default function ContractorInvitationInbox() {
         aiDrafting: false,
         error: err.message ?? 'Could not generate AI draft',
       });
+    }
+  }
+
+  /* ── Instant Book respond ───────────────────────────────────────────── */
+  async function respondToInstantBook(jobId: string, accept: boolean) {
+    if (!user || instantResponding[jobId]) return;
+    setInstantResponding(p => ({ ...p, [jobId]: true }));
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/jobs/${jobId}/instant-respond`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ accept }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Failed');
+
+      if (accept && data.result === 'accepted') {
+        addToast({
+          type: 'bid',
+          title: '🎉 Job accepted!',
+          body: `You locked in $${data.price}. The homeowner has been notified.`,
+          duration: 6000,
+        });
+        setEntries(prev => prev.map(e => e.jobId === jobId ? { ...e, invitationStatus: 'accepted' } : e));
+      } else {
+        addToast({
+          type: 'bid',
+          title: 'Passed',
+          body: 'Job passed to the next available contractor.',
+          duration: 3000,
+        });
+        setEntries(prev => prev.filter(e => e.jobId !== jobId));
+      }
+    } catch (err: any) {
+      addToast({ type: 'bid', title: 'Error', body: err.message, duration: 3000 });
+    } finally {
+      setInstantResponding(p => ({ ...p, [jobId]: false }));
     }
   }
 
@@ -615,6 +654,7 @@ export default function ContractorInvitationInbox() {
           const isPending = entry.invitationStatus === "pending";
           const isAccepted = entry.invitationStatus === "accepted";
           const bid = entry.bid ?? defaultBid();
+          const isInstantBook = !!(entry.job as any)?.instantBook && (entry.job as any)?.instantBookStatus === 'pending' && (entry.job as any)?.instantBookQueue?.[(entry.job as any)?.instantBookCurrentIdx] === user?.uid;
 
           return (
             <div
@@ -710,6 +750,17 @@ export default function ContractorInvitationInbox() {
                 <p style={{ fontSize: 13, color: "var(--color-text-4)", fontStyle: "italic", marginBottom: 14 }}>
                   Job details unavailable
                 </p>
+              )}
+
+              {/* ── INSTANT BOOK OFFER ── */}
+              {isPending && isInstantBook && !bid.submitted && (
+                <InstantBookCard
+                  job={entry.job as any}
+                  jobId={entry.jobId}
+                  responding={!!instantResponding[entry.jobId]}
+                  onAccept={() => respondToInstantBook(entry.jobId, true)}
+                  onPass={() => respondToInstantBook(entry.jobId, false)}
+                />
               )}
 
               {/* ── BID SUBMITTED STATE ── */}
@@ -1216,6 +1267,114 @@ export default function ContractorInvitationInbox() {
           onClose={() => setBidPackEntry(null)}
         />
       )}
+    </div>
+  );
+}
+
+/* ── Instant Book Card ────────────────────────────────────────────────────── */
+function InstantBookCard({
+  job, jobId, responding, onAccept, onPass,
+}: {
+  job: Record<string, any>;
+  jobId: string;
+  responding: boolean;
+  onAccept: () => void;
+  onPass: () => void;
+}) {
+  const [secondsLeft, setSecondsLeft] = useState<number>(() => {
+    const offeredAt = job.instantBookOfferedAt?.toDate?.()?.getTime() ?? Date.now();
+    return Math.max(0, Math.round((offeredAt + 15 * 60_000 - Date.now()) / 1000));
+  });
+
+  useEffect(() => {
+    if (secondsLeft <= 0) return;
+    const t = setInterval(() => setSecondsLeft(s => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(t);
+  }, [secondsLeft]);
+
+  const mins = Math.floor(secondsLeft / 60);
+  const secs = secondsLeft % 60;
+  const isExpired = secondsLeft === 0;
+  const urgentColor = secondsLeft < 120 ? '#f87171' : secondsLeft < 300 ? '#fb923c' : '#4ade80';
+
+  return (
+    <div style={{
+      borderRadius: 14,
+      overflow: 'hidden',
+      border: '1px solid rgba(99,102,241,0.4)',
+      marginBottom: 14,
+    }}>
+      {/* Header */}
+      <div style={{
+        background: 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(139,92,246,0.15))',
+        padding: '14px 16px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 22 }}>⚡</span>
+          <div>
+            <p style={{ fontSize: 14, fontWeight: 800, color: '#f1f5f9' }}>Instant Book Offer</p>
+            <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>Accept to claim this job instantly — no bidding</p>
+          </div>
+        </div>
+        {/* Countdown */}
+        <div style={{ textAlign: 'center', flexShrink: 0 }}>
+          <p style={{ fontSize: 22, fontWeight: 900, color: isExpired ? '#f87171' : urgentColor, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
+            {isExpired ? 'Expired' : `${mins}:${String(secs).padStart(2, '0')}`}
+          </p>
+          <p style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            {isExpired ? '' : 'remaining'}
+          </p>
+        </div>
+      </div>
+
+      {/* Price */}
+      <div style={{ padding: '14px 16px', background: 'rgba(0,0,0,0.2)' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 10 }}>
+          <span style={{ fontSize: 32, fontWeight: 900, color: '#4ade80' }}>${job.instantBookPrice?.toLocaleString()}</span>
+          <span style={{ fontSize: 13, color: '#64748b' }}>fixed · paid via escrow</span>
+        </div>
+
+        {!isExpired ? (
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button
+              onClick={onAccept}
+              disabled={responding}
+              style={{
+                flex: 1, padding: '12px 0',
+                background: responding ? 'rgba(34,197,94,0.1)' : 'linear-gradient(135deg, #22c55e, #16a34a)',
+                color: '#fff', border: 'none', borderRadius: 10,
+                fontSize: 15, fontWeight: 700, cursor: responding ? 'not-allowed' : 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                boxShadow: responding ? 'none' : '0 4px 20px -4px rgba(34,197,94,0.5)',
+                transition: 'all 0.15s',
+              }}
+            >
+              {responding ? (
+                <><span style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.6s linear infinite' }} /> Accepting…</>
+              ) : (
+                <>✅ Accept — ${job.instantBookPrice}</>
+              )}
+            </button>
+            <button
+              onClick={onPass}
+              disabled={responding}
+              style={{
+                padding: '12px 18px',
+                background: 'rgba(255,255,255,0.05)', color: '#64748b',
+                border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10,
+                fontSize: 14, fontWeight: 600, cursor: responding ? 'not-allowed' : 'pointer',
+              }}
+            >
+              Pass
+            </button>
+          </div>
+        ) : (
+          <p style={{ fontSize: 13, color: '#f87171', textAlign: 'center', padding: '8px 0' }}>
+            This offer has expired. You can still bid on this job normally.
+          </p>
+        )}
+      </div>
     </div>
   );
 }

@@ -27,7 +27,8 @@ export type NotifType =
   | "video_consultation_approved"
   | "new_follower"
   | "post_liked"
-  | "post_commented";
+  | "post_commented"
+  | "instant_book_offer";
 
 export type NotifPayload = {
   recipientId: string;
