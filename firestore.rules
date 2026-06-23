@@ -669,6 +669,91 @@ service cloud.firestore {
       allow delete: if signedIn() && uid() == userId;
     }
 
+    /* ================= WORK POSTS (social feed) ================= */
+
+    match /posts/{postId} {
+      // Public read — work feed is visible to everyone
+      allow read: if true;
+
+      // Contractors create their own posts
+      allow create: if signedIn()
+        && request.resource.data.contractorId == uid()
+        && request.resource.data.keys().hasAll(["contractorId", "caption", "trade", "createdAt"]);
+
+      // Server-side increments (likeCount, commentCount, viewCount) only
+      allow update: if false;
+      allow delete: if signedIn() && resource.data.contractorId == uid();
+
+      /* Likes — toggle per viewer */
+      match /likes/{viewerId} {
+        allow read: if true;
+        allow write: if signedIn() && uid() == viewerId;
+      }
+
+      /* Comments — public read, auth create */
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if signedIn()
+          && request.resource.data.authorId == uid()
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 600;
+        // Server handles replyCount increments
+        allow update: if false;
+        allow delete: if signedIn() && resource.data.authorId == uid();
+      }
+    }
+
+    /* ================= SOCIAL GRAPH ================= */
+
+    // contractors/{id}/followers/{viewerUid}
+    match /contractors/{contractorId}/followers/{viewerUid} {
+      allow read: if true;
+      allow write: if signedIn() && uid() == viewerUid;
+    }
+
+    // users/{id}/following/{contractorId}
+    match /users/{userId}/following/{contractorId} {
+      allow read: if signedIn() && uid() == userId;
+      allow write: if signedIn() && uid() == userId;
+    }
+
+    /* ================= CONTRACTOR REVIEWS (public) ================= */
+    match /contractors/{contractorId}/reviews/{reviewId} {
+      allow read: if true;
+      // Written by API routes only (verified token in server)
+      allow write: if false;
+    }
+
+    /* ================= HOMEOWNERS ================= */
+    match /homeowners/{userId} {
+      allow read:   if signedIn() && uid() == userId;
+      allow create: if signedIn() && uid() == userId;
+      allow update: if signedIn() && uid() == userId;
+      allow delete: if false;
+    }
+
+    /* ================= ANALYTICS EVENTS (funnel tracking) ================= */
+    match /analyticsEvents/{eventId} {
+      // Written server-side only; admins read via API
+      allow read, write: if false;
+    }
+
+    /* ================= HOMEOWNER MAINTENANCE ================= */
+    match /homeMaintenancePlans/{planId} {
+      allow read:  if signedIn() && resource.data.userId == uid();
+      allow create: if signedIn() && request.resource.data.userId == uid();
+      allow update: if signedIn() && resource.data.userId == uid();
+      allow delete: if signedIn() && resource.data.userId == uid();
+    }
+
+    /* ================= REFERRALS ================= */
+    match /referrals/{referralId} {
+      allow read: if signedIn()
+        && (resource.data.referrerId == uid() || resource.data.referredId == uid());
+      allow write: if false; // server only
+    }
+
     /* ================= DEFAULT DENY ================= */
 
     match /{document=**} {
