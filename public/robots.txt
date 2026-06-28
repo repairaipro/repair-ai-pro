@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin/
+Disallow: /auth/
+Disallow: /unsubscribe
+
+Sitemap: https://repairaipro.com/sitemap.xml
+
+User-agent: AdsBot-Google
+Allow: /

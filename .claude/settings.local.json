@@ -22,18 +22,17 @@
       "Bash(cat next.config.js)",
       "Bash(cat next.config.ts)",
       "Bash(cat next.config.mjs)",
-      "Bash(grep -E \"\\\\.\\(ts|tsx|js\\)$\")",
-      "Bash(curl -s http://localhost:3000)",
-      "Bash(taskkill /F /IM node.exe)",
-      "PowerShell(Get-Process node -ErrorAction SilentlyContinue)",
-      "PowerShell(Stop-Process -Force)",
-      "PowerShell(\"Killed node processes\")",
-      "Bash(rm dev-server.log)",
-      "Bash(npm run *)",
+      "Bash(git rebase *)",
+      "Bash(git stash *)",
+      "Bash(git push *)",
+      "Bash(npx vercel *)",
+      "mcp__Claude_Preview__preview_start",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "mcp__Claude_Preview__preview_start",
-      "mcp__Claude_in_Chrome__tabs_context_mcp"
+      "Bash(node -e ' *)",
+      "mcp__visualize__read_me",
+      "mcp__visualize__show_widget",
+      "Bash(node scripts/generate-icons.js)"
     ]
   }
 }
