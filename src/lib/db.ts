@@ -5,6 +5,10 @@ import {
   GoogleAuthProvider,
   signInWithPopup,
   signOut as firebaseSignOut,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail,
+  updateProfile,
   UserCredential,
 } from "firebase/auth";
 import { getStorage } from "firebase/storage";
@@ -56,4 +60,37 @@ export async function signInWithGoogle(): Promise<UserCredential["user"] | null>
 /** --- Sign-Out --- */
 export async function signOutUser() {
   await firebaseSignOut(auth);
+}
+
+/** --- Email/Password Sign-In --- */
+export async function signInWithEmail(email: string, password: string) {
+  const result = await signInWithEmailAndPassword(auth, email, password);
+  return result.user;
+}
+
+/** --- Email/Password Sign-Up --- */
+export async function signUpWithEmail(email: string, password: string, name: string) {
+  const result = await createUserWithEmailAndPassword(auth, email, password);
+  const user = result.user;
+  await updateProfile(user, { displayName: name });
+
+  // Create Firestore user record
+  const ref = doc(db, 'users', user.uid);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) {
+    await setDoc(ref, {
+      uid:         user.uid,
+      email:       user.email,
+      role:        'guest',
+      displayName: name,
+      photoURL:    '',
+      createdAt:   new Date(),
+    });
+  }
+  return user;
+}
+
+/** --- Password Reset --- */
+export async function resetPassword(email: string) {
+  await sendPasswordResetEmail(auth, email);
 }

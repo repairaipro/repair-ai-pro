@@ -21,6 +21,7 @@ const MobileBottomNav = dynamic(() => import('@/components/MobileBottomNav'), {
 
 // ✅ Toast notification system
 import { ToastProvider } from '@/components/ToastProvider';
+import Footer from '@/components/Footer';
 
 // ✅ Background notification → toast watcher
 const NotificationToastWatcher = dynamic(() => import('@/components/NotificationToastWatcher'), {
@@ -42,6 +43,11 @@ export const metadata: Metadata = {
     'electrician', 'HVAC', 'handyman', 'repair estimate', 'verified contractors',
   ],
   manifest: '/manifest.json',
+  icons: {
+    icon: '/favicon.svg',
+    shortcut: '/favicon.svg',
+    apple: '/favicon.svg',
+  },
   openGraph: {
     type: 'website',
     siteName: 'RepairAI Pro',
@@ -84,13 +90,14 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="Repair AI Pro" />
       </head>
-      <body className="min-h-screen antialiased">
+      <body className="min-h-screen antialiased flex flex-col">
         {/* ✅ Provide global authentication context */}
         <AuthProvider>
           <ToastProvider>
             <NotificationToastWatcher />
             <Header />
-            <main className="p-6">{children}</main>
+            <main className="p-6 flex-1">{children}</main>
+            <Footer />
             {/* ✅ PWA: Register service worker, update badge, listen for install prompt */}
             <PWASetup />
             {/* ✅ Mobile sticky bottom navigation */}

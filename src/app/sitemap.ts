@@ -17,6 +17,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${BASE_URL}/contractor`,  lastModified: now, changeFrequency: 'daily',   priority: 0.8 },
     { url: `${BASE_URL}/maintenance`, lastModified: now, changeFrequency: 'weekly',  priority: 0.6 },
     { url: `${BASE_URL}/auth/signin`, lastModified: now, changeFrequency: 'yearly',  priority: 0.3 },
+    { url: `${BASE_URL}/financing`,   lastModified: now, changeFrequency: 'monthly', priority: 0.7 },
+    { url: `${BASE_URL}/contractor/pro`, lastModified: now, changeFrequency: 'monthly', priority: 0.8 },
+    { url: `${BASE_URL}/about`,       lastModified: now, changeFrequency: 'yearly',  priority: 0.5 },
+    { url: `${BASE_URL}/contact`,     lastModified: now, changeFrequency: 'yearly',  priority: 0.4 },
+    { url: `${BASE_URL}/terms`,       lastModified: now, changeFrequency: 'yearly',  priority: 0.2 },
+    { url: `${BASE_URL}/privacy`,     lastModified: now, changeFrequency: 'yearly',  priority: 0.2 },
   ];
 
   // Trade-by-city SEO landing pages
