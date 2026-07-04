@@ -29,7 +29,6 @@ const NAV = [
       { label: 'About', href: '/about' },
       { label: 'Contact', href: '/contact' },
       { label: 'Blog', href: '/work' },
-      { label: 'Careers', href: '/contact' },
     ],
   },
   {

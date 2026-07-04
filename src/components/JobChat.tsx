@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
+import { db, auth } from '@/lib/db';
 import { Send, Loader2 } from 'lucide-react';
 
 interface Message {
@@ -25,57 +27,75 @@ export default function JobChat({ jobId, userId, userName, otherUserId, otherUse
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [error, setError] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Fetch messages on mount
+  // Live listener — Firestore pushes new messages instantly, no polling.
+  // Rules already scope this to job participants (isParticipant(jobId)).
   useEffect(() => {
-    fetchMessages();
-    const interval = setInterval(fetchMessages, 2000); // Poll every 2s
-    return () => clearInterval(interval);
-  }, [jobId]);
+    const q = query(
+      collection(db, 'jobs', jobId, 'messages'),
+      orderBy('createdAt', 'asc'),
+      limit(200)
+    );
 
-  // Auto-scroll to bottom
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setMessages(
+          snap.docs.map((d) => {
+            const data = d.data();
+            return {
+              id: d.id,
+              senderId: data.senderId,
+              senderName: data.senderName,
+              text: data.text,
+              createdAt: data.createdAt?.toDate?.() ?? new Date(),
+              isCurrentUser: data.senderId === userId,
+            };
+          })
+        );
+        setLoading(false);
+      },
+      (err) => {
+        console.error('Chat listener error:', err);
+        setLoading(false);
+      }
+    );
+
+    return () => unsub();
+  }, [jobId, userId]);
+
+  // Auto-scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
-  const fetchMessages = async () => {
-    try {
-      const res = await fetch(`/api/jobs/${jobId}/messages`);
-      if (res.ok) {
-        const data = await res.json();
-        setMessages(
-          data.messages.map((m: any) => ({
-            ...m,
-            createdAt: new Date(m.createdAt),
-            isCurrentUser: m.senderId === userId,
-          }))
-        );
-      }
-    } catch (e) {
-      console.error('Failed to fetch messages:', e);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || sending) return;
 
     setSending(true);
+    setError('');
+    const text = input;
+    setInput(''); // optimistic clear — the live listener repaints from Firestore momentarily
+
     try {
+      const token = await auth.currentUser?.getIdToken();
       const res = await fetch(`/api/jobs/${jobId}/messages`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: input }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ text }),
       });
-      if (res.ok) {
-        setInput('');
-        await fetchMessages();
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error ?? 'Failed to send. Please try again.');
+        setInput(text); // restore so they don't lose what they typed
       }
     } catch (e) {
       console.error('Failed to send message:', e);
+      setError('Failed to send. Please try again.');
+      setInput(text);
     } finally {
       setSending(false);
     }
@@ -84,7 +104,8 @@ export default function JobChat({ jobId, userId, userName, otherUserId, otherUse
   return (
     <div className="flex flex-col h-96 rounded-2xl overflow-hidden border" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
       {/* Header */}
-      <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--color-border)' }}>
+      <div className="px-4 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--color-border)' }}>
+        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: '#22c55e' }} title="Live" />
         <p className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>
           {otherUserName}
         </p>
@@ -119,6 +140,11 @@ export default function JobChat({ jobId, userId, userName, otherUserId, otherUse
         )}
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Error */}
+      {error && (
+        <p className="text-xs px-4 py-2" style={{ color: '#f87171' }}>⚠ {error}</p>
+      )}
 
       {/* Input */}
       <form onSubmit={handleSend} className="p-4 border-t flex gap-2" style={{ borderColor: 'var(--color-border)' }}>
