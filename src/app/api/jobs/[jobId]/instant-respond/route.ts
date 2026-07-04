@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { adminDb, adminAuth } from '@/lib/firebaseAdmin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { createNotification } from '@/lib/notif';
+import { sendJobAcceptedEmail } from '@/lib/emailService';
 
 const OFFER_TIMEOUT_MINUTES = 15;
 
@@ -111,14 +112,25 @@ async function notifyHomeowner(
 ) {
   try {
     const contractorSnap = await adminDb.collection('contractors').doc(contractorId).get();
-    const name = contractorSnap.data()?.name ?? 'A contractor';
+    const contractorName = contractorSnap.data()?.name ?? 'A contractor';
+
+    // Send in-app notification
     await createNotification({ recipientId: job.userId,
       type:  'job_accepted',
       title: `🎉 Instant Book confirmed!`,
-      body:  `${name} accepted your job for $${price}. They'll be in touch shortly.`,
+      body:  `${contractorName} accepted your job for $${price}. They'll be in touch shortly.`,
       jobId,
       href:  `/jobs/${jobId}`,
     });
+
+    // Send email notification (fire-and-forget)
+    const homeownerSnap = await adminDb.collection('users').doc(job.userId).get();
+    const homeownerEmail = homeownerSnap.data()?.email;
+    const homeownerName = homeownerSnap.data()?.displayName ?? 'there';
+    const jobTitle = job.description ?? job.trade ?? 'Your job';
+    if (homeownerEmail) {
+      void sendJobAcceptedEmail(homeownerEmail, homeownerName, contractorName, jobTitle, price);
+    }
   } catch (err) {
     console.error('Homeowner notify error:', err);
   }
