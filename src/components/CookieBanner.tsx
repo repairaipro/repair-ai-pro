@@ -17,8 +17,8 @@ export default function CookieBanner() {
     localStorage.setItem('cookie-consent', 'accepted');
     setShow(false);
     // Load analytics if available
-    if (window.gtag) {
-      window.gtag('consent', 'update', {
+    if ((window as any).gtag) {
+      (window as any).gtag('consent', 'update', {
         analytics_storage: 'granted',
       });
     }
