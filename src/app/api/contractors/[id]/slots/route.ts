@@ -56,6 +56,12 @@ export async function GET(
       })
     );
 
+    // External calendar (Google/Outlook/Apple/etc) busy times, synced via
+    // iCal feed import. Cached on the contractor doc and refreshed by cron
+    // + on connect — never fetched live here to keep this endpoint fast.
+    const icalBlocks: BusyBlock[] = contractor.icalBusyBlocks || [];
+    busyBlocks.push(...icalBlocks);
+
     const slots = generateAvailableSlots({
       workingHours,
       dayStatuses,

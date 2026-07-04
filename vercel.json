@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/rebroadcast-stale",
       "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/cron/sync-ical-calendars",
+      "schedule": "0 * * * *"
     }
   ]
 }

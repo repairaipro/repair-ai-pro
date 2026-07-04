@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import ContractorCalendar from '@/components/ContractorCalendar';
 import WorkingHoursSettings from '@/components/WorkingHoursSettings';
+import CalendarConnect from '@/components/CalendarConnect';
 import { AlertCircle, Info } from 'lucide-react';
 
 export default function SchedulePage() {
@@ -105,13 +106,18 @@ export default function SchedulePage() {
           <WorkingHoursSettings contractorId={user.uid} />
         </div>
 
+        {/* Connect external calendar (iCal feed import) */}
+        <div className="mb-8">
+          <CalendarConnect contractorId={user.uid} />
+        </div>
+
         {/* Calendar */}
         <ContractorCalendar contractorId={user.uid} />
 
         {/* Future enhancements hint */}
         <div className="rounded-2xl p-5 mt-8" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
           <p className="text-xs" style={{ color: 'var(--color-text-4)' }}>
-            💡 Coming soon: Import your Google/Outlook/Apple calendar with one link, or connect for automatic two-way sync
+            💡 Coming soon: Full two-way sync (jobs write directly into your Google/Outlook calendar)
           </p>
         </div>
       </div>
