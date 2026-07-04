@@ -29,7 +29,9 @@ export default function ContractorCalendar({ contractorId, onAvailabilityChange,
       const res = await fetch(`/api/contractors/${contractorId}/availability`);
       if (res.ok) {
         const data = await res.json();
-        const map = new Map(data.blocks.map((b: AvailabilityBlock) => [b.date, b.status]));
+        const map = new Map<string, AvailabilityBlock['status']>(
+          data.blocks.map((b: AvailabilityBlock) => [b.date, b.status])
+        );
         setAvailability(map);
       }
     } catch (e) {

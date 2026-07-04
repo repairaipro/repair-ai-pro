@@ -4,6 +4,7 @@ import { useAuth } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import ContractorCalendar from '@/components/ContractorCalendar';
+import WorkingHoursSettings from '@/components/WorkingHoursSettings';
 import { AlertCircle, Info } from 'lucide-react';
 
 export default function SchedulePage() {
@@ -99,13 +100,18 @@ export default function SchedulePage() {
           </div>
         </div>
 
+        {/* Working hours & booking settings */}
+        <div className="mb-8">
+          <WorkingHoursSettings contractorId={user.uid} />
+        </div>
+
         {/* Calendar */}
         <ContractorCalendar contractorId={user.uid} />
 
         {/* Future enhancements hint */}
         <div className="rounded-2xl p-5 mt-8" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
           <p className="text-xs" style={{ color: 'var(--color-text-4)' }}>
-            💡 Coming soon: Auto-block weekends, set vacation weeks, sync with Google Calendar
+            💡 Coming soon: Import your Google/Outlook/Apple calendar with one link, or connect for automatic two-way sync
           </p>
         </div>
       </div>

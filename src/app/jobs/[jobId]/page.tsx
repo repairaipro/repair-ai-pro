@@ -31,6 +31,8 @@ import BidPriceBand from '@/components/BidPriceBand';
 import FileDisputeModal from '@/components/FileDisputeModal';
 import { openDirections } from '@/lib/mapsIntegration';
 import VideoConsultationPanel from '@/components/VideoConsultationPanel';
+import BookingSlotPicker from '@/components/BookingSlotPicker';
+import JobChat from '@/components/JobChat';
 
 /* ── Types ── */
 type Job = {
@@ -821,6 +823,32 @@ export default function JobDetailPage() {
             photos={workPhotos}
             onPhotoAdded={(p) => setWorkPhotos((prev) => [p, ...prev])}
           />
+        )}
+
+        {/* ── Book an appointment (homeowner picks a slot from the contractor's calendar) ── */}
+        {isHomeowner && ['accepted', 'in_progress'].includes(job.status) && job.claimedBy && (
+          <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 20, padding: 20 }}>
+            <h2 className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: 'var(--color-text-4)' }}>
+              Schedule an Appointment
+            </h2>
+            <BookingSlotPicker contractorId={job.claimedBy} jobId={jobId} />
+          </div>
+        )}
+
+        {/* ── In-app messaging ── */}
+        {user && (isHomeowner || isContractor) && ['accepted', 'in_progress', 'completed', 'confirmed'].includes(job.status) && job.claimedBy && (
+          <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 20, padding: 20 }}>
+            <h2 className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: 'var(--color-text-4)' }}>
+              Messages
+            </h2>
+            <JobChat
+              jobId={jobId}
+              userId={user.uid}
+              userName={user.displayName ?? 'You'}
+              otherUserId={isHomeowner ? job.claimedBy : (job.userId ?? '')}
+              otherUserName={isHomeowner ? 'Your contractor' : 'Homeowner'}
+            />
+          </div>
         )}
 
         {/* ── Milestone Setup (contractor proposes) or approval (homeowner) ── */}
