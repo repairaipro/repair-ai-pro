@@ -19,9 +19,15 @@ const MobileBottomNav = dynamic(() => import('@/components/MobileBottomNav'), {
   ssr: false,
 });
 
+// ✅ Help & support widget
+const HelpWidget = dynamic(() => import('@/components/HelpWidget'), {
+  ssr: false,
+});
+
 // ✅ Toast notification system
 import { ToastProvider } from '@/components/ToastProvider';
 import Footer from '@/components/Footer';
+import CookieBanner from '@/components/CookieBanner';
 
 // ✅ Background notification → toast watcher
 const NotificationToastWatcher = dynamic(() => import('@/components/NotificationToastWatcher'), {
@@ -102,6 +108,10 @@ export default function RootLayout({
             <PWASetup />
             {/* ✅ Mobile sticky bottom navigation */}
             <MobileBottomNav />
+            {/* ✅ Cookie consent banner */}
+            <CookieBanner />
+            {/* ✅ Help & support widget */}
+            <HelpWidget />
           </ToastProvider>
         </AuthProvider>
       </body>
