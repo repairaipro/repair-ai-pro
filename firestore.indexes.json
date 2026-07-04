@@ -59,6 +59,14 @@
       ]
     },
     {
+      "collectionGroup": "jobs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "paymentStatus", "order": "ASCENDING" },
+        { "fieldPath": "paymentReleasedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "bids",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
