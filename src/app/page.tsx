@@ -169,7 +169,7 @@ export default function LandingPage() {
               <ArrowRight className="w-4 h-4" />
             </Link>
             <Link
-              href="/contractor-profile"
+              href="/contractor/pro"
               className="btn btn-secondary btn-lg px-8 w-full sm:w-auto"
             >
               I'm a Service Pro

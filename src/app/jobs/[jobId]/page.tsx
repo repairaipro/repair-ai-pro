@@ -275,6 +275,10 @@ export default function JobDetailPage() {
   const [cancelling,       setCancelling]       = useState(false);
   const [cancelError,      setCancelError]      = useState('');
   const [contractorLocationData, setContractorLocationData] = useState<JobLocation | null>(null);
+  // Progressive disclosure: once a contractor is assigned the page holds
+  // 15+ sections — tabs keep it scannable. Pre-assignment, tabs are hidden
+  // and everything renders in one column as before.
+  const [activeTab, setActiveTab] = useState<'overview' | 'messages' | 'payments' | 'photos'>('overview');
   const [showNotifications, setShowNotifications] = useState(false);
   const [recommendations, setRecommendations] = useState<any>(null);
   const [recommendationsLoading, setRecommendationsLoading] = useState(false);
@@ -517,6 +521,12 @@ export default function JobDetailPage() {
   const pendingBids  = bids.filter((b) => b.status === 'pending');
   const selectedBid  = bids.find((b) => b.status === 'selected');
   const trade        = job.aiDetectedTrade ?? job.trade ?? 'General';
+
+  // Tabs only exist once a contractor is on the job — that's when the page
+  // gets dense. inTab() renders a section when tabs are off OR it belongs
+  // to the active tab.
+  const showTabs = !!job.claimedBy && ['accepted', 'in_progress', 'completed', 'confirmed', 'disputed'].includes(job.status);
+  const inTab = (t: 'overview' | 'messages' | 'payments' | 'photos') => !showTabs || activeTab === t;
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--color-bg)' }}>
@@ -802,8 +812,37 @@ export default function JobDetailPage() {
           </div>
         )}
 
+        {/* ── Tab bar (assigned jobs only) ── */}
+        {showTabs && (
+          <div
+            className="flex gap-1 p-1 rounded-xl overflow-x-auto sticky z-10"
+            style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', top: 60 }}
+          >
+            {([
+              ['overview', 'Overview'],
+              ['messages', 'Messages'],
+              ['payments', 'Payments'],
+              ['photos', 'Photos'],
+            ] as const).map(([id, label]) => (
+              <button
+                key={id}
+                onClick={() => setActiveTab(id)}
+                className="flex-1 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all"
+                style={{
+                  background: activeTab === id ? 'rgba(99,102,241,0.15)' : 'transparent',
+                  color: activeTab === id ? '#a5b4fc' : 'var(--color-text-4)',
+                  border: activeTab === id ? '1px solid rgba(99,102,241,0.25)' : '1px solid transparent',
+                  cursor: 'pointer',
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* ── Contractor: live progress logger ── */}
-        {isContractor && job.status === 'in_progress' && (
+        {inTab('photos') && isContractor && job.status === 'in_progress' && (
           <ProgressLogger
             jobId={jobId}
             onUpdateLogged={() => {/* silently refresh */}}
@@ -811,12 +850,12 @@ export default function JobDetailPage() {
         )}
 
         {/* ── Homeowner: live progress dashboard ── */}
-        {isHomeowner && ['in_progress', 'completed', 'awaiting_confirmation'].includes(job.status) && (
+        {inTab('photos') && isHomeowner && ['in_progress', 'completed', 'awaiting_confirmation'].includes(job.status) && (
           <ProgressDashboard jobId={jobId} />
         )}
 
         {/* ── Work photos: contractor uploads during job, homeowner sees all ── */}
-        {['accepted', 'in_progress', 'completed', 'confirmed', 'disputed'].includes(job.status) && (
+        {inTab('photos') && ['accepted', 'in_progress', 'completed', 'confirmed', 'disputed'].includes(job.status) && (
           <WorkPhotoUpload
             jobId={jobId}
             role={isContractor ? 'contractor' : 'homeowner'}
@@ -826,7 +865,7 @@ export default function JobDetailPage() {
         )}
 
         {/* ── Book an appointment (homeowner picks a slot from the contractor's calendar) ── */}
-        {isHomeowner && ['accepted', 'in_progress'].includes(job.status) && job.claimedBy && (
+        {inTab('messages') && isHomeowner && ['accepted', 'in_progress'].includes(job.status) && job.claimedBy && (
           <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 20, padding: 20 }}>
             <h2 className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: 'var(--color-text-4)' }}>
               Schedule an Appointment
@@ -836,7 +875,7 @@ export default function JobDetailPage() {
         )}
 
         {/* ── In-app messaging ── */}
-        {user && (isHomeowner || isContractor) && ['accepted', 'in_progress', 'completed', 'confirmed'].includes(job.status) && job.claimedBy && (
+        {inTab('messages') && user && (isHomeowner || isContractor) && ['accepted', 'in_progress', 'completed', 'confirmed'].includes(job.status) && job.claimedBy && (
           <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 20, padding: 20 }}>
             <h2 className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: 'var(--color-text-4)' }}>
               Messages
@@ -852,7 +891,7 @@ export default function JobDetailPage() {
         )}
 
         {/* ── Milestone Setup (contractor proposes) or approval (homeowner) ── */}
-        {['accepted', 'in_progress'].includes(job.status) && invoiceToken && !(job as any).milestoneAllReleased && (
+        {inTab('payments') && ['accepted', 'in_progress'].includes(job.status) && invoiceToken && !(job as any).milestoneAllReleased && (
           <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 20, padding: 20 }}>
             <h2 className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: 'var(--color-text-4)' }}>
               Milestone Payments
@@ -870,7 +909,7 @@ export default function JobDetailPage() {
         )}
 
         {/* ── Milestone Progress ── */}
-        {milestones.length > 0 && invoiceToken && (
+        {inTab('payments') && milestones.length > 0 && invoiceToken && (
           <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 20, padding: 20 }}>
             <h2 className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: 'var(--color-text-4)' }}>
               Payment Milestones
@@ -886,7 +925,7 @@ export default function JobDetailPage() {
         )}
 
         {/* ── Smart Invoice ── */}
-        {['in_progress', 'completed', 'awaiting_confirmation', 'confirmed'].includes(job.status)
+        {inTab('payments') && ['in_progress', 'completed', 'awaiting_confirmation', 'confirmed'].includes(job.status)
           && invoiceToken && (
           <SmartInvoice
             jobId={jobId}
@@ -907,7 +946,7 @@ export default function JobDetailPage() {
         )}
 
         {/* ── Location Tracking ── */}
-        {['accepted', 'in_progress'].includes(job.status) && job.claimedBy && (
+        {inTab('overview') && ['accepted', 'in_progress'].includes(job.status) && job.claimedBy && (
           <>
             <JobLocationTracker
               jobId={jobId}
@@ -950,7 +989,7 @@ export default function JobDetailPage() {
         )}
 
         {/* ── Before/After Completion Photos ── */}
-        {isContractor && ['in_progress', 'completed'].includes(job.status) && (
+        {inTab('photos') && isContractor && ['in_progress', 'completed'].includes(job.status) && (
           <BeforeAfterPhotoUpload
             jobId={jobId}
             onPhotoSubmitted={() => {
@@ -961,7 +1000,7 @@ export default function JobDetailPage() {
         )}
 
         {/* ── Before/After Comparison ── */}
-        {completion && (
+        {inTab('photos') && completion && (
           <BeforeAfterComparison
             pairs={completion.photoPairs}
             isLoading={completionLoading}
@@ -969,7 +1008,7 @@ export default function JobDetailPage() {
         )}
 
         {/* ── Product Recommendations ── */}
-        {recommendations && (
+        {inTab('overview') && recommendations && (
           <ProductRecommendations
             jobId={jobId}
             recommendations={recommendations.recommendations}
@@ -981,7 +1020,7 @@ export default function JobDetailPage() {
         )}
 
         {/* ── Bids section ── */}
-        {(hasBids || (isHomeowner && ['triaged', 'open'].includes(job.status))) && (
+        {inTab('overview') && (hasBids || (isHomeowner && ['triaged', 'open'].includes(job.status))) && (
           <section>
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-4)' }}>
@@ -1040,7 +1079,7 @@ export default function JobDetailPage() {
         )}
 
         {/* ── AI Summary ── */}
-        {job.aiSummary && (
+        {inTab('overview') && job.aiSummary && (
           <div
             className="rounded-2xl p-4"
             style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.18)' }}

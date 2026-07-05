@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { db } from "@/lib/db";
 import { collection, query, where, onSnapshot, orderBy, doc, getDoc, limit } from "firebase/firestore";
 import { useAuth, isOnboardingComplete } from "@/lib/auth";
+import { useIsContractor } from "@/lib/useRole";
 import { Plus, Inbox, MessageSquare, Briefcase, Users, User, ChevronRight, Zap, TrendingUp, Clock, CheckCircle, Shield, Heart } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -283,6 +284,7 @@ function JobCard({ job }: { job: Job }) {
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const { isContractor } = useIsContractor();
   const router = useRouter();
 
   const [homeownerJobs, setHomeownerJobs] = useState<Job[]>([]);
@@ -326,7 +328,9 @@ export default function DashboardPage() {
   const completedHomeownerJobs = homeownerJobs.filter((j) => ["confirmed", "verified"].includes(j.status));
   const activeContractorJobs   = contractorJobs.filter((j) => ACTIVE_STATUSES.includes(j.status));
   const pendingInvites         = inbox.length;
-  const isContractor           = contractor !== null || contractorJobs.length > 0 || inbox.length > 0;
+  // Role comes from useIsContractor (contractors/{uid} doc existence) —
+  // the same single source of truth the header and mobile nav use, so a
+  // contractor never sees a homeowner dashboard or vice versa.
   // "Live" section: active + awaiting-match jobs combined, deduplicated
   const allActiveJobs = [
     ...activeHomeownerJobs,
@@ -371,20 +375,27 @@ export default function DashboardPage() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Link href="/jobs/new" className="btn btn-primary btn-sm">
-              <Plus className="w-3.5 h-3.5" /> Post Job
-            </Link>
-            {isContractor && (
-              <Link href="/contractor-inbox" className="btn btn-secondary btn-sm relative">
-                <Inbox className="w-3.5 h-3.5" /> My Inbox
-                {pendingInvites > 0 && (
-                  <span
-                    className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full text-[9px] font-bold flex items-center justify-center"
-                    style={{ background: '#fb923c', color: '#fff' }}
-                  >
-                    {pendingInvites}
-                  </span>
-                )}
+            {/* Role-aware primary action: contractors work their inbox, homeowners post jobs */}
+            {isContractor ? (
+              <>
+                <Link href="/contractor-inbox" className="btn btn-primary btn-sm relative">
+                  <Inbox className="w-3.5 h-3.5" /> My Inbox
+                  {pendingInvites > 0 && (
+                    <span
+                      className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full text-[9px] font-bold flex items-center justify-center"
+                      style={{ background: '#fb923c', color: '#fff' }}
+                    >
+                      {pendingInvites}
+                    </span>
+                  )}
+                </Link>
+                <Link href="/studio" className="btn btn-secondary btn-sm">
+                  Studio
+                </Link>
+              </>
+            ) : (
+              <Link href="/jobs/new" className="btn btn-primary btn-sm">
+                <Plus className="w-3.5 h-3.5" /> Post Job
               </Link>
             )}
           </div>
