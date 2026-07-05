@@ -10,7 +10,7 @@ import {
   Briefcase, CheckCircle2, Users, Heart, Eye, Share2, Check, Copy,
   ArrowRight, ArrowUpRight, Loader2, Settings, Camera, BarChart2,
   Sparkles, Wallet, ChevronRight, Link2, Instagram, AtSign, Globe,
-  Youtube, Unlink, ExternalLink, Edit3, Save, X,
+  Youtube, Unlink, ExternalLink, Edit3, Save, X, Calendar,
 } from 'lucide-react';
 import StudioAssistant from '@/components/StudioAssistant';
 
@@ -446,7 +446,8 @@ export default function ContractorStudio() {
             </div>
 
             {/* ── Quick links ── */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+              <QuickLink href="/contractor/schedule" icon={<Calendar className="w-4 h-4" />} label="Schedule" />
               <QuickLink href="/studio/analytics" icon={<BarChart2 className="w-4 h-4" />} label="Analytics" />
               <QuickLink href="/studio/wrapped" icon={<Sparkles className="w-4 h-4" />} label="My Wrapped" />
               <QuickLink href="/contractor-profile" icon={<Settings className="w-4 h-4" />} label="Profile" />

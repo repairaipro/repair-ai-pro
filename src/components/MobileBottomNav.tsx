@@ -6,26 +6,29 @@ import { useAuth } from '@/lib/auth';
 import { useEffect, useState } from 'react';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/db';
-import { LayoutDashboard, Briefcase, Plus, Inbox, Camera } from 'lucide-react';
+import { useIsContractor } from '@/lib/useRole';
+import { LayoutDashboard, Briefcase, Plus, Inbox, Camera, Calendar, Users } from 'lucide-react';
 
 /**
  * Sticky bottom navigation bar for mobile — only shown on small screens.
- * Renders when user is authenticated.
+ * Renders when user is authenticated. Role-aware: contractors get their
+ * inbox as the center CTA, homeowners get Post Job.
  */
 export default function MobileBottomNav() {
   const { user } = useAuth();
+  const { isContractor } = useIsContractor();
   const pathname  = usePathname();
   const [pendingInvites, setPendingInvites] = useState(0);
 
-  /* Watch contractor inbox for pending invitations */
+  /* Watch contractor inbox for pending invitations (contractors only) */
   useEffect(() => {
-    if (!user) return;
+    if (!user || !isContractor) return;
     const q = query(
       collection(db, 'contractors', user.uid, 'jobInbox'),
       where('invitationStatus', '==', 'pending')
     );
     return onSnapshot(q, (snap) => setPendingInvites(snap.size), () => {});
-  }, [user]);
+  }, [user, isContractor]);
 
 
   if (!user) return null;
@@ -33,7 +36,16 @@ export default function MobileBottomNav() {
   // Hide on auth pages
   if (pathname?.startsWith('/auth')) return null;
 
-  const tabs = [
+  type Tab = {
+    href: string;
+    label: string;
+    icon: typeof LayoutDashboard;
+    active: boolean | undefined;
+    cta?: boolean;
+    badge?: number;
+  };
+
+  const tabs: Tab[] = isContractor ? [
     {
       href:   '/dashboard',
       label:  'Home',
@@ -44,7 +56,40 @@ export default function MobileBottomNav() {
       href:   '/jobs',
       label:  'Jobs',
       icon:   Briefcase,
-      active: pathname?.startsWith('/jobs') && pathname !== '/jobs/new',
+      active: pathname?.startsWith('/jobs'),
+    },
+    {
+      href:   '/contractor-inbox',
+      label:  'Inbox',
+      icon:   Inbox,
+      active: pathname?.startsWith('/contractor-inbox'),
+      cta:    true,
+      badge:  pendingInvites,
+    },
+    {
+      href:   '/contractor/schedule',
+      label:  'Schedule',
+      icon:   Calendar,
+      active: pathname?.startsWith('/contractor/schedule'),
+    },
+    {
+      href:   '/work',
+      label:  'Feed',
+      icon:   Camera,
+      active: pathname?.startsWith('/work'),
+    },
+  ] : [
+    {
+      href:   '/dashboard',
+      label:  'Home',
+      icon:   LayoutDashboard,
+      active: pathname === '/dashboard' || pathname?.startsWith('/dashboard'),
+    },
+    {
+      href:   '/my-jobs',
+      label:  'My Jobs',
+      icon:   Briefcase,
+      active: pathname?.startsWith('/my-jobs') || (pathname?.startsWith('/jobs') && pathname !== '/jobs/new'),
     },
     {
       href:   '/jobs/new',
@@ -54,11 +99,10 @@ export default function MobileBottomNav() {
       cta:    true,
     },
     {
-      href:   '/contractor-inbox',
-      label:  'Inbox',
-      icon:   Inbox,
-      active: pathname?.startsWith('/contractor-inbox'),
-      badge:  pendingInvites,
+      href:   '/contractor',
+      label:  'Pros',
+      icon:   Users,
+      active: pathname?.startsWith('/contractor'),
     },
     {
       href:   '/work',
@@ -76,7 +120,7 @@ export default function MobileBottomNav() {
       <nav
         className="md:hidden fixed bottom-0 left-0 right-0 z-50"
         style={{
-          background: 'rgba(10,11,17,0.95)',
+          background: 'var(--color-bg)',
           backdropFilter: 'blur(20px)',
           borderTop: '1px solid var(--color-border)',
           paddingBottom: 'env(safe-area-inset-bottom)',
@@ -111,8 +155,23 @@ export default function MobileBottomNav() {
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   boxShadow: '0 4px 20px rgba(99,102,241,0.5)',
                   marginBottom: 4,
+                  position: 'relative',
                 }}>
                   <Icon size={22} color="#fff" />
+                  {badge != null && badge > 0 && (
+                    <span style={{
+                      position: 'absolute',
+                      top: -2, right: -2,
+                      background: '#ef4444', color: '#fff',
+                      fontSize: 9, fontWeight: 800,
+                      minWidth: 16, height: 16, borderRadius: 8,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      padding: '0 3px',
+                      border: '1.5px solid var(--color-bg)',
+                    }}>
+                      {badge > 9 ? '9+' : badge}
+                    </span>
+                  )}
                 </div>
               ) : (
                 <>

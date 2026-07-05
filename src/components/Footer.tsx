@@ -19,6 +19,7 @@ const NAV = [
       { label: 'Join as a Pro', href: '/auth/signin' },
       { label: 'Pro Plans', href: '/contractor/pro' },
       { label: 'Studio Dashboard', href: '/studio' },
+      { label: 'My Schedule', href: '/contractor/schedule' },
       { label: 'Work Feed', href: '/work' },
       { label: 'Contractor Wrapped', href: '/studio/wrapped' },
     ],

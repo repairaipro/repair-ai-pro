@@ -2,16 +2,18 @@
 
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
-import { useEffect, useState } from 'react';
-import { collection, onSnapshot, query, where, orderBy } from 'firebase/firestore';
+import { useEffect, useRef, useState } from 'react';
+import { collection, onSnapshot, query, where, orderBy, limit } from 'firebase/firestore';
 import { db } from '@/lib/db';
-import { MessageSquare, Bell, LayoutDashboard, Briefcase, Users, LogOut, Plus, Menu, X } from 'lucide-react';
+import { useIsContractor } from '@/lib/useRole';
+import { MessageSquare, Bell, LayoutDashboard, Briefcase, Users, LogOut, Plus, Menu, X, Inbox, Calendar, Clapperboard } from 'lucide-react';
 import NotificationCenter from '@/components/NotificationCenter';
 
 const ADMIN_UIDS = (process.env.NEXT_PUBLIC_ADMIN_UIDS ?? "").split(",").map(s => s.trim()).filter(Boolean);
 
 export default function Header() {
   const { user, logout } = useAuth();
+  const { isContractor } = useIsContractor();
   const [unreadCount, setUnreadCount] = useState(0);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -25,39 +27,61 @@ export default function Header() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // Unread messages listener
+  // Unread messages badge: count jobs whose most recent message was sent by
+  // the other party. Stateless per snapshot — recomputed from a jobId→bool
+  // map rather than incremented, so it can't drift or double-count. Each
+  // job gets exactly one listener (limit(1) = last message only); listeners
+  // are keyed by jobId so re-fires of the jobs query never attach duplicates.
+  const msgListeners = useRef<Map<string, () => void>>(new Map());
+  const unreadByJob = useRef<Map<string, boolean>>(new Map());
+
   useEffect(() => {
     if (!user) return;
-    let active = true;
-    const listeners: (() => void)[] = [];
+    const listeners = msgListeners.current;
+    const unread = unreadByJob.current;
+
+    const recount = () => setUnreadCount([...unread.values()].filter(Boolean).length);
 
     function watchJobs(jobIds: string[]) {
       jobIds.forEach(jobId => {
-        const q = query(collection(db, 'jobs', jobId, 'messages'), orderBy('createdAt', 'desc'));
+        if (listeners.has(jobId)) return; // already watching
+        const q = query(collection(db, 'jobs', jobId, 'messages'), orderBy('createdAt', 'desc'), limit(1));
         const unsub = onSnapshot(q, snap => {
-          if (!active || snap.empty) return;
-          const last = snap.docs[0].data();
-          if (last?.senderId && last.senderId !== user.uid) {
-            setUnreadCount(n => n + 1);
-          }
-        });
-        listeners.push(unsub);
+          const last = snap.docs[0]?.data();
+          unread.set(jobId, !!last?.senderId && last.senderId !== user!.uid);
+          recount();
+        }, () => {});
+        listeners.set(jobId, unsub);
       });
     }
 
-    const u1 = onSnapshot(query(collection(db, 'jobs'), where('userId', '==', user.uid)), snap => watchJobs(snap.docs.map(d => d.id)));
-    const u2 = onSnapshot(query(collection(db, 'jobs'), where('claimedBy', '==', user.uid)), snap => watchJobs(snap.docs.map(d => d.id)));
+    const u1 = onSnapshot(query(collection(db, 'jobs'), where('userId', '==', user.uid)), snap => watchJobs(snap.docs.map(d => d.id)), () => {});
+    const u2 = onSnapshot(query(collection(db, 'jobs'), where('claimedBy', '==', user.uid)), snap => watchJobs(snap.docs.map(d => d.id)), () => {});
 
-    return () => { active = false; u1(); u2(); listeners.forEach(f => f()); };
+    return () => {
+      u1(); u2();
+      listeners.forEach(f => f());
+      listeners.clear();
+      unread.clear();
+    };
   }, [user]);
 
-  const navLinks = user ? [
-    { href: '/jobs/new',                    label: 'Post Job',    icon: Plus,            highlight: true },
-    { href: '/jobs',                        label: 'Marketplace', icon: Briefcase,       highlight: false },
-    { href: '/contractor',                  label: 'Contractors', icon: Users,           highlight: false },
-    { href: '/contractor-inbox',            label: 'Inbox',       icon: Bell,            highlight: false },
-    { href: '/dashboard',                   label: 'Dashboard',   icon: LayoutDashboard, highlight: false },
+  // Role-aware navigation: each side of the marketplace gets its own
+  // primary actions. Contractors live in Inbox/Studio/Schedule; homeowners
+  // post jobs and track their own. Before the role resolves (one cached
+  // Firestore read) we show the homeowner set — it flips in <100ms.
+  const navLinks = user ? (isContractor ? [
+    { href: '/contractor-inbox',  label: 'Inbox',       icon: Inbox,           highlight: true },
+    { href: '/jobs',              label: 'Marketplace', icon: Briefcase,       highlight: false },
+    { href: '/studio',            label: 'Studio',      icon: Clapperboard,    highlight: false },
+    { href: '/contractor/schedule', label: 'Schedule',  icon: Calendar,        highlight: false },
+    { href: '/dashboard',         label: 'Dashboard',   icon: LayoutDashboard, highlight: false },
   ] : [
+    { href: '/jobs/new',          label: 'Post Job',    icon: Plus,            highlight: true },
+    { href: '/my-jobs',           label: 'My Jobs',     icon: Briefcase,       highlight: false },
+    { href: '/contractor',        label: 'Contractors', icon: Users,           highlight: false },
+    { href: '/dashboard',         label: 'Dashboard',   icon: LayoutDashboard, highlight: false },
+  ]) : [
     { href: '/jobs',              label: 'Marketplace', icon: Briefcase,       highlight: false },
     { href: '/contractor',        label: 'Contractors', icon: Users,           highlight: false },
   ];
@@ -85,10 +109,10 @@ export default function Header() {
 
           {/* Desktop nav */}
           <nav className="hidden md:flex items-center gap-0.5 flex-1 justify-center">
-            {navLinks.map(({ href, label, highlight }) =>
+            {navLinks.map(({ href, label, icon: Icon, highlight }) =>
               highlight ? (
                 <Link key={href} href={href} className="btn btn-primary btn-sm ml-1">
-                  <Plus className="w-3.5 h-3.5" />
+                  <Icon className="w-3.5 h-3.5" />
                   {label}
                 </Link>
               ) : (
@@ -221,7 +245,7 @@ export default function Header() {
           <div
             className="absolute top-14 left-0 right-0 p-4 space-y-1 animate-fade-in"
             style={{
-              background: 'rgba(14, 17, 23, 0.98)',
+              background: 'var(--color-bg)',
               backdropFilter: 'blur(24px)',
               borderBottom: '1px solid var(--color-border)',
             }}
