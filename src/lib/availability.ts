@@ -129,3 +129,32 @@ export function groupSlotsByDay(slots: Slot[]): Record<string, Slot[]> {
   }
   return grouped;
 }
+
+/**
+ * Fetches a contractor's booked (proposed/accepted) appointments in one
+ * query via the `appointments` collectionGroup, filtered by the
+ * denormalized `contractorId` field written at appointment-creation time.
+ *
+ * Replaces the older pattern of fetching every job claimed by the
+ * contractor and then querying each job's appointments subcollection
+ * individually (N+1 reads on every booking-picker page load).
+ */
+export async function fetchContractorBusyBlocks(
+  adminDb: FirebaseFirestore.Firestore,
+  contractorId: string
+): Promise<BusyBlock[]> {
+  const apptsSnap = await adminDb
+    .collectionGroup('appointments')
+    .where('contractorId', '==', contractorId)
+    .where('status', 'in', ['proposed', 'accepted'])
+    .get();
+
+  const blocks: BusyBlock[] = [];
+  apptsSnap.forEach((a) => {
+    const data = a.data();
+    const startMs = data.startAt?.toDate?.()?.getTime();
+    const endMs = data.endAt?.toDate?.()?.getTime();
+    if (startMs && endMs) blocks.push({ startMs, endMs });
+  });
+  return blocks;
+}

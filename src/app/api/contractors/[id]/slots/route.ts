@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebaseAdmin';
-import { generateAvailableSlots, groupSlotsByDay, DEFAULT_WORKING_HOURS, type BusyBlock } from '@/lib/availability';
+import { generateAvailableSlots, groupSlotsByDay, fetchContractorBusyBlocks, DEFAULT_WORKING_HOURS, type BusyBlock } from '@/lib/availability';
 
 /**
  * GET /api/contractors/[contractorId]/slots?durationMinutes=90
@@ -32,29 +32,10 @@ export async function GET(
     const blocks: Array<{ date: string; status: string }> = contractor.availabilityBlocks || [];
     const dayStatuses = new Map(blocks.map((b) => [b.date, b.status as 'available' | 'busy' | 'blocked']));
 
-    // Existing appointments across all jobs this contractor is party to.
-    // Jobs claimed by this contractor hold their appointment subcollections.
-    const jobsSnap = await adminDb
-      .collection('jobs')
-      .where('claimedBy', '==', contractorId)
-      .where('status', 'in', ['accepted', 'in_progress'])
-      .get();
-
-    const busyBlocks: BusyBlock[] = [];
-    await Promise.all(
-      jobsSnap.docs.map(async (jobDoc) => {
-        const apptsSnap = await jobDoc.ref
-          .collection('appointments')
-          .where('status', 'in', ['proposed', 'accepted'])
-          .get();
-        apptsSnap.forEach((a) => {
-          const data = a.data();
-          const startMs = data.startAt?.toDate?.()?.getTime();
-          const endMs = data.endAt?.toDate?.()?.getTime();
-          if (startMs && endMs) busyBlocks.push({ startMs, endMs });
-        });
-      })
-    );
+    // Existing appointments across all jobs this contractor is party to —
+    // one collectionGroup query instead of fetching every claimed job and
+    // querying each one's appointments subcollection individually.
+    const busyBlocks: BusyBlock[] = await fetchContractorBusyBlocks(adminDb, contractorId);
 
     // External calendar (Google/Outlook/Apple/etc) busy times, synced via
     // iCal feed import. Cached on the contractor doc and refreshed by cron

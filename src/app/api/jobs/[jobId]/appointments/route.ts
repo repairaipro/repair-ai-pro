@@ -3,6 +3,7 @@ import { adminDb, adminAuth } from '@/lib/firebaseAdmin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { createNotification } from '@/lib/notif';
 import { rateLimit, rateLimitResponse } from '@/lib/rateLimit';
+import { fetchContractorBusyBlocks } from '@/lib/availability';
 
 /**
  * GET /api/jobs/[jobId]/appointments
@@ -80,25 +81,14 @@ export async function POST(
     return NextResponse.json({ error: 'Job has no assigned contractor yet' }, { status: 409 });
   }
 
-  // Prevent double-booking: check overlap against existing proposed/accepted appointments
-  // for this contractor across ALL their jobs (uses a transaction-free read-then-write —
+  // Prevent double-booking: check overlap against existing proposed/accepted
+  // appointments for this contractor across ALL their jobs, via a single
+  // collectionGroup query (uses a transaction-free read-then-write —
   // acceptable here since a genuine double-click race is rare and caught by the UI refresh).
-  const contractorJobsSnap = await adminDb
-    .collection('jobs')
-    .where('claimedBy', '==', job.claimedBy)
-    .where('status', 'in', ['accepted', 'in_progress'])
-    .get();
-
-  for (const jd of contractorJobsSnap.docs) {
-    const apptsSnap = await jd.ref.collection('appointments').where('status', 'in', ['proposed', 'accepted']).get();
-    for (const a of apptsSnap.docs) {
-      const data = a.data();
-      const s = data.startAt?.toDate?.()?.getTime();
-      const e = data.endAt?.toDate?.()?.getTime();
-      if (s && e && startMs < e && endMs > s) {
-        return NextResponse.json({ error: 'That time slot was just booked. Please pick another.' }, { status: 409 });
-      }
-    }
+  const existingBusyBlocks = await fetchContractorBusyBlocks(adminDb, job.claimedBy);
+  const overlaps = existingBusyBlocks.some((b) => startMs < b.endMs && endMs > b.startMs);
+  if (overlaps) {
+    return NextResponse.json({ error: 'That time slot was just booked. Please pick another.' }, { status: 409 });
   }
 
   const contractorSnap = await adminDb.collection('contractors').doc(job.claimedBy).get();
@@ -112,6 +102,12 @@ export async function POST(
     status: autoAccept ? 'accepted' : 'proposed',
     createdBy: userId,
     createdAt: FieldValue.serverTimestamp(),
+    // Denormalized so the slots API can do one collectionGroup query
+    // instead of fetching every one of this contractor's jobs and then
+    // querying each job's appointments subcollection individually.
+    // Written via Admin SDK only — not part of the client-write schema
+    // in firestore.rules, so this never conflicts with rule validation.
+    contractorId: job.claimedBy,
   });
 
   // Notify the other participant

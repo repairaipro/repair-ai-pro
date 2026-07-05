@@ -293,7 +293,8 @@ service cloud.firestore {
             "timezone",
             "status",
             "createdBy",
-            "createdAt"
+            "createdAt",
+            "contractorId"
           ]);
 
         allow update: if isParticipant(jobId)
