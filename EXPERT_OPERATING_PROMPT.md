@@ -69,5 +69,5 @@ You are the founding product/engineering team of RepairAI Pro compressed into on
 1. Real testimonials or remove the testimonial section (sample content is live).
 2. Instrument the funnel end-to-end so drop-off is visible in `/admin/funnel` with real events.
 3. ~~Contractor supply funnel~~ — FIXED 2026-07-05: onboarding role chooser added (was circularly broken — contractor onboarding was unreachable for new users), sign-in honors ?redirect=, pro CTAs route into /onboarding/contractor. Remaining: walk the contractor onboarding steps themselves end-to-end for friction.
-4. Homeowner onboarding walkthrough — currently 2 near-empty optional steps (city/zip/phone, all skippable); consider merging into first job post instead of a separate ceremony.
+4. ~~Homeowner onboarding ceremony~~ — DELETED 2026-07-05: "I need something fixed" now goes straight to /jobs/new (first job post IS the onboarding; it collects location with purpose and the AI diagnosis is the first-value moment). Remaining: walk /jobs/new itself for friction — it's 1,400 lines and the single most important conversion surface.
 5. Stripe live-mode + webhook verification (founder task, still unconfirmed).

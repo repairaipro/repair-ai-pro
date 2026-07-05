@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '@/lib/db';
 import { useAuth, isContractor } from '@/lib/auth';
 import { Home, HardHat, ArrowRight } from 'lucide-react';
 
@@ -49,19 +51,30 @@ export default function OnboardingPage() {
     );
   }
 
+  // Homeowners have no separate onboarding ceremony — their first job post
+  // IS the onboarding (it collects location with obvious purpose, and the
+  // AI diagnosis is the first-value moment). We just mark the flag so the
+  // dashboard stops redirecting here, then send them straight to posting.
+  const startAsHomeowner = async () => {
+    try {
+      await setDoc(doc(db, 'users', user!.uid), { onboardingComplete: true }, { merge: true });
+    } catch { /* non-blocking — worst case they see this chooser once more */ }
+    router.push('/jobs/new');
+  };
+
   const options = [
     {
-      href: '/onboarding/homeowner',
+      onClick: startAsHomeowner,
       icon: <Home className="w-7 h-7" />,
       color: '#818cf8',
       bg: 'rgba(99,102,241,0.1)',
       border: 'rgba(99,102,241,0.25)',
       title: 'I need something fixed',
-      desc: 'Post a repair, get an AI diagnosis and price, and match with a verified local pro.',
-      cta: 'Continue as homeowner',
+      desc: 'Describe the problem — AI diagnoses it, prices it, and matches you with a verified local pro.',
+      cta: 'Post my first repair',
     },
     {
-      href: '/onboarding/contractor',
+      onClick: () => router.push('/onboarding/contractor'),
       icon: <HardHat className="w-7 h-7" />,
       color: '#34d399',
       bg: 'rgba(16,185,129,0.1)',
@@ -87,8 +100,8 @@ export default function OnboardingPage() {
         <div className="grid sm:grid-cols-2 gap-4">
           {options.map((o) => (
             <button
-              key={o.href}
-              onClick={() => router.push(o.href)}
+              key={o.title}
+              onClick={o.onClick}
               className="text-left rounded-2xl p-6 transition-all duration-200 hover:-translate-y-0.5"
               style={{ background: 'var(--color-surface)', border: `1px solid var(--color-border)`, cursor: 'pointer' }}
               onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = o.border; }}
