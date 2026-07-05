@@ -32,16 +32,15 @@ export default function CookieBanner() {
   if (!show) return null;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 p-4 sm:p-6" style={{ background: 'rgba(0,0,0,0.8)' }}>
-      <div className="max-w-2xl mx-auto rounded-2xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
-        style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+    // Slim bar, no dark page overlay — a cookie notice shouldn't dim the hero
+    // CTA on first visit. Full width on mobile, floating card on desktop.
+    <div className="fixed bottom-0 left-0 right-0 z-50 p-3 sm:p-4 pointer-events-none">
+      <div className="max-w-2xl mx-auto rounded-2xl px-4 py-3 sm:px-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pointer-events-auto"
+        style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', boxShadow: '0 8px 32px rgba(0,0,0,0.35)' }}>
 
         <div className="flex-1">
-          <h3 className="font-bold text-sm mb-1" style={{ color: 'var(--color-text)' }}>
-            We use cookies
-          </h3>
-          <p className="text-xs" style={{ color: 'var(--color-text-4)' }}>
-            We use essential cookies for authentication and session management. Optional analytics cookies help us improve the platform. You can control these preferences anytime.
+          <p className="text-xs leading-relaxed" style={{ color: 'var(--color-text-3)' }}>
+            <strong style={{ color: 'var(--color-text)' }}>We use cookies</strong> — essential ones for sign-in, optional analytics to improve the app.
           </p>
         </div>
 

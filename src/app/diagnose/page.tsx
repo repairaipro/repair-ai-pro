@@ -161,7 +161,7 @@ Respond with ONLY a JSON object:
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder={'e.g. "Water is dripping from the ceiling under my upstairs bathroom" or "AC blows warm air and makes a clicking sound"'}
+            placeholder={'e.g. "Water dripping from the ceiling under my upstairs bathroom"'}
             rows={4}
             className="input resize-none"
           />
@@ -211,7 +211,7 @@ Respond with ONLY a JSON object:
             onClick={runDiagnosis}
             disabled={loading || !description.trim()}
             className="btn btn-primary btn-full"
-            style={{ opacity: !description.trim() ? 0.5 : 1 }}
+            style={{ opacity: !description.trim() ? 0.75 : 1, cursor: !description.trim() ? 'not-allowed' : 'pointer' }}
           >
             {loading ? (
               <><Loader2 className="w-4 h-4 animate-spin" /> Analyzing…</>

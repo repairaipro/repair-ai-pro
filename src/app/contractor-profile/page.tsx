@@ -246,7 +246,7 @@ export default function ContractorProfilePage() {
             <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-4)' }}>Your profile controls which jobs you get matched to.</p>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <Link href="/contractor/earnings" className="btn btn-secondary btn-sm">
+            <Link href="/dashboard/contractor/earnings" className="btn btn-secondary btn-sm">
               <TrendingUp className="w-3.5 h-3.5" /> Earnings
             </Link>
             <Link href="/contractor-inbox" className="btn btn-secondary btn-sm">

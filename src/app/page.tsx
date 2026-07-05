@@ -47,7 +47,7 @@ const FEATURES = [
     bg: 'rgba(245,158,11,0.1)',
     border: 'rgba(245,158,11,0.2)',
     title: "Automatic Dispatch",
-    desc: "Like Uber for any service — pros are invited in waves, ranked by fit. The best available one claims your job.",
+    desc: "Like Uber for home repair — pros are invited in waves, ranked by fit. The best available one claims your job.",
   },
   {
     icon: <MessageSquare className="w-5 h-5" />,
@@ -84,7 +84,7 @@ const TESTIMONIALS = [
     avatar: "SM",
   },
   {
-    quote: "My car wouldn't start and I had no idea who to call. Posted it here, had a mobile mechanic at my door in two hours. The AI nailed the diagnosis.",
+    quote: "Our AC died in the middle of a Houston July. The AI flagged it as a capacitor issue, quoted a fair range, and an HVAC tech accepted within the hour.",
     name: "DeShawn T.",
     role: "The Woodlands, TX",
     stars: 5,
@@ -99,7 +99,7 @@ const TESTIMONIALS = [
   },
 ];
 
-const SERVICE_TAGS = ["🔧 Plumbing", "⚡ Electrical", "🚗 Auto Mechanic", "❄️ HVAC", "🏠 Handyman", "💻 IT Support", "🌿 Landscaping", "🔒 Locksmith"];
+const SERVICE_TAGS = ["🔧 Plumbing", "⚡ Electrical", "❄️ HVAC", "🏠 Handyman", "🧰 Appliance Repair", "🎨 Painting", "🌿 Landscaping", "🔒 Locksmith"];
 
 export default function LandingPage() {
   return (
@@ -128,7 +128,7 @@ export default function LandingPage() {
             }}
           >
             <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
-            AI-Powered Service Marketplace · Houston, TX
+            AI-Powered Home Repair · Houston, TX
           </motion.div>
 
           <motion.h1
@@ -138,12 +138,12 @@ export default function LandingPage() {
             className="text-5xl md:text-7xl font-extrabold leading-[1.05] mb-6 tracking-tight"
             style={{ color: 'var(--color-text)' }}
           >
-            Any job. Any trade.{" "}
+            Snap it. Price it.{" "}
             <span
               className="text-transparent bg-clip-text"
               style={{ backgroundImage: 'linear-gradient(135deg, #818cf8, #a78bfa, #60a5fa)' }}
             >
-              Done fast.
+              Fixed today.
             </span>
           </motion.h1>
 
@@ -154,9 +154,9 @@ export default function LandingPage() {
             className="text-lg md:text-xl max-w-2xl mx-auto mb-10 leading-relaxed"
             style={{ color: 'var(--color-text-3)' }}
           >
-            Plumber, mechanic, electrician, handyman — describe the problem and AI
-            dispatches the best local pro to your door automatically.
-            Like Uber, for any skilled service.
+            Plumbing, electrical, HVAC, handyman — snap a photo and AI diagnoses
+            the problem, prices it from real local jobs, and matches you with a
+            verified pro nearby. Like Uber, for home repair.
           </motion.p>
 
           <motion.div
@@ -199,7 +199,7 @@ export default function LandingPage() {
                 color: '#818cf8',
               }}
             >
-              + 25 more
+              + more home trades
             </span>
           </div>
 
@@ -223,10 +223,10 @@ export default function LandingPage() {
         <div className="max-w-4xl mx-auto px-6 py-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
             {[
-              { value: "1,200+", label: "Jobs Posted" },
-              { value: "340+",   label: "Verified Pros" },
-              { value: "4.9★",   label: "Avg Rating" },
-              { value: "<45m",   label: "Avg Match Time" },
+              { value: "10 sec", label: "AI Diagnosis" },
+              { value: "$0",     label: "To Post a Job" },
+              { value: "15 min", label: "Instant Book Window" },
+              { value: "100%",   label: "Payment Protected" },
             ].map(({ value, label }) => (
               <div key={label}>
                 <div
