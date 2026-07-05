@@ -252,6 +252,15 @@ export default function NewJobPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const photoFileRef = useRef<HTMLInputElement>(null);
 
+  // Sign-in link must carry the full current URL (incl. ?desc= from the
+  // free-diagnosis handoff) so the description survives authentication —
+  // previously it was dropped and users landed on /dashboard empty-handed.
+  // Set in an effect to keep server/client HTML identical (hydration-safe).
+  const [signinHref, setSigninHref] = useState('/auth/signin?redirect=%2Fjobs%2Fnew');
+  useEffect(() => {
+    setSigninHref(`/auth/signin?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+  }, []);
+
   // ── Auth gate ────────────────────────────────────────────────────────────
   if (!user) {
     return (
@@ -263,9 +272,9 @@ export default function NewJobPage() {
           >
             <Briefcase className="w-6 h-6" style={{ color: '#fff' }} />
           </div>
-          <h2 className="text-lg font-bold mb-2" style={{ color: 'var(--color-text)' }}>Sign in required</h2>
-          <p className="text-sm mb-6" style={{ color: 'var(--color-text-3)' }}>You need to sign in to post a job.</p>
-          <Link href="/auth/signin" className="btn btn-primary btn-full">Sign In to Continue</Link>
+          <h2 className="text-lg font-bold mb-2" style={{ color: 'var(--color-text)' }}>Almost there</h2>
+          <p className="text-sm mb-6" style={{ color: 'var(--color-text-3)' }}>Create a free account to post your job — everything you've entered comes with you.</p>
+          <Link href={signinHref} className="btn btn-primary btn-full">Sign In to Continue</Link>
         </div>
       </div>
     );
