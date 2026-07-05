@@ -74,8 +74,8 @@ export default function HomeownerOnboardingPage() {
 
   if (!user) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-950">
-        <p className="text-gray-400">Redirecting...</p>
+      <div className="flex items-center justify-center min-h-screen" style={{ background: 'var(--color-bg)' }}>
+        <p style={{ color: 'var(--color-text-4)' }}>Redirecting...</p>
       </div>
     );
   }

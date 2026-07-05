@@ -16,7 +16,7 @@ const NAV = [
   {
     heading: 'For Contractors',
     links: [
-      { label: 'Join as a Pro', href: '/auth/signin' },
+      { label: 'Join as a Pro', href: '/auth/signin?redirect=%2Fonboarding%2Fcontractor' },
       { label: 'Pro Plans', href: '/contractor/pro' },
       { label: 'Studio Dashboard', href: '/studio' },
       { label: 'My Schedule', href: '/contractor/schedule' },

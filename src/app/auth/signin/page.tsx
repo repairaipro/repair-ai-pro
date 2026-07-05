@@ -23,15 +23,24 @@ export default function SignInPage() {
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
 
+  // Honor ?redirect= so entry funnels survive authentication (e.g. the
+  // contractor pitch page sends pros to /onboarding/contractor instead of
+  // dumping everyone on the homeowner dashboard). Same-origin paths only —
+  // anything not starting with "/" is ignored to prevent open redirects.
+  const getDestination = () => {
+    const raw = new URLSearchParams(window.location.search).get('redirect');
+    return raw && raw.startsWith('/') && !raw.startsWith('//') ? raw : '/dashboard';
+  };
+
   useEffect(() => { setHydrated(true); }, []);
-  useEffect(() => { if (hydrated && user) router.push('/dashboard'); }, [hydrated, user, router]);
+  useEffect(() => { if (hydrated && user) router.push(getDestination()); }, [hydrated, user, router]);
 
   const handleGoogle = async () => {
     setGoogleLoading(true);
     setError('');
     try {
       const u = await signInWithGoogle();
-      if (u) router.push('/dashboard');
+      if (u) router.push(getDestination());
     } catch (e: any) {
       setError(e.message ?? 'Google sign-in failed');
     } finally {
@@ -52,7 +61,7 @@ export default function SignInPage() {
       } else {
         await signInWithEmail(email, password);
       }
-      router.push('/dashboard');
+      router.push(getDestination());
     } catch (e: any) {
       // Map Firebase error codes to human-readable messages
       const code = e.code ?? '';

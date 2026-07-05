@@ -107,7 +107,7 @@ export default function ContractorProPage() {
   const [error, setError]     = useState<string | null>(null);
 
   async function handleSubscribe(planId: string) {
-    if (!user) { router.push('/auth/signin'); return; }
+    if (!user) { router.push('/auth/signin?redirect=%2Fcontractor%2Fpro'); return; }
     setLoading(planId);
     setError(null);
     try {
@@ -244,7 +244,7 @@ export default function ContractorProPage() {
 
                   {/* CTA */}
                   {tier.id === 'starter'
-                    ? <Link href="/auth/signin" className="btn btn-secondary btn-full" style={{ textAlign: 'center' }}>Get Started Free</Link>
+                    ? <Link href="/auth/signin?redirect=%2Fonboarding%2Fcontractor" className="btn btn-secondary btn-full" style={{ textAlign: 'center' }}>Get Started Free</Link>
                     : <button onClick={() => handleSubscribe(tier.id)} disabled={loading === tier.id}
                         className={`btn btn-full ${tier.highlight ? 'btn-primary' : 'btn-secondary'}`}>
                         {loading === tier.id
