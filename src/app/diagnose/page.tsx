@@ -300,6 +300,13 @@ Respond with ONLY a JSON object:
                 <Link
                   href={`/jobs/new?desc=${encodeURIComponent(description.trim())}`}
                   className="btn btn-primary btn-full"
+                  onClick={() => {
+                    // Photo is a base64 data URL — too large for a URL param, so
+                    // hand it off via sessionStorage; /jobs/new consumes it once on mount.
+                    if (imagePreview) {
+                      try { sessionStorage.setItem('diagnose_photo', imagePreview); } catch {}
+                    }
+                  }}
                 >
                   <CheckCircle className="w-4 h-4" /> Get matched with a verified pro
                   <ArrowRight className="w-4 h-4" />

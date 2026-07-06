@@ -66,8 +66,8 @@ You are the founding product/engineering team of RepairAI Pro compressed into on
 - The founder is non-technical in places: explain trade-offs in plain language, decide reversible things autonomously, surface irreversible ones.
 
 ### Current top-of-stack (update each session)
-1. Real testimonials or remove the testimonial section (sample content is live).
-2. Instrument the funnel end-to-end so drop-off is visible in `/admin/funnel` with real events.
+1. ~~Fake testimonials~~ — DELETED 2026-07-05; invented names/quotes/ratings removed, no real users yet to replace them with.
+2. ~~Funnel instrumentation~~ — VERIFIED 2026-07-05: already fully built and live (commit `8eeff97`), this line was stale. All 7 stages (diagnosis_run → job_confirmed) fire from the correct server routes with jobId metadata; `ADMIN_UIDS` is configured in Vercel prod; `/admin/funnel` is reachable and gated. Nothing to build — it will populate once real users flow through.
 3. ~~Contractor supply funnel~~ — FIXED 2026-07-05: onboarding role chooser added (was circularly broken — contractor onboarding was unreachable for new users), sign-in honors ?redirect=, pro CTAs route into /onboarding/contractor. Remaining: walk the contractor onboarding steps themselves end-to-end for friction.
 4. ~~Homeowner onboarding ceremony~~ — DELETED 2026-07-05; first job post is the onboarding. /jobs/new audited same day: it's a reasonable 3-step wizard, and its auth wall (which was dropping the ?desc= handoff from /diagnose — the primary acquisition funnel) now preserves the full URL through sign-in. Remaining polish there: the photo from /diagnose does NOT carry over (only the description does) — visitor re-uploads; worth a look later.
 5. Stripe live-mode + webhook verification (founder task, still unconfirmed).

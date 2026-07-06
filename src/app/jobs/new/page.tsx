@@ -211,6 +211,19 @@ export default function NewJobPage() {
     const desc = sp.get('desc');
     if (desc) setDescription(desc);
 
+    // Photo handoff from /diagnose (too large for a URL param, so it rides in
+    // sessionStorage). Left in place (not cleared here) since unauthenticated
+    // users get bounced through /auth/signin and back — a full navigation that
+    // wipes this component's state, so sessionStorage must survive the round
+    // trip. Cleared for real in clearImage() and after a successful job post.
+    try {
+      const photo = sessionStorage.getItem('diagnose_photo');
+      if (photo) {
+        setImagePreview(photo);
+        setActiveMode('photo');
+      }
+    } catch {}
+
     const id = sp.get('contractor');
     if (!id) return;
     setPreferredContractorId(id);
@@ -293,6 +306,7 @@ export default function NewJobPage() {
   function clearImage(refEl: React.RefObject<HTMLInputElement | null>) {
     setImagePreview(null);
     if (refEl.current) refEl.current.value = "";
+    try { sessionStorage.removeItem('diagnose_photo'); } catch {}
   }
 
   async function runAIAnalysis() {
@@ -462,6 +476,7 @@ CRITICAL: If you're not confident, ask clarifying questions rather than guessing
         }).catch(() => {});
       }
 
+      try { sessionStorage.removeItem('diagnose_photo'); } catch {}
       router.push(`/jobs/${data.jobId}`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to post job. Please try again.";
