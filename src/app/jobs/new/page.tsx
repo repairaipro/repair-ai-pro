@@ -64,6 +64,8 @@ type Part = {
   name: string;
   estimatedPrice: string;
   why: string;
+  searchQuery?: string;
+  partNumber?: string;
 };
 
 type SmartEstimate = {
@@ -1167,6 +1169,11 @@ CRITICAL: If you're not confident, ask clarifying questions rather than guessing
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>{part.name}</div>
+                          {part.partNumber && (
+                            <div className="text-[11px] font-mono mt-0.5" style={{ color: '#818cf8' }}>
+                              Part # {part.partNumber}
+                            </div>
+                          )}
                           <div className="text-xs mt-0.5" style={{ color: 'var(--color-text-4)' }}>{part.why}</div>
                         </div>
                         <span className="text-sm font-bold flex-shrink-0" style={{ color: '#34d399' }}>
@@ -1175,20 +1182,7 @@ CRITICAL: If you're not confident, ask clarifying questions rather than guessing
                       </div>
                       <div className="flex flex-wrap gap-2 mt-2.5">
                         <a
-                          href={`https://www.amazon.com/s?k=${encodeURIComponent(part.name)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-lg transition-opacity hover:opacity-80"
-                          style={{
-                            background: 'rgba(251,191,36,0.12)',
-                            border: '1px solid rgba(251,191,36,0.25)',
-                            color: '#fbbf24',
-                          }}
-                        >
-                          Find on Amazon <ExternalLink className="w-3 h-3" />
-                        </a>
-                        <a
-                          href={`https://www.homedepot.com/s/${encodeURIComponent(part.name)}`}
+                          href={`https://www.homedepot.com/s/${encodeURIComponent(part.searchQuery ?? part.name)}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-lg transition-opacity hover:opacity-80"
@@ -1198,7 +1192,33 @@ CRITICAL: If you're not confident, ask clarifying questions rather than guessing
                             color: '#fb923c',
                           }}
                         >
-                          Find at Home Depot <ExternalLink className="w-3 h-3" />
+                          Home Depot <ExternalLink className="w-3 h-3" />
+                        </a>
+                        <a
+                          href={`https://www.lowes.com/search?searchTerm=${encodeURIComponent(part.searchQuery ?? part.name)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-lg transition-opacity hover:opacity-80"
+                          style={{
+                            background: 'rgba(59,130,246,0.1)',
+                            border: '1px solid rgba(59,130,246,0.22)',
+                            color: '#60a5fa',
+                          }}
+                        >
+                          Lowe&apos;s <ExternalLink className="w-3 h-3" />
+                        </a>
+                        <a
+                          href={`https://www.amazon.com/s?k=${encodeURIComponent(part.searchQuery ?? part.name)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-lg transition-opacity hover:opacity-80"
+                          style={{
+                            background: 'rgba(251,191,36,0.12)',
+                            border: '1px solid rgba(251,191,36,0.25)',
+                            color: '#fbbf24',
+                          }}
+                        >
+                          Amazon <ExternalLink className="w-3 h-3" />
                         </a>
                       </div>
                     </li>

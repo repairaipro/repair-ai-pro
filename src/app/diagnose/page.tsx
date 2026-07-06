@@ -25,6 +25,19 @@ type Estimate = {
   why_this_range: string;
   scope_of_work?: string[];
   risk_factors?: string[];
+  labor_hours_low?: number;
+  labor_hours_high?: number;
+  labor_rate_assumption?: string;
+  materials_breakdown?: string;
+  questions_to_confirm?: string[];
+  diy_feasibility?: string;
+};
+
+const DIY_META: Record<string, { color: string; bg: string }> = {
+  'Easy':            { color: '#34d399', bg: 'rgba(16,185,129,0.1)' },
+  'Moderate':        { color: '#fbbf24', bg: 'rgba(245,158,11,0.1)' },
+  'Difficult':       { color: '#fb923c', bg: 'rgba(249,115,22,0.1)' },
+  'Not recommended': { color: '#f87171', bg: 'rgba(239,68,68,0.1)' },
 };
 
 const SEVERITY_META: Record<string, { label: string; color: string; bg: string }> = {
@@ -286,12 +299,101 @@ Respond with ONLY a JSON object:
                             {estimate.why_this_range}
                           </p>
                         )}
+                        {(estimate.labor_hours_low != null || estimate.materials_breakdown) && (
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2.5 text-xs" style={{ color: 'var(--color-text-3)' }}>
+                            {estimate.labor_hours_low != null && estimate.labor_hours_high != null && (
+                              <span>
+                                <strong style={{ color: 'var(--color-text-2)' }}>Labor:</strong>{' '}
+                                {estimate.labor_hours_low === estimate.labor_hours_high
+                                  ? `~${estimate.labor_hours_low}h`
+                                  : `${estimate.labor_hours_low}–${estimate.labor_hours_high}h`}
+                                {estimate.labor_rate_assumption ? ` at ${estimate.labor_rate_assumption}` : ''}
+                              </span>
+                            )}
+                            {estimate.materials_breakdown && (
+                              <span>
+                                <strong style={{ color: 'var(--color-text-2)' }}>Materials:</strong> {estimate.materials_breakdown}
+                              </span>
+                            )}
+                          </div>
+                        )}
                         <div className="mt-2">
                           <FinancingOption total={estimate.price_typical_usd} variant="inline" />
                         </div>
                       </>
                     )}
                   </div>
+                </div>
+              )}
+
+              {/* Full job breakdown — the "know the job before the contractor does" section */}
+              {estimate && (
+                <div className="px-5 pb-5 space-y-4">
+                  {estimate.diy_feasibility && DIY_META[estimate.diy_feasibility] && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold" style={{ color: 'var(--color-text-3)' }}>DIY difficulty:</span>
+                      <span
+                        className="text-xs font-bold px-2.5 py-1 rounded-full"
+                        style={{ background: DIY_META[estimate.diy_feasibility].bg, color: DIY_META[estimate.diy_feasibility].color }}
+                      >
+                        {estimate.diy_feasibility}
+                      </span>
+                    </div>
+                  )}
+
+                  {Array.isArray(estimate.scope_of_work) && estimate.scope_of_work.length > 0 && (
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: 'var(--color-text-3)' }}>
+                        What the job involves
+                      </p>
+                      <ol className="space-y-1.5">
+                        {estimate.scope_of_work.map((step, i) => (
+                          <li key={i} className="flex gap-2.5 text-xs leading-relaxed" style={{ color: 'var(--color-text-2)' }}>
+                            <span
+                              className="flex-shrink-0 w-[18px] h-[18px] rounded-full flex items-center justify-center text-[10px] font-bold"
+                              style={{ background: 'rgba(99,102,241,0.12)', color: '#818cf8' }}
+                            >
+                              {i + 1}
+                            </span>
+                            {step}
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  )}
+
+                  {Array.isArray(estimate.questions_to_confirm) && estimate.questions_to_confirm.length > 0 && (
+                    <div
+                      className="rounded-xl p-3.5"
+                      style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)' }}
+                    >
+                      <p className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: '#818cf8' }}>
+                        A contractor will ask you these — know your answers
+                      </p>
+                      <ul className="space-y-1.5">
+                        {estimate.questions_to_confirm.map((q, i) => (
+                          <li key={i} className="flex gap-2 text-xs leading-relaxed" style={{ color: 'var(--color-text-2)' }}>
+                            <span style={{ color: '#818cf8' }}>•</span> {q}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {Array.isArray(estimate.risk_factors) && estimate.risk_factors.length > 0 && (
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: 'var(--color-text-3)' }}>
+                        What could raise the price
+                      </p>
+                      <ul className="space-y-1.5">
+                        {estimate.risk_factors.map((r, i) => (
+                          <li key={i} className="flex gap-2 text-xs leading-relaxed" style={{ color: 'var(--color-text-4)' }}>
+                            <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-0.5" style={{ color: '#fbbf24' }} /> {r}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               )}
 
