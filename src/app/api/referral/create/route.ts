@@ -20,6 +20,11 @@ export async function GET(req: Request) {
     const decoded = await adminAuth.verifyIdToken(token);
     const uid = decoded.uid;
 
+    // Build the share URL from the actual request origin — never hardcode a
+    // domain here, the project doesn't have a custom one yet and this was
+    // previously pointing at a domain we don't own.
+    const origin = new URL(req.url).origin;
+
     // 2. Check if referral doc already exists
     const referralRef = adminDb.collection("referrals").doc(uid);
     const referralSnap = await referralRef.get();
@@ -28,7 +33,7 @@ export async function GET(req: Request) {
       const data = referralSnap.data()!;
       return NextResponse.json({
         code: data.code,
-        shareUrl: `https://repair-ai-pro.com/join?ref=${data.code}`,
+        shareUrl: `${origin}/join?ref=${data.code}`,
         redeemCount: data.redeemCount ?? 0,
         creditsEarned: data.creditsEarned ?? 0,
       });
@@ -48,7 +53,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       code,
-      shareUrl: `https://repair-ai-pro.com/join?ref=${code}`,
+      shareUrl: `${origin}/join?ref=${code}`,
       redeemCount: 0,
       creditsEarned: 0,
     });
