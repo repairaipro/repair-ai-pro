@@ -26,7 +26,7 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     if (!user) {
-      router.push('/auth/signin');
+      router.push('/auth/signin?redirect=%2Fonboarding');
       return;
     }
     (async () => {

@@ -33,7 +33,7 @@ export default function ContractorOnboardingPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!user) router.push('/auth/signin');
+    if (!user) router.push('/auth/signin?redirect=%2Fonboarding%2Fcontractor');
   }, [user, router]);
 
   // Pure function — no side effects, safe to call during render

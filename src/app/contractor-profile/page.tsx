@@ -223,7 +223,7 @@ export default function ContractorProfilePage() {
       <div className="min-h-screen mesh-bg flex flex-col items-center justify-center gap-4 animate-fade-in">
         <div className="card p-8 text-center max-w-sm w-full">
           <p className="text-sm mb-4" style={{ color: 'var(--color-text-3)' }}>Sign in to manage your contractor profile.</p>
-          <Link href="/auth/signin" className="btn btn-primary btn-full">Sign In</Link>
+          <Link href="/auth/signin?redirect=%2Fcontractor-profile" className="btn btn-primary btn-full">Sign In</Link>
         </div>
       </div>
     );
