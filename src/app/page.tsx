@@ -75,30 +75,6 @@ const FEATURES = [
   },
 ];
 
-const TESTIMONIALS = [
-  {
-    quote: "I posted my leak at 9am and had a plumber accepted by 9:45. The AI even told me what the problem probably was before anyone showed up.",
-    name: "Sarah M.",
-    role: "Houston, TX",
-    stars: 5,
-    avatar: "SM",
-  },
-  {
-    quote: "Our AC died in the middle of a Houston July. The AI flagged it as a capacitor issue, quoted a fair range, and an HVAC tech accepted within the hour.",
-    name: "DeShawn T.",
-    role: "The Woodlands, TX",
-    stars: 5,
-    avatar: "DT",
-  },
-  {
-    quote: "As an electrician, I used to spend hours chasing leads. Now the right jobs come to me ranked by how well they match my trade and location.",
-    name: "Carlos R.",
-    role: "Licensed Electrician",
-    stars: 5,
-    avatar: "CR",
-  },
-];
-
 const SERVICE_TAGS = ["🔧 Plumbing", "⚡ Electrical", "❄️ HVAC", "🏠 Handyman", "🧰 Appliance Repair", "🎨 Painting", "🌿 Landscaping", "🔒 Locksmith"];
 
 export default function LandingPage() {
@@ -362,62 +338,6 @@ export default function LandingPage() {
                 <h3 className="font-semibold mb-1.5 text-sm" style={{ color: 'var(--color-text)' }}>{f.title}</h3>
                 <p className="text-sm leading-relaxed" style={{ color: 'var(--color-text-4)' }}>{f.desc}</p>
               </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ══════════════ TESTIMONIALS ══════════════ */}
-      <section className="py-24 px-6" style={{ borderBottom: '1px solid var(--color-border)' }}>
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-3" style={{ color: 'var(--color-text)' }}>
-              What people are saying
-            </h2>
-            <p className="text-sm" style={{ color: 'var(--color-text-4)' }}>
-              Real reviews from real customers in Houston and surrounding areas.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-5">
-            {TESTIMONIALS.map((t, i) => (
-              <div
-                key={i}
-                className="card p-6 flex flex-col gap-4 transition-all duration-300"
-                onMouseEnter={e => {
-                  (e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.2)';
-                  (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)';
-                }}
-                onMouseLeave={e => {
-                  (e.currentTarget as HTMLElement).style.borderColor = 'var(--color-border)';
-                  (e.currentTarget as HTMLElement).style.transform = 'translateY(0)';
-                }}
-              >
-                {/* Stars */}
-                <div className="flex gap-0.5">
-                  {Array.from({ length: t.stars }).map((_, j) => (
-                    <Star key={j} className="w-4 h-4 fill-current" style={{ color: '#fbbf24' }} />
-                  ))}
-                </div>
-                <p className="text-sm leading-relaxed flex-1" style={{ color: 'var(--color-text-2)' }}>
-                  "{t.quote}"
-                </p>
-                <div className="flex items-center gap-3 pt-2" style={{ borderTop: '1px solid var(--color-border)' }}>
-                  <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-                    style={{
-                      background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
-                      color: '#fff',
-                    }}
-                  >
-                    {t.avatar}
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>{t.name}</p>
-                    <p className="text-xs" style={{ color: 'var(--color-text-4)' }}>{t.role}</p>
-                  </div>
-                </div>
-              </div>
             ))}
           </div>
         </div>
