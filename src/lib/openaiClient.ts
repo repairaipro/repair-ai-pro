@@ -18,6 +18,9 @@ export async function handleOpenAIError(error: any): Promise<string> {
     if (error.status === 401) {
       return 'Invalid API key. Please check your OPENAI_API_KEY environment variable.';
     }
+    if (error.code === 'insufficient_quota') {
+      return 'OpenAI account is out of quota — add billing or increase the usage limit at platform.openai.com.';
+    }
     if (error.status === 429) {
       return 'Rate limited by OpenAI. Please try again in a moment.';
     }
