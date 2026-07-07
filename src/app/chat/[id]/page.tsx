@@ -385,23 +385,23 @@ export default function JobChat() {
           </button>
 
           {otherParticipant && (
-            <Link href={otherParticipant.role === 'contractor' ? `/contractor/${otherParticipant.uid}` : '#'} className="relative flex-shrink-0">
-              <Avatar name={otherParticipant.name} photo={otherParticipant.photo} size={40} />
-              {/* presence dot */}
-              <span
-                className="absolute bottom-0 right-0 w-3 h-3 rounded-full"
-                style={{ background: '#22c55e', border: '2.5px solid rgba(15,16,22,0.95)' }}
-              />
-            </Link>
+            otherParticipant.role === 'contractor' ? (
+              <Link href={`/contractor/${otherParticipant.uid}`} className="flex-shrink-0" title="View contractor profile">
+                <Avatar name={otherParticipant.name} photo={otherParticipant.photo} size={40} />
+              </Link>
+            ) : (
+              <div className="flex-shrink-0">
+                <Avatar name={otherParticipant.name} photo={otherParticipant.photo} size={40} />
+              </div>
+            )
           )}
 
           <div className="flex-1 min-w-0">
             <p className="font-bold text-[15px] truncate leading-tight" style={{ color: 'var(--color-text)' }}>
               {otherParticipant?.name ?? 'Loading…'}
             </p>
-            <p className="text-xs truncate flex items-center gap-1" style={{ color: 'var(--color-text-4)' }}>
-              <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: '#22c55e' }} />
-              {otherParticipant?.role === 'contractor' ? 'Contractor · Active now' : 'Homeowner · Active now'}
+            <p className="text-xs truncate" style={{ color: 'var(--color-text-4)' }}>
+              {otherParticipant?.role === 'contractor' ? 'Contractor' : 'Homeowner'}
             </p>
           </div>
 

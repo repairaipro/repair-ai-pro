@@ -29,7 +29,6 @@ const NAV = [
     links: [
       { label: 'About', href: '/about' },
       { label: 'Contact', href: '/contact' },
-      { label: 'Blog', href: '/work' },
     ],
   },
   {
@@ -63,20 +62,8 @@ export default function Footer() {
             <p className="text-xs leading-relaxed mb-4" style={{ color: 'var(--color-text-4)' }}>
               AI-powered home repair marketplace for Houston, TX. Get a fair price, a verified pro, and payment protection — all in one place.
             </p>
-            {/* Social */}
-            <div className="flex gap-3">
-              {[
-                { href: 'https://instagram.com/repairai', label: '📸' },
-                { href: 'https://tiktok.com/@repairai', label: '🎵' },
-                { href: 'https://facebook.com/repairai', label: '📘' },
-              ].map(s => (
-                <a key={s.href} href={s.href} target="_blank" rel="noopener noreferrer"
-                  className="w-8 h-8 rounded-lg flex items-center justify-center text-sm"
-                  style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border)' }}>
-                  {s.label}
-                </a>
-              ))}
-            </div>
+            {/* Social icons removed: they pointed at instagram.com/repairai etc. —
+                handles this business doesn't own. Restore only with real accounts. */}
           </div>
 
           {/* Nav columns */}
