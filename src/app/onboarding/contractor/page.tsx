@@ -106,8 +106,8 @@ export default function ContractorOnboardingPage() {
 
   if (!user) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-950">
-        <p className="text-gray-400">Redirecting...</p>
+      <div className="flex items-center justify-center min-h-screen" style={{ background: 'var(--color-bg)' }}>
+        <p style={{ color: 'var(--color-text-4)' }}>Redirecting...</p>
       </div>
     );
   }
@@ -150,13 +150,13 @@ export default function ContractorOnboardingPage() {
       {step === 1 && (
         <div className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-200 mb-2">
+            <label className="label mb-2">
               Primary Trade *
             </label>
             <select
               value={trade}
               onChange={(e) => setTrade(e.target.value)}
-              className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+              className="input"
             >
               <option value="">Select a trade...</option>
               {TRADES.map((t) => (
@@ -168,34 +168,34 @@ export default function ContractorOnboardingPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-200 mb-2">
+            <label className="label mb-2">
               City *
             </label>
             <input
               type="text"
               value={city}
               onChange={(e) => setCity(e.target.value)}
-              placeholder="e.g. San Francisco"
-              className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+              placeholder="e.g. Houston"
+              className="input"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-200 mb-2">
+              <label className="label mb-2">
                 ZIP Code *
               </label>
               <input
                 type="text"
                 value={zipCode}
                 onChange={(e) => setZipCode(e.target.value)}
-                placeholder="e.g. 94103"
-                className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+                placeholder="e.g. 77002"
+                className="input"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-200 mb-2">
+              <label className="label mb-2">
                 Service Radius: {radius} mi
               </label>
               <input
@@ -214,7 +214,7 @@ export default function ContractorOnboardingPage() {
       {step === 2 && (
         <div className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-200 mb-2">
+            <label className="label mb-2">
               Full Name *
             </label>
             <input
@@ -222,12 +222,12 @@ export default function ContractorOnboardingPage() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Your name or business name"
-              className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+              className="input"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-200 mb-2">
+            <label className="label mb-2">
               Phone Number *
             </label>
             <input
@@ -235,12 +235,12 @@ export default function ContractorOnboardingPage() {
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="(555) 123-4567"
-              className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+              className="input"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-200 mb-2">
+            <label className="label mb-2">
               Profile Photo (optional)
             </label>
             <PhotoUpload
@@ -254,7 +254,7 @@ export default function ContractorOnboardingPage() {
       {step === 3 && (
         <div className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-200 mb-2">
+            <label className="label mb-2">
               Bio / Description
             </label>
             <textarea
@@ -262,12 +262,12 @@ export default function ContractorOnboardingPage() {
               onChange={(e) => setBio(e.target.value)}
               placeholder="Tell homeowners about your experience and expertise..."
               rows={4}
-              className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+              className="input"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-200 mb-2">
+            <label className="label mb-2">
               Hourly Rate (USD, optional)
             </label>
             <input
@@ -276,18 +276,18 @@ export default function ContractorOnboardingPage() {
               onChange={(e) => setHourly(e.target.value)}
               placeholder="e.g. 75"
               min="0"
-              className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+              className="input"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-200 mb-2">
+            <label className="label mb-2">
               Availability Status
             </label>
             <select
               value={availability}
               onChange={(e) => setAvailability(e.target.value)}
-              className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-indigo-500"
+              className="input"
             >
               <option value="available">Available - Taking jobs</option>
               <option value="busy">Busy - Limited availability</option>
@@ -299,46 +299,46 @@ export default function ContractorOnboardingPage() {
 
       {step === 4 && (
         <div className="space-y-4">
-          <div className="p-4 bg-gray-800/50 rounded-lg">
-            <p className="text-xs text-gray-500 mb-1">Trade</p>
-            <p className="text-white font-medium">{trade}</p>
+          <div className="p-4 rounded-lg" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border)' }}>
+            <p className="text-xs mb-1" style={{ color: 'var(--color-text-4)' }}>Trade</p>
+            <p className="font-medium" style={{ color: 'var(--color-text)' }}>{trade}</p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="p-4 bg-gray-800/50 rounded-lg">
-              <p className="text-xs text-gray-500 mb-1">Location</p>
-              <p className="text-white font-medium">
+            <div className="p-4 rounded-lg" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border)' }}>
+              <p className="text-xs mb-1" style={{ color: 'var(--color-text-4)' }}>Location</p>
+              <p className="font-medium" style={{ color: 'var(--color-text)' }}>
                 {city}, {zipCode}
               </p>
             </div>
-            <div className="p-4 bg-gray-800/50 rounded-lg">
-              <p className="text-xs text-gray-500 mb-1">Service Radius</p>
-              <p className="text-white font-medium">{radius} miles</p>
+            <div className="p-4 rounded-lg" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border)' }}>
+              <p className="text-xs mb-1" style={{ color: 'var(--color-text-4)' }}>Service Radius</p>
+              <p className="font-medium" style={{ color: 'var(--color-text)' }}>{radius} miles</p>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="p-4 bg-gray-800/50 rounded-lg">
-              <p className="text-xs text-gray-500 mb-1">Name</p>
-              <p className="text-white font-medium">{name}</p>
+            <div className="p-4 rounded-lg" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border)' }}>
+              <p className="text-xs mb-1" style={{ color: 'var(--color-text-4)' }}>Name</p>
+              <p className="font-medium" style={{ color: 'var(--color-text)' }}>{name}</p>
             </div>
-            <div className="p-4 bg-gray-800/50 rounded-lg">
-              <p className="text-xs text-gray-500 mb-1">Phone</p>
-              <p className="text-white font-medium">{phone}</p>
+            <div className="p-4 rounded-lg" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border)' }}>
+              <p className="text-xs mb-1" style={{ color: 'var(--color-text-4)' }}>Phone</p>
+              <p className="font-medium" style={{ color: 'var(--color-text)' }}>{phone}</p>
             </div>
           </div>
 
           {bio && (
-            <div className="p-4 bg-gray-800/50 rounded-lg">
-              <p className="text-xs text-gray-500 mb-1">Bio</p>
-              <p className="text-white text-sm">{bio}</p>
+            <div className="p-4 rounded-lg" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border)' }}>
+              <p className="text-xs mb-1" style={{ color: 'var(--color-text-4)' }}>Bio</p>
+              <p className="text-sm" style={{ color: 'var(--color-text-2)' }}>{bio}</p>
             </div>
           )}
 
           {hourly && (
-            <div className="p-4 bg-gray-800/50 rounded-lg">
-              <p className="text-xs text-gray-500 mb-1">Hourly Rate</p>
-              <p className="text-white font-medium">${hourly}/hr</p>
+            <div className="p-4 rounded-lg" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border)' }}>
+              <p className="text-xs mb-1" style={{ color: 'var(--color-text-4)' }}>Hourly Rate</p>
+              <p className="font-medium" style={{ color: 'var(--color-text)' }}>${hourly}/hr</p>
             </div>
           )}
 

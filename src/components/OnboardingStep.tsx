@@ -28,23 +28,29 @@ export default function OnboardingStep({
   showSkip = false,
 }: OnboardingStepProps) {
   return (
-    <div className="min-h-screen bg-gray-950 flex flex-col">
+    <div className="min-h-screen flex flex-col" style={{ background: 'var(--color-bg)' }}>
       {/* Header with step indicator */}
-      <div className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm sticky top-0 z-10">
+      <div
+        className="backdrop-blur-sm sticky top-0 z-10"
+        style={{ background: 'var(--color-bg-2)', borderBottom: '1px solid var(--color-border)' }}
+      >
         <div className="max-w-2xl mx-auto px-6 py-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex-1">
-              <p className="text-sm text-gray-500 mb-1">Step {step} of {totalSteps}</p>
-              <h1 className="text-2xl font-bold text-white">{title}</h1>
-              {subtitle && <p className="text-gray-400 text-sm mt-1">{subtitle}</p>}
+              <p className="text-sm mb-1" style={{ color: 'var(--color-text-4)' }}>Step {step} of {totalSteps}</p>
+              <h1 className="text-2xl font-bold" style={{ color: 'var(--color-text)' }}>{title}</h1>
+              {subtitle && <p className="text-sm mt-1" style={{ color: 'var(--color-text-3)' }}>{subtitle}</p>}
             </div>
           </div>
 
           {/* Progress bar */}
-          <div className="w-full h-1 bg-gray-800 rounded-full overflow-hidden">
+          <div className="w-full h-1 rounded-full overflow-hidden" style={{ background: 'var(--color-surface-2)' }}>
             <div
-              className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-300"
-              style={{ width: `${(step / totalSteps) * 100}%` }}
+              className="h-full transition-all duration-300"
+              style={{
+                width: `${(step / totalSteps) * 100}%`,
+                background: 'linear-gradient(90deg, #6366f1, #8b5cf6)',
+              }}
             />
           </div>
         </div>
@@ -52,19 +58,22 @@ export default function OnboardingStep({
 
       {/* Content */}
       <div className="flex-1 max-w-2xl mx-auto w-full px-6 py-8">
-        <div className="bg-gray-900/50 rounded-2xl border border-gray-800 p-8">
+        <div
+          className="rounded-2xl p-8"
+          style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+        >
           {children}
         </div>
       </div>
 
       {/* Footer with actions */}
-      <div className="border-t border-gray-800 bg-gray-900/50 backdrop-blur-sm">
+      <div
+        className="backdrop-blur-sm"
+        style={{ background: 'var(--color-bg-2)', borderTop: '1px solid var(--color-border)' }}
+      >
         <div className="max-w-2xl mx-auto px-6 py-6 flex items-center gap-3">
           {step > 1 && (
-            <button
-              onClick={onPrev}
-              className="px-6 py-2 text-gray-300 hover:text-white border border-gray-700 hover:border-gray-600 rounded-lg transition"
-            >
+            <button onClick={onPrev} className="btn btn-secondary">
               Back
             </button>
           )}
@@ -72,7 +81,8 @@ export default function OnboardingStep({
           {showSkip && onSkip && (
             <button
               onClick={onSkip}
-              className="px-6 py-2 text-gray-400 hover:text-gray-300 text-sm transition"
+              className="px-6 py-2 text-sm transition-opacity hover:opacity-80"
+              style={{ color: 'var(--color-text-4)' }}
             >
               Skip
             </button>
@@ -83,7 +93,8 @@ export default function OnboardingStep({
           <button
             onClick={onNext}
             disabled={!canNext}
-            className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white rounded-lg transition font-medium"
+            className="btn btn-primary"
+            style={!canNext ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
           >
             {nextLabel}
           </button>

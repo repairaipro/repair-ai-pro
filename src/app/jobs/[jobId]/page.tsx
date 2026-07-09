@@ -1143,6 +1143,36 @@ export default function JobDetailPage() {
           )}
         </div>
 
+        {/* ── Maintenance plan upsell — the recurring-revenue moment.
+             Shown only after the job is done and paid: trust is at its peak,
+             and the pain of "this broke" is fresh. ── */}
+        {(job.status === 'confirmed' || job.status === 'verified') && isHomeowner && (
+          <Link
+            href="/maintenance/new"
+            className="flex items-center gap-3 rounded-2xl p-4 transition-transform hover:-translate-y-0.5"
+            style={{
+              background: 'linear-gradient(135deg, rgba(16,185,129,0.1), rgba(52,211,153,0.04))',
+              border: '1px solid rgba(16,185,129,0.25)',
+            }}
+          >
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: 'linear-gradient(135deg,#059669,#10b981)' }}
+            >
+              <Wrench size={18} color="#fff" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold" style={{ color: 'var(--color-text)' }}>
+                Keep this from happening again
+              </p>
+              <p className="text-xs" style={{ color: 'var(--color-text-4)' }}>
+                Set up a seasonal maintenance plan — catch the next problem before it costs you.
+              </p>
+            </div>
+            <ChevronRight size={16} style={{ color: '#34d399' }} />
+          </Link>
+        )}
+
         {/* ── Security note ── */}
         <div className="flex items-center gap-2 justify-center">
           <Shield size={12} style={{ color: 'var(--color-text-4)' }} />

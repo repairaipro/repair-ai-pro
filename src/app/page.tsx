@@ -1,6 +1,8 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Zap, Brain, Star, MessageSquare, MapPin, Shield, ArrowRight, CheckCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import TrustBar from '@/components/TrustBar';
@@ -78,6 +80,17 @@ const FEATURES = [
 const SERVICE_TAGS = ["🔧 Plumbing", "⚡ Electrical", "❄️ HVAC", "🏠 Handyman", "🧰 Appliance Repair", "🎨 Painting", "🌿 Landscaping", "🔒 Locksmith"];
 
 export default function LandingPage() {
+  const router = useRouter();
+  const [heroDesc, setHeroDesc] = useState('');
+
+  // The hero input is the funnel: typing here carries straight into an
+  // auto-running diagnosis instead of bouncing through a second empty form.
+  function submitHero(e?: React.FormEvent) {
+    e?.preventDefault();
+    const d = heroDesc.trim();
+    router.push(d ? `/diagnose?desc=${encodeURIComponent(d)}` : '/diagnose');
+  }
+
   return (
     <div className="-mx-6 -mt-6" style={{ background: 'var(--color-bg)' }}>
 
@@ -139,16 +152,36 @@ export default function LandingPage() {
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.3 }}
-            className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-10">
-            <Link href="/diagnose" className="btn btn-primary btn-lg px-8 w-full sm:w-auto">
-              Diagnose It Free
-              <ArrowRight className="w-4 h-4" />
-            </Link>
+            className="mb-10"
+          >
+            {/* Live problem input — the diagnosis starts right here */}
+            <form
+              onSubmit={submitHero}
+              className="flex flex-col sm:flex-row gap-2 max-w-xl mx-auto mb-4 p-1.5 rounded-2xl"
+              style={{
+                background: 'var(--color-surface)',
+                border: '1px solid var(--color-border)',
+                boxShadow: '0 8px 40px -12px rgba(99,102,241,0.35)',
+              }}
+            >
+              <input
+                value={heroDesc}
+                onChange={(e) => setHeroDesc(e.target.value)}
+                placeholder={'Try: "water dripping from the ceiling"'}
+                aria-label="Describe your home repair problem"
+                className="flex-1 bg-transparent outline-none text-sm px-4 py-3"
+                style={{ color: 'var(--color-text)' }}
+              />
+              <button type="submit" className="btn btn-primary btn-lg px-6 whitespace-nowrap">
+                <Brain className="w-4 h-4" /> Diagnose It Free
+              </button>
+            </form>
             <Link
               href="/contractor/pro"
-              className="btn btn-secondary btn-lg px-8 w-full sm:w-auto"
+              className="inline-flex items-center gap-1.5 text-sm font-medium transition-opacity hover:opacity-80"
+              style={{ color: 'var(--color-text-3)' }}
             >
-              I'm a Service Pro
+              I'm a Service Pro <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </motion.div>
 

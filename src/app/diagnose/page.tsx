@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TRADES_FOR_PROMPT } from '@/lib/constants';
@@ -67,8 +67,21 @@ export default function DiagnosePage() {
     reader.readAsDataURL(file);
   }
 
-  async function runDiagnosis() {
-    if (!description.trim()) return;
+  // Landing-hero handoff: ?desc= pre-fills and auto-runs, so a visitor who
+  // typed their problem on the homepage lands here mid-diagnosis instead of
+  // facing the same empty box twice.
+  useEffect(() => {
+    const desc = new URLSearchParams(window.location.search).get('desc');
+    if (desc?.trim()) {
+      setDescription(desc);
+      runDiagnosis(desc);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function runDiagnosis(overrideDesc?: string) {
+    const desc = (overrideDesc ?? description).trim();
+    if (!desc) return;
     setLoading(true);
     setError('');
     setDiagnosis(null);
@@ -78,7 +91,7 @@ export default function DiagnosePage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: `You are diagnosing a home repair problem. The customer describes: "${description.trim()}".
+          message: `You are diagnosing a home repair problem. The customer describes: "${desc}".
 
 Respond with ONLY a JSON object:
 {
@@ -116,7 +129,7 @@ Respond with ONLY a JSON object:
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            description: description.trim(),
+            description: desc,
             trade: parsed.trade,
             location: { zipcode: zip.trim() },
             urgency: parsed.severity === 'emergency' ? 'emergency' : 'flexible',
@@ -225,7 +238,7 @@ Respond with ONLY a JSON object:
           )}
 
           <button
-            onClick={runDiagnosis}
+            onClick={() => runDiagnosis()}
             disabled={loading || !description.trim()}
             className="btn btn-primary btn-full"
             style={{ opacity: !description.trim() ? 0.75 : 1, cursor: !description.trim() ? 'not-allowed' : 'pointer' }}
