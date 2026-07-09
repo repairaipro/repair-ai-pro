@@ -6,8 +6,9 @@ import { useEffect, useRef, useState } from 'react';
 import { collection, onSnapshot, query, where, orderBy, limit } from 'firebase/firestore';
 import { db } from '@/lib/db';
 import { useIsContractor } from '@/lib/useRole';
-import { MessageSquare, Bell, LayoutDashboard, Briefcase, Users, LogOut, Plus, Menu, X, Inbox, Calendar, Clapperboard } from 'lucide-react';
+import { Bell, LayoutDashboard, Briefcase, Users, LogOut, Plus, Menu, X, Inbox, Calendar, Clapperboard } from 'lucide-react';
 import NotificationCenter from '@/components/NotificationCenter';
+import ChatBubbleIcon from '@/components/ChatBubbleIcon';
 
 const ADMIN_UIDS = (process.env.NEXT_PUBLIC_ADMIN_UIDS ?? "").split(",").map(s => s.trim()).filter(Boolean);
 
@@ -143,13 +144,15 @@ export default function Header() {
                 {/* Chat icon */}
                 <Link
                   href="/chat"
-                  className="relative p-2 rounded-lg transition-all duration-150"
-                  style={{ color: 'var(--color-text-3)' }}
+                  className="relative p-2 rounded-lg transition-transform duration-150 hover:scale-110"
                   title="Messages"
                 >
-                  <MessageSquare className="w-4.5 h-4.5" />
+                  <ChatBubbleIcon size={21} />
                   {unreadCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                    <span
+                      className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-0.5 text-white text-[9px] font-bold rounded-full flex items-center justify-center"
+                      style={{ background: '#ef4444', border: '2px solid var(--color-bg)' }}
+                    >
                       {unreadCount > 9 ? '9+' : unreadCount}
                     </span>
                   )}
@@ -213,10 +216,13 @@ export default function Header() {
           <div className="flex md:hidden items-center gap-2">
             {user && (
               <>
-                <Link href="/chat" className="relative p-1.5" style={{ color: 'var(--color-text-3)' }}>
-                  <MessageSquare className="w-5 h-5" />
+                <Link href="/chat" className="relative p-1.5" title="Messages">
+                  <ChatBubbleIcon size={23} />
                   {unreadCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                    <span
+                      className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-0.5 text-white text-[9px] font-bold rounded-full flex items-center justify-center"
+                      style={{ background: '#ef4444', border: '2px solid var(--color-bg)' }}
+                    >
                       {unreadCount > 9 ? '9+' : unreadCount}
                     </span>
                   )}

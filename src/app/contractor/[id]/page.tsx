@@ -191,7 +191,7 @@ Reviews: ${reviews.slice(0, 5).map((r) => `${r.rating}★ — "${r.text}"`).join
         }),
       });
       const data = await res.json();
-      setAISummary(data.reply ?? "Analysis unavailable.");
+      setAISummary(data.reply ?? `Analysis unavailable${data.error ? ` — ${data.error}` : ". Please try again."}`);
     } catch {
       setAISummary("Analysis unavailable. Please try again.");
     }

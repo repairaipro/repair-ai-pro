@@ -91,8 +91,12 @@ Respond with ONLY a JSON object:
           mode: 'homeowner',
         }),
       });
-      if (res.status === 429) throw new Error('Too many requests — give it a minute and try again.');
       const data = await res.json();
+      // Surface the real API error (rate limit, provider outage, quota) —
+      // "try adding more detail" is the wrong advice when the AI itself is down.
+      if (!res.ok || data.error) {
+        throw new Error(data.error ?? `AI is unavailable right now (HTTP ${res.status}). Please try again shortly.`);
+      }
       const m = ((data.reply as string) ?? '').match(/\{[\s\S]*\}/);
       if (!m) throw new Error('Could not analyze that — try adding more detail.');
       const parsed = JSON.parse(m[0]) as Diagnosis;

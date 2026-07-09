@@ -341,6 +341,21 @@ CRITICAL: If you're not confident, ask clarifying questions rather than guessing
         }),
       });
       const data = await res.json();
+
+      // Surface API errors honestly (e.g. AI provider down/out of quota)
+      // instead of pretending the analysis succeeded with trade "General".
+      if (!res.ok || data.error) {
+        setError(
+          `AI analysis is unavailable right now (${data.error ?? `HTTP ${res.status}`}). ` +
+          "You can still post the job manually — contractors will read your description directly."
+        );
+        const fallback: AIAnalysis = { trade: "General", severity: "moderate", summary: description.trim() };
+        setAnalysis(fallback);
+        setDetectedTrade("General");
+        setStep(2);
+        return;
+      }
+
       let parsed: AIAnalysis | null = null;
       try {
         const raw = (data.reply as string) ?? "";

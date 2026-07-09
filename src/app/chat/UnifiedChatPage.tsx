@@ -143,6 +143,7 @@ export default function UnifiedChatPage() {
   const [search,        setSearch]        = useState("");
   const [detailsOpen,   setDetailsOpen]   = useState(false);
   const [aiAsking,      setAiAsking]      = useState(false);
+  const [aiError,       setAiError]       = useState<string | null>(null);
   const [imagePreview,  setImagePreview]  = useState<string | null>(null);
   const [mobileView,    setMobileView]    = useState<"sidebar" | "chat">("sidebar");
 
@@ -244,6 +245,7 @@ export default function UnifiedChatPage() {
   async function askAI() {
     if (!selectedJob || !user || aiAsking) return;
     setAiAsking(true);
+    setAiError(null);
     try {
       const token = await user.getIdToken();
       const res = await fetch("/api/ai-chat", {
@@ -255,13 +257,17 @@ export default function UnifiedChatPage() {
         }),
       });
       const data = await res.json();
-      if (data.reply && selectedJob && user) {
+      if (!res.ok || data.error) {
+        setAiError(data.error ?? `AI is unavailable right now (HTTP ${res.status}).`);
+      } else if (data.reply && selectedJob && user) {
         // Log as an event so it appears in the timeline
         await logJobEvent(selectedJob.id, "system_ai", "ai_diagnosis", {
           message: data.reply,
         });
       }
-    } catch (err) { console.error(err); }
+    } catch {
+      setAiError("AI request failed — check your connection and try again.");
+    }
     setAiAsking(false);
   }
 
@@ -606,6 +612,19 @@ export default function UnifiedChatPage() {
                   </button>
                 </div>
               </div>
+
+              {/* ── AI error strip ── */}
+              {aiError && (
+                <div
+                  className="flex-shrink-0 flex items-center justify-between gap-2 px-4 py-2 text-xs"
+                  style={{ background: "rgba(239,68,68,0.08)", borderBottom: "1px solid rgba(239,68,68,0.2)", color: "#f87171" }}
+                >
+                  <span>{aiError}</span>
+                  <button type="button" onClick={() => setAiError(null)} style={{ color: "#f87171" }} aria-label="Dismiss">
+                    <X size={12} />
+                  </button>
+                </div>
+              )}
 
               {/* ── Job Details Panel (collapsible) ── */}
               {detailsOpen && (
