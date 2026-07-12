@@ -15,7 +15,7 @@ export async function analyzeJobInput(input: AnalyzeInput) {
 Analyze the provided description and/or image and return a JSON object with these exact fields:
 {
   "issue": "brief description of the problem",
-  "trade": "one of: Plumbing|Electrical|HVAC|Carpentry|Roofing|Painting|Appliance Repair|General|Auto Mechanic|IT Support|Landscaping|Locksmith|Other",
+  "trade": "one of: Plumbing|Electrical|HVAC|Carpentry|Roofing|Painting|Appliance Repair|Handyman|Landscaping|Locksmith|General|Other",
   "severity": "low|moderate|high|emergency",
   "estimatedCostLow": number (USD, no dollar sign),
   "estimatedCostHigh": number (USD, no dollar sign),

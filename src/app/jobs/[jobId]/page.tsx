@@ -264,6 +264,7 @@ export default function JobDetailPage() {
   const [confirmDone,      setConfirmDone]      = useState(false);
   const [confirmError,     setConfirmError]     = useState('');
   const [selectingBid,     setSelectingBid]     = useState<string | null>(null);
+  const [selectBidError,   setSelectBidError]   = useState('');
   const [showInsurance,    setShowInsurance]    = useState(false);
   const [showReview,       setShowReview]       = useState(false);
   const [showDisputeModal, setShowDisputeModal] = useState(false);
@@ -423,6 +424,7 @@ export default function JobDetailPage() {
   async function handleSelectBid(contractorId: string) {
     if (!user) return;
     setSelectingBid(contractorId);
+    setSelectBidError('');
     try {
       const token = await user.getIdToken();
       const res   = await fetch(`/api/jobs/${jobId}/select-bid`, {
@@ -431,8 +433,12 @@ export default function JobDetailPage() {
         body:    JSON.stringify({ contractorId }),
       });
       const data  = await res.json();
-      if (!data.success) console.error(data.error);
-    } catch { /* ignore */ }
+      if (!res.ok || !data.success) {
+        setSelectBidError(data.error ?? 'Could not accept this bid. Please try again.');
+      }
+    } catch {
+      setSelectBidError('Network error accepting the bid. Please try again.');
+    }
     setSelectingBid(null);
   }
 
@@ -1041,6 +1047,14 @@ export default function JobDetailPage() {
               </div>
             ) : hasBids ? (
               <div className="space-y-3">
+                {selectBidError && (
+                  <div
+                    className="rounded-xl px-4 py-3 text-sm"
+                    style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: '#f87171' }}
+                  >
+                    {selectBidError}
+                  </div>
+                )}
                 {/* AI fair-price band — every bid shown against the data-driven range */}
                 {(job as any).estimatedCost?.low > 0 && (job as any).estimatedCost?.high > 0 && (
                   <BidPriceBand

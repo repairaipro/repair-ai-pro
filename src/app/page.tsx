@@ -401,7 +401,7 @@ export default function LandingPage() {
               </h2>
               <ul className="space-y-2.5 mb-8">
                 {[
-                  "Works for any trade — plumbers, mechanics, electricians, IT, movers and more",
+                  "Built for the home trades — plumbing, electrical, HVAC, handyman, appliance repair and more",
                   "Get matched to jobs that fit your exact service and location",
                   "Import your Google Business profile in one click",
                   "Build a trust score that gets you ranked higher over time",
@@ -628,7 +628,7 @@ export default function LandingPage() {
             Need something fixed?
           </h2>
           <p className="text-base mb-10" style={{ color: 'var(--color-text-3)' }}>
-            Any service, any trade. Describe it in plain English — AI handles the rest.
+            Plumbing, electrical, HVAC, handyman and more. Describe it in plain English — AI handles the rest.
           </p>
           <Link href="/jobs/new" className="btn btn-primary btn-lg px-10">
             Post a Job — It's Free <ArrowRight className="w-5 h-5" />

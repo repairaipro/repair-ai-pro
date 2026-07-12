@@ -176,25 +176,6 @@ export const SERVICE_TRADES: ServiceTrade[] = [
       { q: 'How often should I repaint my home exterior in Texas?', a: 'Every 5–8 years for most siding in the Houston climate — sun exposure on south and west faces ages paint fastest. Annual touch-ups extend the cycle.' },
     ],
   },
-  {
-    slug: 'auto-mechanic',
-    name: 'Mobile Auto Repair',
-    short: 'Auto Mechanic',
-    emoji: '🚗',
-    pricingKey: 'car mechanic',
-    typicalLow: 100,
-    typicalHigh: 500,
-    commonJobs: [
-      { job: 'Brake pads & rotors (per axle)', range: '$150–$450' },
-      { job: 'Battery replacement', range: '$150–$350' },
-      { job: 'CV axle replacement', range: '$250–$600' },
-      { job: 'Diagnostic (check engine light)', range: '$60–$150' },
-    ],
-    faqs: [
-      { q: 'Are mobile mechanics cheaper than shops?', a: 'Often 20–30% cheaper for common repairs since there is no shop overhead — and you skip the tow. Complex jobs requiring a lift still belong in a shop.' },
-      { q: 'What does a clicking noise when turning mean?', a: 'Classic symptom of a worn CV joint. Caught early it is a $250–$600 axle replacement; ignored, it can leave you stranded.' },
-    ],
-  },
 ];
 
 export function getTrade(slug: string): ServiceTrade | undefined {

@@ -22,13 +22,6 @@ export const TRADES = [
   "Masonry",
   "Windows & Doors",
   "Pressure Washing",
-  // ── Automotive ────────────────────────────────────────────
-  "Auto Mechanic",
-  "Auto Body & Paint",
-  "Auto Detailing",
-  "Towing",
-  "Tire & Wheels",
-  "Auto Glass",
   // ── Tech & Security ───────────────────────────────────────
   "IT & Tech Support",
   "Security Systems",
