@@ -248,15 +248,24 @@ export default function JobChat() {
 
   /* Upload image to Cloudinary */
   async function uploadImage(file: File): Promise<string | null> {
+    if (!user) return null;
     try {
-      const sigRes = await fetch('/api/cloudinary/sign');
-      const { signature, timestamp, apiKey, cloudName } = await sigRes.json();
+      const authToken = await user.getIdToken();
+      const sigRes = await fetch('/api/cloudinary/sign', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      if (!sigRes.ok) return null;
+      // folder must come from the sign response — it's baked into the
+      // server-computed signature, so a different client-supplied value
+      // fails Cloudinary's signature check.
+      const { signature, timestamp, apiKey, cloudName, folder } = await sigRes.json();
       const fd = new FormData();
       fd.append('file', file);
       fd.append('api_key', apiKey);
       fd.append('timestamp', timestamp);
       fd.append('signature', signature);
-      fd.append('folder', `job-chat/${id}`);
+      fd.append('folder', folder);
       const r = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
         method: 'POST', body: fd,
       });
