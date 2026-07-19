@@ -185,49 +185,50 @@ export default function ProviderSelection({
   }
 
   return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900 p-4 space-y-4">
+    <div className="rounded-xl p-4 space-y-4" style={{ border: '1px solid var(--color-border)', background: 'var(--color-surface)' }}>
       <div>
-        <div className="text-sm font-semibold text-indigo-300">
+        <div className="text-sm font-semibold" style={{ color: '#818cf8' }}>
           Recommended Providers
         </div>
-        <div className="text-xs text-gray-400">
+        <div className="text-xs" style={{ color: 'var(--color-text-4)' }}>
           Ranked by match quality, reliability, and history
         </div>
       </div>
 
-      {status && <div className="text-xs text-gray-300">{status}</div>}
+      {status && <div className="text-xs" style={{ color: 'var(--color-text-3)' }}>{status}</div>}
 
       {loading ? (
-        <div className="text-sm text-gray-400">Loading providers...</div>
+        <div className="text-sm" style={{ color: 'var(--color-text-4)' }}>Loading providers...</div>
       ) : providers.length === 0 ? (
-        <div className="text-sm text-gray-500">No contractors found.</div>
+        <div className="text-sm" style={{ color: 'var(--color-text-4)' }}>No contractors found.</div>
       ) : (
         <div className="space-y-3">
           {providers.slice(0, 10).map((p) => (
             <div
               key={p.id}
-              className="rounded-lg border border-gray-800 bg-gray-950 p-3"
+              className="rounded-lg p-3"
+              style={{ border: '1px solid var(--color-border)', background: 'var(--color-surface-2)' }}
             >
               <div className="flex justify-between items-start gap-3">
                 <div>
-                  <div className="text-sm font-semibold text-white">
+                  <div className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>
                     {p.name || "Contractor"}
                   </div>
 
-                  <div className="text-xs text-gray-400">
+                  <div className="text-xs" style={{ color: 'var(--color-text-4)' }}>
                     {p.trade || "General"}
                   </div>
 
-                  <div className="text-xs text-gray-500">
+                  <div className="text-xs" style={{ color: 'var(--color-text-4)' }}>
                     {p.city || "Unknown location"}
                   </div>
                 </div>
 
                 <div className="text-right">
-                  <div className="text-xs text-indigo-300 font-semibold">
+                  <div className="text-xs font-semibold" style={{ color: '#818cf8' }}>
                     Match {p.score}
                   </div>
-                  <div className="text-[11px] text-gray-500">
+                  <div className="text-[11px]" style={{ color: 'var(--color-text-4)' }}>
                     Trust {p.trustScore}
                   </div>
                 </div>

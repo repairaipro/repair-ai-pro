@@ -158,34 +158,34 @@ export default function SchedulingCard({ jobId, jobOwnerId, claimedBy }: Props) 
     isParticipant; // either party can cancel accepted appt
 
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 space-y-3">
+    <div className="rounded-xl p-4 space-y-3" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-indigo-300 font-semibold">Scheduling</p>
-          <p className="text-xs text-gray-400">
+          <p className="font-semibold" style={{ color: '#818cf8' }}>Scheduling</p>
+          <p className="text-xs" style={{ color: 'var(--color-text-4)' }}>
             Propose a time in-app. Acceptance locks the appointment to this job.
           </p>
         </div>
-        <div className="text-[10px] text-gray-500">
+        <div className="text-[10px]" style={{ color: 'var(--color-text-4)' }}>
           TZ: {timezone}
         </div>
       </div>
 
       {!isParticipant ? (
-        <p className="text-xs text-gray-400">
+        <p className="text-xs" style={{ color: 'var(--color-text-4)' }}>
           Claim or own the job to schedule.
         </p>
       ) : (
         <>
           {/* Latest appointment summary */}
           {latest ? (
-            <div className="bg-gray-950 border border-gray-800 rounded-lg p-3">
+            <div className="rounded-lg p-3" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border)' }}>
               <div className="flex items-center justify-between gap-2">
-                <p className="text-sm text-gray-200">
-                  <span className="text-gray-400">Latest:</span>{" "}
+                <p className="text-sm" style={{ color: 'var(--color-text-2)' }}>
+                  <span style={{ color: 'var(--color-text-4)' }}>Latest:</span>{" "}
                   {fmt(latest.startAt)} → {fmt(latest.endAt)}
                 </p>
-                <span className="text-[10px] uppercase text-gray-400">
+                <span className="text-[10px] uppercase" style={{ color: 'var(--color-text-4)' }}>
                   {latest.status}
                 </span>
               </div>
@@ -197,7 +197,8 @@ export default function SchedulingCard({ jobId, jobOwnerId, claimedBy }: Props) 
                     type="button"
                     disabled={loading}
                     onClick={() => setStatus(latest.id, "accepted")}
-                    className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white text-xs px-3 py-2 rounded-lg"
+                    className="text-white text-xs px-3 py-2 rounded-lg disabled:opacity-60 transition-opacity"
+                    style={{ background: '#059669' }}
                   >
                     Accept
                   </button>
@@ -205,7 +206,7 @@ export default function SchedulingCard({ jobId, jobOwnerId, claimedBy }: Props) 
                     type="button"
                     disabled={loading}
                     onClick={() => setStatus(latest.id, "declined")}
-                    className="bg-gray-800 hover:bg-gray-700 disabled:opacity-60 text-white text-xs px-3 py-2 rounded-lg"
+                    className="btn btn-secondary btn-sm"
                   >
                     Decline
                   </button>
@@ -218,7 +219,7 @@ export default function SchedulingCard({ jobId, jobOwnerId, claimedBy }: Props) 
                     type="button"
                     disabled={loading}
                     onClick={() => setStatus(latest.id, "cancelled")}
-                    className="bg-gray-800 hover:bg-gray-700 disabled:opacity-60 text-white text-xs px-3 py-2 rounded-lg"
+                    className="btn btn-secondary btn-sm"
                   >
                     Cancel appointment
                   </button>
@@ -226,7 +227,7 @@ export default function SchedulingCard({ jobId, jobOwnerId, claimedBy }: Props) 
               )}
             </div>
           ) : (
-            <p className="text-xs text-gray-400">
+            <p className="text-xs" style={{ color: 'var(--color-text-4)' }}>
               No appointment yet. Propose one below.
             </p>
           )}
@@ -234,21 +235,23 @@ export default function SchedulingCard({ jobId, jobOwnerId, claimedBy }: Props) 
           {/* Propose appointment */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             <div>
-              <label className="text-[10px] text-gray-400">Start</label>
+              <label className="text-[10px]" style={{ color: 'var(--color-text-4)' }}>Start</label>
               <input
                 type="datetime-local"
                 value={startLocal}
                 onChange={(e) => setStartLocal(e.target.value)}
-                className="w-full mt-1 bg-gray-800 rounded-lg px-3 py-2 text-xs"
+                className="w-full mt-1 rounded-lg px-3 py-2 text-xs outline-none"
+                style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
               />
             </div>
             <div>
-              <label className="text-[10px] text-gray-400">End</label>
+              <label className="text-[10px]" style={{ color: 'var(--color-text-4)' }}>End</label>
               <input
                 type="datetime-local"
                 value={endLocal}
                 onChange={(e) => setEndLocal(e.target.value)}
-                className="w-full mt-1 bg-gray-800 rounded-lg px-3 py-2 text-xs"
+                className="w-full mt-1 rounded-lg px-3 py-2 text-xs outline-none"
+                style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
               />
             </div>
           </div>
@@ -257,12 +260,12 @@ export default function SchedulingCard({ jobId, jobOwnerId, claimedBy }: Props) 
             type="button"
             onClick={propose}
             disabled={loading || !startLocal || !endLocal}
-            className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-xs px-3 py-2 rounded-lg"
+            className="btn btn-primary btn-sm"
           >
             {loading ? "Saving..." : "Propose appointment"}
           </button>
 
-          {error ? <p className="text-red-400 text-xs">{error}</p> : null}
+          {error ? <p className="text-xs" style={{ color: '#f87171' }}>{error}</p> : null}
         </>
       )}
     </div>
