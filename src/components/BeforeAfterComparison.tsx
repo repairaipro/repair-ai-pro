@@ -24,10 +24,10 @@ export default function BeforeAfterComparison({ pairs, isLoading }: Props) {
 
   if (isLoading) {
     return (
-      <div className="rounded-2xl p-6 bg-white border border-gray-200">
+      <div className="rounded-2xl p-6" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
         <div className="flex items-center justify-center gap-3">
-          <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-gray-600">Loading photos...</p>
+          <div className="w-5 h-5 border-2 rounded-full animate-spin" style={{ borderColor: '#818cf8', borderTopColor: 'transparent' }} />
+          <p className="text-sm" style={{ color: 'var(--color-text-4)' }}>Loading photos...</p>
         </div>
       </div>
     );
@@ -35,8 +35,8 @@ export default function BeforeAfterComparison({ pairs, isLoading }: Props) {
 
   if (!pairs || pairs.length === 0) {
     return (
-      <div className="rounded-2xl p-6 bg-blue-50 border border-blue-200">
-        <p className="text-sm text-blue-900">
+      <div className="rounded-2xl p-6" style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.2)' }}>
+        <p className="text-sm" style={{ color: 'var(--color-text-2)' }}>
           No before/after photos yet. Contractor will upload final photos when work is complete.
         </p>
       </div>
@@ -66,8 +66,8 @@ export default function BeforeAfterComparison({ pairs, isLoading }: Props) {
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="font-bold text-lg">Work Verification</h3>
-          <p className="text-xs text-gray-600 mt-1">
+          <h3 className="font-bold text-lg" style={{ color: 'var(--color-text)' }}>Work Verification</h3>
+          <p className="text-xs mt-1" style={{ color: 'var(--color-text-4)' }}>
             {pairs.length} area{pairs.length !== 1 ? 's' : ''} completed
             {current.area && ` • ${current.area}`}
           </p>
@@ -96,7 +96,7 @@ export default function BeforeAfterComparison({ pairs, isLoading }: Props) {
           className="relative rounded-xl overflow-hidden cursor-col-resize select-none"
           style={{
             aspectRatio: '4 / 3',
-            background: '#f3f4f6',
+            background: 'var(--color-surface-2)',
           }}
         >
           {/* After image (background) */}
@@ -197,7 +197,7 @@ export default function BeforeAfterComparison({ pairs, isLoading }: Props) {
                 onClick={() => setCurrentIndex(idx)}
                 className="w-2 h-2 rounded-full transition"
                 style={{
-                  background: idx === currentIndex ? '#818cf8' : '#e5e7eb',
+                  background: idx === currentIndex ? '#818cf8' : 'var(--color-border)',
                 }}
               />
             ))}
@@ -218,7 +218,7 @@ export default function BeforeAfterComparison({ pairs, isLoading }: Props) {
 
       {/* Info */}
       {current.area && (
-        <div className="p-3 rounded-lg bg-gray-50 text-xs text-gray-700">
+        <div className="p-3 rounded-lg text-xs" style={{ background: 'var(--color-surface-2)', color: 'var(--color-text-3)' }}>
           <strong>Location:</strong> {current.area}
         </div>
       )}

@@ -1,13 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
-  ShoppingCart,
-  TrendingDown,
   AlertCircle,
-  CheckCircle,
   Link as LinkIcon,
-  DollarSign,
 } from 'lucide-react';
 
 type Product = {
@@ -64,10 +60,10 @@ export default function ProductRecommendations({
 
   if (isLoading) {
     return (
-      <div className="p-6 bg-white rounded-xl border border-gray-200">
+      <div className="p-6 rounded-xl" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
         <div className="flex items-center justify-center gap-3">
-          <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-gray-600">Finding best products...</p>
+          <div className="w-5 h-5 border-2 rounded-full animate-spin" style={{ borderColor: '#818cf8', borderTopColor: 'transparent' }} />
+          <p className="text-sm" style={{ color: 'var(--color-text-4)' }}>Finding best products...</p>
         </div>
       </div>
     );
@@ -75,8 +71,8 @@ export default function ProductRecommendations({
 
   if (!recommendations || recommendations.length === 0) {
     return (
-      <div className="p-6 bg-blue-50 rounded-xl border border-blue-200">
-        <p className="text-sm text-blue-900">
+      <div className="p-6 rounded-xl" style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.2)' }}>
+        <p className="text-sm" style={{ color: 'var(--color-text-2)' }}>
           No product recommendations generated yet. Complete photo analysis to see product options.
         </p>
       </div>
@@ -112,19 +108,22 @@ export default function ProductRecommendations({
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+      <div
+        className="p-4 rounded-lg"
+        style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.1), rgba(139,92,246,0.06))', border: '1px solid rgba(99,102,241,0.2)' }}
+      >
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h3 className="font-bold text-lg">Recommended Products</h3>
-            <p className="text-xs text-gray-600 mt-1">
+            <h3 className="font-bold text-lg" style={{ color: 'var(--color-text)' }}>Recommended Products</h3>
+            <p className="text-xs mt-1" style={{ color: 'var(--color-text-4)' }}>
               From {new Set(recommendations.flatMap(r => r.sourcesFound)).size} retailers with
               real pricing & availability
             </p>
           </div>
           {isContractor && totalPotentialCommission ? (
             <div className="text-right">
-              <p className="text-xs text-gray-600">Potential Commission</p>
-              <p className="font-bold text-lg text-green-600">
+              <p className="text-xs" style={{ color: 'var(--color-text-4)' }}>Potential Commission</p>
+              <p className="font-bold text-lg" style={{ color: '#34d399' }}>
                 ${totalPotentialCommission.toFixed(2)}
               </p>
             </div>
@@ -140,29 +139,31 @@ export default function ProductRecommendations({
           return (
             <div
               key={idx}
-              className="border border-gray-200 rounded-lg overflow-hidden"
+              className="rounded-lg overflow-hidden"
+              style={{ border: '1px solid var(--color-border)' }}
             >
               {/* Defect Header */}
               <button
                 onClick={() => toggleDefect(rec.defectType)}
-                className="w-full p-4 bg-gray-50 hover:bg-gray-100 transition text-left flex items-center justify-between gap-3"
+                className="w-full p-4 transition text-left flex items-center justify-between gap-3 hover:opacity-90"
+                style={{ background: 'var(--color-surface-2)' }}
               >
                 <div className="flex-1">
-                  <p className="font-semibold capitalize">{rec.defectType.replace(/_/g, ' ')}</p>
-                  <p className="text-xs text-gray-600 mt-1">{rec.description}</p>
+                  <p className="font-semibold capitalize" style={{ color: 'var(--color-text)' }}>{rec.defectType.replace(/_/g, ' ')}</p>
+                  <p className="text-xs mt-1" style={{ color: 'var(--color-text-4)' }}>{rec.description}</p>
                   <div className="flex items-center gap-2 mt-2">
-                    <div className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                    <div className="text-xs px-2 py-1 rounded" style={{ background: 'rgba(99,102,241,0.15)', color: '#a5b4fc' }}>
                       {rec.products.length} products found
                     </div>
-                    <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                    <div className="text-xs px-2 py-1 rounded" style={{ background: 'rgba(16,185,129,0.15)', color: '#6ee7b7' }}>
                       ${rec.estimatedCost.low} - ${rec.estimatedCost.high}
                     </div>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs text-gray-600">Confidence</p>
-                  <p className="font-bold text-sm">{rec.confidence}%</p>
-                  <span className="text-gray-400 mt-2 block">
+                  <p className="text-xs" style={{ color: 'var(--color-text-4)' }}>Confidence</p>
+                  <p className="font-bold text-sm" style={{ color: 'var(--color-text)' }}>{rec.confidence}%</p>
+                  <span className="mt-2 block" style={{ color: 'var(--color-text-4)' }}>
                     {isExpanded ? '▼' : '▶'}
                   </span>
                 </div>
@@ -170,13 +171,13 @@ export default function ProductRecommendations({
 
               {/* Products List */}
               {isExpanded && (
-                <div className="p-4 space-y-3 border-t border-gray-200 bg-white">
+                <div className="p-4 space-y-3" style={{ borderTop: '1px solid var(--color-border)', background: 'var(--color-surface)' }}>
                   {rec.products.map((product, pidx) => (
-                    <div key={pidx} className="p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
+                    <div key={pidx} className="p-3 rounded-lg transition hover:opacity-90" style={{ background: 'var(--color-surface-2)' }}>
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           {/* Product name and rating */}
-                          <p className="font-medium text-sm line-clamp-2">
+                          <p className="font-medium text-sm line-clamp-2" style={{ color: 'var(--color-text)' }}>
                             {product.name}
                           </p>
 
@@ -184,17 +185,15 @@ export default function ProductRecommendations({
                             <span
                               className="text-xs px-2 py-1 rounded"
                               style={{
-                                background: product.inStock
-                                  ? '#dcfce7'
-                                  : '#fee2e2',
-                                color: product.inStock ? '#166534' : '#991b1b',
+                                background: product.inStock ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
+                                color: product.inStock ? '#6ee7b7' : '#fca5a5',
                               }}
                             >
                               {product.inStock ? '✓ In stock' : '✗ Out of stock'}
                             </span>
 
                             {product.rating > 0 && (
-                              <span className="text-xs text-amber-600">
+                              <span className="text-xs" style={{ color: '#fbbf24' }}>
                                 ★ {product.rating.toFixed(1)} ({product.reviews} reviews)
                               </span>
                             )}
@@ -202,11 +201,11 @@ export default function ProductRecommendations({
 
                           {/* Retailer & compatibility */}
                           <div className="mt-2 text-xs space-y-1">
-                            <p className="text-gray-600">
+                            <p style={{ color: 'var(--color-text-4)' }}>
                               📍 {product.source}
                             </p>
                             {product.compatibility.reasons.length > 0 && (
-                              <p className="text-green-700">
+                              <p style={{ color: '#6ee7b7' }}>
                                 ✓ {product.compatibility.reasons[0]}
                               </p>
                             )}
@@ -215,19 +214,19 @@ export default function ProductRecommendations({
 
                         {/* Price and action */}
                         <div className="text-right flex-shrink-0">
-                          <p className="text-xl font-bold text-blue-600">
+                          <p className="text-xl font-bold" style={{ color: '#818cf8' }}>
                             ${product.price.toFixed(2)}
                           </p>
 
                           {isContractor && (
-                            <p className="text-xs text-green-600 font-medium mt-1">
+                            <p className="text-xs font-medium mt-1" style={{ color: '#34d399' }}>
                               +${product.commission.toFixed(2)} commission
                             </p>
                           )}
 
                           <button
                             onClick={() => handleProductClick(product)}
-                            className="mt-3 w-full py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition flex items-center justify-center gap-2"
+                            className="btn btn-primary btn-sm mt-3 w-full"
                           >
                             <LinkIcon size={14} />
                             View & Buy
@@ -238,22 +237,22 @@ export default function ProductRecommendations({
                   ))}
 
                   {/* Price summary for this defect */}
-                  <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
-                    <p className="text-xs font-medium text-blue-900 mb-2">
+                  <div className="p-3 rounded-lg" style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.2)' }}>
+                    <p className="text-xs font-medium mb-2" style={{ color: 'var(--color-text-2)' }}>
                       💰 Cost estimate for {rec.defectType.replace(/_/g, ' ')}:
                     </p>
                     <div className="grid grid-cols-3 gap-2 text-xs">
                       <div>
-                        <p className="text-gray-600">Budget</p>
-                        <p className="font-bold">${rec.estimatedCost.low}</p>
+                        <p style={{ color: 'var(--color-text-4)' }}>Budget</p>
+                        <p className="font-bold" style={{ color: 'var(--color-text)' }}>${rec.estimatedCost.low}</p>
                       </div>
                       <div>
-                        <p className="text-gray-600">Mid-range</p>
-                        <p className="font-bold">${rec.estimatedCost.mid}</p>
+                        <p style={{ color: 'var(--color-text-4)' }}>Mid-range</p>
+                        <p className="font-bold" style={{ color: 'var(--color-text)' }}>${rec.estimatedCost.mid}</p>
                       </div>
                       <div>
-                        <p className="text-gray-600">Premium</p>
-                        <p className="font-bold">${rec.estimatedCost.high}</p>
+                        <p style={{ color: 'var(--color-text-4)' }}>Premium</p>
+                        <p className="font-bold" style={{ color: 'var(--color-text)' }}>${rec.estimatedCost.high}</p>
                       </div>
                     </div>
                   </div>
@@ -266,20 +265,20 @@ export default function ProductRecommendations({
 
       {/* Disclaimer */}
       {disclaimer && (
-        <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+        <div className="p-4 rounded-lg" style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)' }}>
           <div className="flex gap-3">
-            <AlertCircle size={18} className="text-amber-700 flex-shrink-0 mt-0.5" />
-            <div className="text-xs text-amber-800">{disclaimer}</div>
+            <AlertCircle size={18} className="flex-shrink-0 mt-0.5" style={{ color: '#fbbf24' }} />
+            <div className="text-xs" style={{ color: '#fde68a' }}>{disclaimer}</div>
           </div>
         </div>
       )}
 
       {/* CTA for next steps */}
-      <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-        <h4 className="font-medium text-sm text-green-900 mb-2">Next Steps:</h4>
-        <ul className="text-xs text-green-800 space-y-1">
+      <div className="p-4 rounded-lg" style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)' }}>
+        <h4 className="font-medium text-sm mb-2" style={{ color: '#6ee7b7' }}>Next Steps:</h4>
+        <ul className="text-xs space-y-1" style={{ color: '#a7f3d0' }}>
           <li>✓ Review product options and prices</li>
-          <li>✓ Click "View & Buy" to purchase from preferred retailer</li>
+          <li>✓ Click &quot;View &amp; Buy&quot; to purchase from preferred retailer</li>
           <li>✓ Share product links with contractor for approval</li>
           <li>✓ Contractors can order with professional discounts</li>
         </ul>

@@ -1,6 +1,5 @@
 'use client';
 
-import { Badge } from './ui/Badge';
 import { CheckCircle2, AlertCircle, FileText } from 'lucide-react';
 
 export interface Certification {
@@ -51,13 +50,12 @@ const isExpired = (date?: Date | string) => {
 
 export function CertificationBadges({
   certifications,
-  showDetails = false,
   onViewCertificate,
 }: CertificationBadgesProps) {
   if (certifications.length === 0) {
     return (
-      <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-center">
-        <p className="text-sm text-gray-600">No certifications added yet</p>
+      <div className="rounded-lg p-4 text-center" style={{ border: '1px solid var(--color-border)', background: 'var(--color-surface-2)' }}>
+        <p className="text-sm" style={{ color: 'var(--color-text-4)' }}>No certifications added yet</p>
       </div>
     );
   }
@@ -70,35 +68,38 @@ export function CertificationBadges({
         return (
           <div
             key={cert.id || idx}
-            className="flex items-start gap-3 rounded-lg border border-gray-200 bg-white p-3"
+            className="flex items-start gap-3 rounded-lg p-3"
+            style={{ border: '1px solid var(--color-border)', background: 'var(--color-surface)' }}
           >
             <div className="mt-0.5 text-xl">{getIcon(cert.type)}</div>
 
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <p className="font-medium text-gray-900">{cert.name}</p>
+                <p className="font-medium" style={{ color: 'var(--color-text)' }}>{cert.name}</p>
                 {cert.verified && (
-                  <CheckCircle2 className="h-4 w-4 flex-shrink-0 text-green-600" />
+                  <CheckCircle2 className="h-4 w-4 flex-shrink-0" style={{ color: '#34d399' }} />
                 )}
                 {expired && (
-                  <AlertCircle className="h-4 w-4 flex-shrink-0 text-red-600" />
+                  <AlertCircle className="h-4 w-4 flex-shrink-0" style={{ color: '#f87171' }} />
                 )}
               </div>
 
               <div className="mt-1 flex flex-wrap items-center gap-2">
-                <Badge variant="neutral" className="text-xs">
+                <span
+                  className="text-xs px-2 py-0.5 rounded-full font-medium"
+                  style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', color: 'var(--color-text-3)' }}
+                >
                   {getTypeLabel(cert.type)}
-                </Badge>
+                </span>
 
                 {cert.issuer && (
-                  <span className="text-xs text-gray-600">{cert.issuer}</span>
+                  <span className="text-xs" style={{ color: 'var(--color-text-4)' }}>{cert.issuer}</span>
                 )}
 
                 {cert.expirationDate && (
                   <span
-                    className={`text-xs ${
-                      expired ? 'text-red-600 font-medium' : 'text-gray-600'
-                    }`}
+                    className="text-xs"
+                    style={expired ? { color: '#f87171', fontWeight: 500 } : { color: 'var(--color-text-4)' }}
                   >
                     {expired ? 'Expired: ' : 'Expires: '}
                     {new Date(cert.expirationDate).toLocaleDateString()}
@@ -110,7 +111,8 @@ export function CertificationBadges({
             {cert.certificateUrl && (
               <button
                 onClick={() => onViewCertificate?.(cert.certificateUrl!)}
-                className="flex-shrink-0 text-blue-600 hover:text-blue-700"
+                className="flex-shrink-0 transition-opacity hover:opacity-70"
+                style={{ color: '#818cf8' }}
                 title="View certificate"
               >
                 <FileText className="h-5 w-5" />
