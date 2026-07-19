@@ -264,7 +264,10 @@ export default function JobLocationTracker({
           },
           (error) => {
             console.error('Geolocation error:', error);
-            alert('Unable to access location. Please enable location services.');
+            // Debounced in-app toast, not a blocking alert() — this fires from
+            // watchPosition and can repeat while a contractor is actively
+            // driving to a job; a blocking popup mid-drive is a real hazard.
+            addNotification('info', 'Unable to access location. Please enable location services.');
           },
           { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
         );
@@ -627,11 +630,11 @@ export default function JobLocationTracker({
               )}
 
               {isContractor && customerAddress && (
-                <button
-                  onClick={() => {
-                    alert('Open customer address in Maps:\n' + customerAddress);
-                  }}
-                  className="w-full px-3 py-2 rounded-lg text-xs font-medium transition-all"
+                <a
+                  href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(customerAddress)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full px-3 py-2 rounded-lg text-xs font-medium transition-all flex items-center justify-center"
                   style={{
                     background: 'rgba(59, 130, 246, 0.2)',
                     color: '#3b82f6',
@@ -639,7 +642,7 @@ export default function JobLocationTracker({
                   }}
                 >
                   📍 Navigate to Customer Address
-                </button>
+                </a>
               )}
 
               {!isContractor && contractorLocation && (

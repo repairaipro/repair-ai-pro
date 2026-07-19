@@ -78,6 +78,7 @@ export default function InvoicesPage() {
 
   async function handleSend(invoice: InvoiceItem) {
     setActionLoading(invoice.id);
+    setError('');
     try {
       const token = await user!.getIdToken();
       const res = await fetch(`/api/jobs/${invoice.jobId}/invoice`, {
@@ -89,7 +90,7 @@ export default function InvoicesPage() {
       if (!data.success) throw new Error(data.error);
       await fetchInvoices();
     } catch (e: any) {
-      alert('Failed to send: ' + e.message);
+      setError('Failed to send invoice: ' + (e.message ?? 'please try again'));
     } finally {
       setActionLoading(null);
     }
@@ -98,6 +99,7 @@ export default function InvoicesPage() {
   async function handleMarkPaid(invoice: InvoiceItem) {
     if (!confirm('Mark this invoice as paid?')) return;
     setActionLoading(invoice.id);
+    setError('');
     try {
       const token = await user!.getIdToken();
       const res = await fetch(`/api/jobs/${invoice.jobId}/invoice`, {
@@ -109,7 +111,7 @@ export default function InvoicesPage() {
       if (!data.success) throw new Error(data.error);
       await fetchInvoices();
     } catch (e: any) {
-      alert('Failed to update: ' + e.message);
+      setError('Failed to update invoice: ' + (e.message ?? 'please try again'));
     } finally {
       setActionLoading(null);
     }

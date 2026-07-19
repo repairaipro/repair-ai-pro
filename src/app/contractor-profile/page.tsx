@@ -467,6 +467,7 @@ export default function ContractorProfilePage() {
             <PortfolioManager
               images={form.images}
               onImagesChange={(newImages) => set("images", newImages)}
+              authToken={authToken}
               maxImages={20}
             />
           </SectionCard>

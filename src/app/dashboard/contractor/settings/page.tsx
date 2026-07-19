@@ -95,6 +95,7 @@ export default function ContractorSettingsPage() {
   const [goLive,          setGoLive]          = useState(false);
   const [goLiveSaving,    setGoLiveSaving]    = useState(false);
   const [locationPermission, setLocationPermission] = useState<'default' | 'granted' | 'denied' | 'unsupported'>('default');
+  const [locationError, setLocationError] = useState<string | null>(null);
   const [batteryLevel,    setBatteryLevel]    = useState(100);
 
   useEffect(() => {
@@ -159,7 +160,7 @@ export default function ContractorSettingsPage() {
       try {
         // Check geolocation support
         if (!navigator.geolocation) {
-          alert('Geolocation is not supported on your device');
+          setLocationPermission('unsupported');
           setGoLiveSaving(false);
           return;
         }
@@ -183,9 +184,9 @@ export default function ContractorSettingsPage() {
           (error) => {
             if (error.code === error.PERMISSION_DENIED) {
               setLocationPermission('denied');
-              alert('Location permission denied. You need to enable location access to use this feature.');
             } else {
-              alert('Unable to access location: ' + error.message);
+              setLocationPermission('unsupported');
+              setLocationError(error.message || 'Unable to access location.');
             }
           }
         );
@@ -589,6 +590,21 @@ export default function ContractorSettingsPage() {
                 : <ToggleLeft size={32} style={{ color: 'var(--color-text-4)' }} />}
             </button>
           </div>
+
+          {/* Permission denied / unsupported */}
+          {(locationPermission === 'denied' || locationPermission === 'unsupported') && (
+            <div
+              className="rounded-lg p-3 flex items-start gap-2"
+              style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)' }}
+            >
+              <AlertTriangle size={14} style={{ color: '#ef4444', flexShrink: 0, marginTop: 2 }} />
+              <p style={{ fontSize: '12px', color: '#ef4444' }}>
+                {locationPermission === 'denied'
+                  ? 'Location permission denied. Enable location access in your browser settings to use live dispatch.'
+                  : locationError ?? 'Geolocation is not supported on this device.'}
+              </p>
+            </div>
+          )}
 
           {/* Battery Warning */}
           {goLive && batteryLevel < 20 && (
