@@ -996,6 +996,7 @@ export default function JobDetailPage() {
         {isHomeowner && ['triaged', 'open', 'matched'].includes(job.status) && (
           <PhotoAnalysisFlow
             jobId={jobId}
+            trade={trade}
             onAnalysisComplete={(analysis: any) => {
               setAnalysisId(analysis.id);
             }}

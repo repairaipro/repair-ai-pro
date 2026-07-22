@@ -1,13 +1,29 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { signInWithGoogle, signInWithEmail, signUpWithEmail } from '@/lib/db';
+import { signInWithGoogle, completeGoogleRedirectSignIn, signInWithEmail, signUpWithEmail } from '@/lib/db';
 import { useAuth } from '@/lib/auth';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Loader2, Eye, EyeOff } from 'lucide-react';
 
 type Mode = 'signin' | 'signup';
+
+function googleErrorMessage(code?: string): string | null {
+  switch (code) {
+    case 'auth/popup-closed-by-user':
+    case 'auth/cancelled-popup-request':
+      return null; // user closed it themselves — no error needed
+    case 'auth/account-exists-with-different-credential':
+      return 'An account already exists with this email using a different sign-in method. Try signing in with email & password.';
+    case 'auth/network-request-failed':
+      return 'Network error — check your connection and try again.';
+    case 'auth/unauthorized-domain':
+      return 'Google sign-in isn’t configured for this domain yet. Please use email & password.';
+    default:
+      return code ? 'Google sign-in failed. Please try again or use email & password.' : null;
+  }
+}
 
 export default function SignInPage() {
   const router    = useRouter();
@@ -35,14 +51,30 @@ export default function SignInPage() {
   useEffect(() => { setHydrated(true); }, []);
   useEffect(() => { if (hydrated && user) router.push(getDestination()); }, [hydrated, user, router]);
 
+  // Picks up a Google sign-in that fell back to a full-page redirect
+  // (signInWithPopup gets auth/popup-blocked on Safari, most mobile
+  // browsers, and locked-down Chrome profiles). Without this, a redirect
+  // failure (e.g. account-exists-with-different-credential) failed with
+  // zero feedback — the user just landed back here, still signed out.
+  useEffect(() => {
+    completeGoogleRedirectSignIn().catch((e: any) => {
+      setError(googleErrorMessage(e?.code) ?? '');
+    });
+  }, []);
+
   const handleGoogle = async () => {
     setGoogleLoading(true);
     setError('');
     try {
       const u = await signInWithGoogle();
       if (u) router.push(getDestination());
+      // If u is null here, signInWithGoogle fell back to a redirect —
+      // the page is about to navigate away, nothing else to do.
     } catch (e: any) {
-      setError(e.message ?? 'Google sign-in failed');
+      const code = e?.code ?? '';
+      if (code !== 'auth/popup-closed-by-user' && code !== 'auth/cancelled-popup-request') {
+        setError(googleErrorMessage(code) ?? e.message ?? 'Google sign-in failed');
+      }
     } finally {
       setGoogleLoading(false);
     }

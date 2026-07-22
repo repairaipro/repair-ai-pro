@@ -111,7 +111,14 @@ export async function POST(
       );
     }
 
-    // Analyze photos with AWS Rekognition
+    // Fall back to the job's own trade/description when the client didn't
+    // send them (PhotoAnalysisFlow never sent description at all, and the
+    // job page never passed a trade prop) — critically, Firestore's Admin
+    // SDK throws on any `undefined` field value, so leaving these undefined
+    // crashed every analysis with a generic 500 before it ever reached AI.
+    const effectiveTrade = trade ?? jobData?.aiDetectedTrade ?? jobData?.trade ?? null;
+    const effectiveDescription = description ?? jobData?.description ?? null;
+
     console.log(`Analyzing ${photoUrls.length} photos for job ${jobId}...`);
     const analysis = await analyzeJobPhotos(photoUrls);
 
@@ -124,8 +131,8 @@ export async function POST(
       .collection('photoAnalyses')
       .add({
         photoUrls,
-        trade,
-        description,
+        trade: effectiveTrade,
+        description: effectiveDescription,
         severity: analysis.aggregatedSeverity,
         defects: analysis.allDefects,
         detectedObjects: analysis.analyses[0]?.detectedObjects || [],
