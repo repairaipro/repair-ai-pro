@@ -34,6 +34,7 @@ import { getQuestionsForTrade } from "@/lib/tradeQuestionnaires";
 import type { Question } from "@/lib/tradeQuestionnaires";
 import LocationPrivacySettings from "@/components/LocationPrivacySettings";
 import type { LocationPrivacyMode } from "@/components/LocationPrivacySettings";
+import { getRetailersForTrade } from "@/lib/partsRetailers";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -247,7 +248,9 @@ export default function NewJobPage() {
   const [estimate, setEstimate] = useState<Estimate | null>(null);
   const [parts, setParts] = useState<Part[]>([]);
   const [partsLoading, setPartsLoading] = useState(false);
+  // One answer per clarifying question, aligned by index to analysis.clarifyingQuestions
   const [answeredQuestions, setAnsweredQuestions] = useState<string[]>([]);
+  const [clarifyingIndex, setClarifyingIndex] = useState(0);
   const [skipQuestions, setSkipQuestions] = useState(false);
 
   // Trade questionnaire + smart estimate
@@ -463,11 +466,22 @@ CRITICAL: If you're not confident, ask clarifying questions rather than guessing
     setError(null);
     try {
       const token = await user.getIdToken();
+
+      // Fold in the AI's clarifying-question answers, if any — previously
+      // collected but never actually sent anywhere, a silent data-loss bug.
+      const clarifyingQA = analysis?.clarifyingQuestions
+        ?.map((q, i) => (answeredQuestions[i]?.trim() ? `Q: ${q}\nA: ${answeredQuestions[i].trim()}` : null))
+        .filter((qa): qa is string => Boolean(qa))
+        .join('\n\n');
+      const fullDescription = clarifyingQA
+        ? `${description.trim()}\n\n${clarifyingQA}`
+        : description.trim();
+
       const res = await fetch("/api/create-job", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          description: description.trim(),
+          description: fullDescription,
           location,
           aiDetectedTrade: detectedTrade || analysis?.trade || null,
           aiSummary: analysis?.summary ?? null,
@@ -850,43 +864,79 @@ CRITICAL: If you're not confident, ask clarifying questions rather than guessing
 
               {analysis.clarifyingQuestions && analysis.clarifyingQuestions.length > 0 && !skipQuestions && (
                 <div
-                  className="rounded-lg p-3 space-y-3"
+                  className="rounded-lg p-4 space-y-3"
                   style={{ background: 'rgba(251, 191, 36, 0.08)', border: '1px solid rgba(251, 191, 36, 0.2)' }}
                 >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="text-xs font-semibold" style={{ color: '#fbbf24' }}>
-                        📋 Answer these to narrow down the diagnosis (optional):
-                      </p>
-                      <p className="text-[11px] mt-1" style={{ color: 'var(--color-text-4)' }}>
-                        These help contractors understand your issue better, but you can skip if you're in a hurry.
-                      </p>
-                    </div>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold" style={{ color: '#fbbf24' }}>
+                      📋 Question {clarifyingIndex + 1} of {analysis.clarifyingQuestions.length} — helps contractors understand your issue
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setSkipQuestions(true)}
+                      className="text-[11px] flex-shrink-0"
+                      style={{ color: 'var(--color-text-4)', textDecoration: 'underline' }}
+                    >
+                      Skip all
+                    </button>
                   </div>
-                  <ul className="space-y-1.5">
-                    {analysis.clarifyingQuestions.map((q, i) => (
-                      <li key={i} className="text-xs flex gap-2" style={{ color: 'var(--color-text-3)' }}>
-                        <span style={{ color: '#fbbf24' }}>•</span>
-                        <span>{q}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <textarea
-                    placeholder="(Optional) Paste your answers to the questions above, or add any other details you think are important..."
-                    value={answeredQuestions.join('\n')}
-                    onChange={(e) => setAnsweredQuestions(e.target.value.split('\n').filter((a) => a.trim()))}
-                    rows={2}
-                    className="input resize-none text-xs"
-                    style={{ fontSize: '12px' }}
+
+                  <div className="h-1 rounded-full overflow-hidden" style={{ background: 'rgba(251,191,36,0.15)' }}>
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{ width: `${((clarifyingIndex + 1) / analysis.clarifyingQuestions.length) * 100}%`, background: '#fbbf24' }}
+                    />
+                  </div>
+
+                  <p className="text-sm font-medium" style={{ color: 'var(--color-text)' }}>
+                    {analysis.clarifyingQuestions[clarifyingIndex]}
+                  </p>
+
+                  <input
+                    type="text"
+                    autoFocus
+                    placeholder="Your answer… (optional)"
+                    value={answeredQuestions[clarifyingIndex] ?? ''}
+                    onChange={(e) => {
+                      const next = [...answeredQuestions];
+                      next[clarifyingIndex] = e.target.value;
+                      setAnsweredQuestions(next);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key !== 'Enter') return;
+                      if (clarifyingIndex < analysis.clarifyingQuestions!.length - 1) setClarifyingIndex((i) => i + 1);
+                    }}
+                    className="input text-sm"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setSkipQuestions(true)}
-                    className="text-xs"
-                    style={{ color: '#818cf8', textDecoration: 'underline' }}
-                  >
-                    Skip these questions, I'll add details in the description
-                  </button>
+
+                  <div className="flex gap-2">
+                    {clarifyingIndex > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setClarifyingIndex((i) => i - 1)}
+                        className="btn btn-secondary btn-sm"
+                      >
+                        Back
+                      </button>
+                    )}
+                    {clarifyingIndex < analysis.clarifyingQuestions.length - 1 ? (
+                      <button
+                        type="button"
+                        onClick={() => setClarifyingIndex((i) => i + 1)}
+                        className="btn btn-primary btn-sm flex-1"
+                      >
+                        {answeredQuestions[clarifyingIndex]?.trim() ? 'Next' : 'Skip this one'}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setSkipQuestions(true)}
+                        className="btn btn-primary btn-sm flex-1"
+                      >
+                        Done
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -896,7 +946,9 @@ CRITICAL: If you're not confident, ask clarifying questions rather than guessing
                   style={{ background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.2)' }}
                 >
                   <p className="text-xs" style={{ color: '#818cf8' }}>
-                    ✓ Got it — skipped clarifying questions. Contractors will work with your description.
+                    {answeredQuestions.some((a) => a?.trim())
+                      ? '✓ Thanks — your answers will be shared with contractors.'
+                      : '✓ Got it — skipped clarifying questions. Contractors will work with your description.'}
                   </p>
                 </div>
               )}
@@ -1196,45 +1248,26 @@ CRITICAL: If you're not confident, ask clarifying questions rather than guessing
                         </span>
                       </div>
                       <div className="flex flex-wrap gap-2 mt-2.5">
-                        <a
-                          href={`https://www.homedepot.com/s/${encodeURIComponent(part.searchQuery ?? part.name)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-lg transition-opacity hover:opacity-80"
-                          style={{
-                            background: 'rgba(249,115,22,0.1)',
-                            border: '1px solid rgba(249,115,22,0.22)',
-                            color: '#fb923c',
-                          }}
-                        >
-                          Home Depot <ExternalLink className="w-3 h-3" />
-                        </a>
-                        <a
-                          href={`https://www.lowes.com/search?searchTerm=${encodeURIComponent(part.searchQuery ?? part.name)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-lg transition-opacity hover:opacity-80"
-                          style={{
-                            background: 'rgba(59,130,246,0.1)',
-                            border: '1px solid rgba(59,130,246,0.22)',
-                            color: '#60a5fa',
-                          }}
-                        >
-                          Lowe&apos;s <ExternalLink className="w-3 h-3" />
-                        </a>
-                        <a
-                          href={`https://www.amazon.com/s?k=${encodeURIComponent(part.searchQuery ?? part.name)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-lg transition-opacity hover:opacity-80"
-                          style={{
-                            background: 'rgba(251,191,36,0.12)',
-                            border: '1px solid rgba(251,191,36,0.25)',
-                            color: '#fbbf24',
-                          }}
-                        >
-                          Amazon <ExternalLink className="w-3 h-3" />
-                        </a>
+                        {getRetailersForTrade(detectedTrade || analysis?.trade).map((retailer, ri) => {
+                          const palette = [
+                            { bg: 'rgba(249,115,22,0.1)',  border: 'rgba(249,115,22,0.22)',  color: '#fb923c' },
+                            { bg: 'rgba(59,130,246,0.1)',  border: 'rgba(59,130,246,0.22)',  color: '#60a5fa' },
+                            { bg: 'rgba(251,191,36,0.12)', border: 'rgba(251,191,36,0.25)',  color: '#fbbf24' },
+                            { bg: 'rgba(52,211,153,0.1)',  border: 'rgba(52,211,153,0.22)',  color: '#34d399' },
+                          ][ri % 4];
+                          return (
+                            <a
+                              key={retailer.name}
+                              href={retailer.buildUrl(part.searchQuery ?? part.name)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-lg transition-opacity hover:opacity-80"
+                              style={{ background: palette.bg, border: `1px solid ${palette.border}`, color: palette.color }}
+                            >
+                              {retailer.name} <ExternalLink className="w-3 h-3" />
+                            </a>
+                          );
+                        })}
                       </div>
                     </li>
                   ))}

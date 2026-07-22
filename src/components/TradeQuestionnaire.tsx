@@ -1,7 +1,8 @@
 'use client';
 
-import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, Loader2, ChevronDown, ChevronUp, ClipboardList } from 'lucide-react';
+import { useState } from 'react';
+import { motion } from 'framer-motion';
+import { CheckCircle, Loader2, ClipboardList, ChevronLeft, ArrowRight } from 'lucide-react';
 import type { Question } from '@/lib/tradeQuestionnaires';
 
 type Props = {
@@ -14,6 +15,12 @@ type Props = {
   tradeName?: string;
 };
 
+function isAnswered(q: Question, answers: Record<string, any>): boolean {
+  const v = answers[q.id];
+  if (q.type === 'multi-select') return Array.isArray(v) && v.length > 0;
+  return v !== undefined && v !== '';
+}
+
 /* ── Pill button (shared) ────────────────────────────────────────────── */
 function Pill({
   label, selected, onClick,
@@ -23,9 +30,9 @@ function Pill({
       type="button"
       onClick={onClick}
       style={{
-        padding: '8px 14px',
+        padding: '10px 16px',
         borderRadius: 20,
-        fontSize: 13,
+        fontSize: 14,
         fontWeight: selected ? 700 : 500,
         border: selected ? '1.5px solid #6366f1' : '1px solid rgba(255,255,255,0.12)',
         background: selected ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.04)',
@@ -59,9 +66,9 @@ function YesNo({
             onClick={() => onChange(val)}
             style={{
               flex: 1,
-              padding: '10px',
+              padding: '14px',
               borderRadius: 10,
-              fontSize: 14,
+              fontSize: 15,
               fontWeight: sel ? 700 : 500,
               border: sel ? `1.5px solid ${border}` : '1px solid rgba(255,255,255,0.1)',
               background: sel ? bg : 'rgba(255,255,255,0.04)',
@@ -80,40 +87,40 @@ function YesNo({
 
 /* ── Single question renderer ────────────────────────────────────────── */
 function QuestionBlock({
-  question, value, onChange,
-}: { question: Question; value: any; onChange: (v: any) => void }) {
+  question, value, onChange, onAutoAdvance, onForceAdvance,
+}: { question: Question; value: any; onChange: (v: any) => void; onAutoAdvance: () => void; onForceAdvance: () => void }) {
   return (
-    <div style={{ marginBottom: 20 }}>
-      <div style={{ marginBottom: 8 }}>
-        <span style={{ fontSize: 14, fontWeight: 600, color: '#e5e7eb' }}>
+    <div>
+      <div style={{ marginBottom: 16 }}>
+        <span style={{ fontSize: 17, fontWeight: 700, color: '#e5e7eb' }}>
           {question.label}
           {question.required && <span style={{ color: '#f87171', marginLeft: 4 }}>*</span>}
         </span>
         {question.description && (
-          <p style={{ fontSize: 12, color: '#6b7280', marginTop: 3 }}>{question.description}</p>
+          <p style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>{question.description}</p>
         )}
         {question.followUp && (
-          <p style={{ fontSize: 11, color: '#818cf8', marginTop: 2 }}>ℹ️ {question.followUp}</p>
+          <p style={{ fontSize: 12, color: '#818cf8', marginTop: 4 }}>ℹ️ {question.followUp}</p>
         )}
       </div>
 
-      {/* single-select */}
+      {/* single-select — clicking an option auto-advances */}
       {question.type === 'single-select' && question.options && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
           {question.options.map((opt) => (
             <Pill
               key={opt.value}
               label={opt.label}
               selected={value === opt.value}
-              onClick={() => onChange(opt.value)}
+              onClick={() => { onChange(opt.value); onForceAdvance(); }}
             />
           ))}
         </div>
       )}
 
-      {/* multi-select */}
+      {/* multi-select — no auto-advance, user picks several then hits Next */}
       {question.type === 'multi-select' && question.options && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
           {question.options.map((opt) => {
             const selected = Array.isArray(value) && value.includes(opt.value);
             return (
@@ -135,26 +142,28 @@ function QuestionBlock({
         </div>
       )}
 
-      {/* yes-no */}
+      {/* yes-no — auto-advances */}
       {question.type === 'yes-no' && (
-        <YesNo value={value} onChange={onChange} />
+        <YesNo value={value} onChange={(v) => { onChange(v); onForceAdvance(); }} />
       )}
 
       {/* short-text */}
       {question.type === 'short-text' && (
         <input
           type="text"
+          autoFocus
           value={value ?? ''}
           onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') onAutoAdvance(); }}
           placeholder={question.description ?? 'Your answer…'}
           style={{
             width: '100%',
-            padding: '10px 14px',
+            padding: '13px 16px',
             background: 'rgba(255,255,255,0.06)',
             border: '1px solid rgba(255,255,255,0.12)',
             borderRadius: 10,
             color: '#e5e7eb',
-            fontSize: 14,
+            fontSize: 15,
             outline: 'none',
             boxSizing: 'border-box',
           }}
@@ -165,16 +174,18 @@ function QuestionBlock({
       {question.type === 'number' && (
         <input
           type="number"
+          autoFocus
           value={value ?? ''}
           onChange={(e) => onChange(Number(e.target.value))}
+          onKeyDown={(e) => { if (e.key === 'Enter') onAutoAdvance(); }}
           style={{
             width: '100%',
-            padding: '10px 14px',
+            padding: '13px 16px',
             background: 'rgba(255,255,255,0.06)',
             border: '1px solid rgba(255,255,255,0.12)',
             borderRadius: 10,
             color: '#e5e7eb',
-            fontSize: 14,
+            fontSize: 15,
             outline: 'none',
             boxSizing: 'border-box',
           }}
@@ -184,15 +195,16 @@ function QuestionBlock({
   );
 }
 
-/* ── Main component ──────────────────────────────────────────────────── */
+/* ── Main component — one question at a time ─────────────────────────── */
 export default function TradeQuestionnaire({
   questions, answers, onChange, onSubmit, loading, submitted, tradeName,
 }: Props) {
-  // Count answered required questions
+  const [index, setIndex] = useState(0);
+  const [direction, setDirection] = useState<1 | -1>(1);
+
   const requiredQs    = questions.filter((q) => q.required);
-  const answeredReqQs = requiredQs.filter((q) => q.id in answers && answers[q.id] !== '' && answers[q.id] !== undefined);
-  const allRequiredAnswered = answeredReqQs.length === requiredQs.length;
-  const totalAnswered = questions.filter((q) => q.id in answers).length;
+  const answeredReqQs = requiredQs.filter((q) => isAnswered(q, answers));
+  const totalAnswered = questions.filter((q) => isAnswered(q, answers)).length;
 
   if (submitted) {
     return (
@@ -222,6 +234,36 @@ export default function TradeQuestionnaire({
     );
   }
 
+  const current = questions[index];
+  const isLast = index === questions.length - 1;
+  const currentAnswered = isAnswered(current, answers);
+  const canAdvance = !current.required || currentAnswered;
+
+  function goTo(next: number) {
+    setDirection(next > index ? 1 : -1);
+    setIndex(Math.max(0, Math.min(questions.length - 1, next)));
+  }
+
+  function handleNext() {
+    if (!canAdvance) return;
+    if (isLast) {
+      onSubmit();
+    } else {
+      goTo(index + 1);
+    }
+  }
+
+  /** Used right after selecting a single-select/yes-no option: the click just supplied
+   * the answer, so the required-check (gated on state that hasn't committed yet) doesn't
+   * need to run — advancing is always valid. */
+  function handleForceAdvance() {
+    if (isLast) {
+      onSubmit();
+    } else {
+      goTo(index + 1);
+    }
+  }
+
   return (
     <div
       style={{
@@ -237,65 +279,124 @@ export default function TradeQuestionnaire({
           padding: '16px 20px',
           background: 'rgba(99,102,241,0.08)',
           borderBottom: '1px solid rgba(99,102,241,0.15)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
         }}
       >
-        <ClipboardList size={18} color="#818cf8" />
-        <div style={{ flex: 1 }}>
-          <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#a5b4fc' }}>
-            {tradeName ? `${tradeName} ` : ''}Quick Questions
-          </p>
-          <p style={{ margin: '2px 0 0', fontSize: 12, color: '#6b7280' }}>
-            Takes ~60 seconds · Unlocks a data-driven estimate
-          </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+          <ClipboardList size={18} color="#818cf8" />
+          <div style={{ flex: 1 }}>
+            <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#a5b4fc' }}>
+              {tradeName ? `${tradeName} ` : ''}Quick Questions
+            </p>
+            <p style={{ margin: '2px 0 0', fontSize: 12, color: '#6b7280' }}>
+              Question {index + 1} of {questions.length} · Unlocks a data-driven estimate
+            </p>
+          </div>
+          <div
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              padding: '3px 10px',
+              borderRadius: 20,
+              background: answeredReqQs.length === requiredQs.length
+                ? 'rgba(52,211,153,0.15)' : 'rgba(255,255,255,0.06)',
+              color: answeredReqQs.length === requiredQs.length ? '#34d399' : '#6b7280',
+              flexShrink: 0,
+            }}
+          >
+            {answeredReqQs.length}/{requiredQs.length} required
+          </div>
         </div>
-        <div
-          style={{
-            fontSize: 11,
-            fontWeight: 700,
-            padding: '3px 10px',
-            borderRadius: 20,
-            background: answeredReqQs.length === requiredQs.length
-              ? 'rgba(52,211,153,0.15)' : 'rgba(255,255,255,0.06)',
-            color: answeredReqQs.length === requiredQs.length ? '#34d399' : '#6b7280',
-          }}
-        >
-          {answeredReqQs.length}/{requiredQs.length} required
-        </div>
-      </div>
-
-      {/* Questions */}
-      <div style={{ padding: '20px 20px 0' }}>
-        {questions.map((q) => (
-          <QuestionBlock
-            key={q.id}
-            question={q}
-            value={answers[q.id]}
-            onChange={(v) => onChange(q.id, v)}
+        {/* Progress bar */}
+        <div style={{ height: 4, borderRadius: 4, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+          <div
+            style={{
+              height: '100%',
+              borderRadius: 4,
+              width: `${((index + 1) / questions.length) * 100}%`,
+              background: 'linear-gradient(90deg, #6366f1, #8b5cf6)',
+              transition: 'width 0.25s ease',
+            }}
           />
-        ))}
+        </div>
       </div>
 
-      {/* Submit */}
-      <div style={{ padding: '8px 20px 20px' }}>
+      {/* Current question, animated */}
+      <div style={{ padding: '24px 20px', minHeight: 140, position: 'relative', overflow: 'hidden' }}>
+        <motion.div
+          key={current.id}
+          initial={{ opacity: 0, x: direction * 24 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.18 }}
+        >
+          <QuestionBlock
+            question={current}
+            value={answers[current.id]}
+            onChange={(v) => onChange(current.id, v)}
+            onAutoAdvance={handleNext}
+            onForceAdvance={handleForceAdvance}
+          />
+        </motion.div>
+      </div>
+
+      {/* Nav */}
+      <div style={{ padding: '8px 20px 20px', display: 'flex', gap: 10, alignItems: 'center' }}>
+        {index > 0 && (
+          <button
+            type="button"
+            onClick={() => goTo(index - 1)}
+            style={{
+              padding: '13px 16px',
+              borderRadius: 12,
+              border: '1px solid rgba(255,255,255,0.12)',
+              background: 'rgba(255,255,255,0.04)',
+              color: '#9ca3af',
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+            }}
+          >
+            <ChevronLeft size={16} /> Back
+          </button>
+        )}
+
+        {!current.required && !currentAnswered && !isLast && (
+          <button
+            type="button"
+            onClick={() => goTo(index + 1)}
+            style={{
+              padding: '13px 16px',
+              borderRadius: 12,
+              border: 'none',
+              background: 'transparent',
+              color: '#6b7280',
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Skip
+          </button>
+        )}
+
         <button
           type="button"
-          onClick={onSubmit}
-          disabled={!allRequiredAnswered || loading}
+          onClick={handleNext}
+          disabled={!canAdvance || loading}
           style={{
-            width: '100%',
+            flex: 1,
             padding: '13px',
             borderRadius: 12,
             border: 'none',
-            background: allRequiredAnswered && !loading
+            background: canAdvance && !loading
               ? 'linear-gradient(135deg, #6366f1, #8b5cf6)'
               : 'rgba(255,255,255,0.08)',
-            color: allRequiredAnswered && !loading ? '#fff' : '#4b5563',
+            color: canAdvance && !loading ? '#fff' : '#4b5563',
             fontSize: 15,
             fontWeight: 700,
-            cursor: allRequiredAnswered && !loading ? 'pointer' : 'not-allowed',
+            cursor: canAdvance && !loading ? 'pointer' : 'not-allowed',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -305,13 +406,12 @@ export default function TradeQuestionnaire({
         >
           {loading ? (
             <><Loader2 size={16} className="animate-spin" /> Getting precise estimate…</>
-          ) : (
+          ) : isLast ? (
             <><ClipboardList size={16} /> Get Smart Estimate</>
+          ) : (
+            <>Next <ArrowRight size={16} /></>
           )}
         </button>
-        <p style={{ textAlign: 'center', fontSize: 11, color: '#4b5563', marginTop: 8 }}>
-          Based on real pricing data from similar jobs in your area
-        </p>
       </div>
     </div>
   );

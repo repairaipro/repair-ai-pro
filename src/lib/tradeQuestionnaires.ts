@@ -84,6 +84,13 @@ export const tradeQuestionnaires: TradeQuestions = {
       followUp: 'Older homes may have more expensive issues',
     },
     {
+      id: 'fixture_brand',
+      type: 'short-text',
+      label: 'Brand of the fixture, if you know it',
+      description: 'e.g. Moen, Kohler, Delta, Rheem — helps us find the exact replacement part',
+      required: false,
+    },
+    {
       id: 'access_easy',
       type: 'yes-no',
       label: 'Can the contractor easily access the affected area?',
@@ -176,6 +183,13 @@ export const tradeQuestionnaires: TradeQuestions = {
       id: 'power_completely_out',
       type: 'yes-no',
       label: 'Is power completely out to this area?',
+      required: false,
+    },
+    {
+      id: 'panel_brand',
+      type: 'short-text',
+      label: 'Brand of your breaker panel, if visible',
+      description: 'e.g. Square D, Eaton, Siemens — printed inside the panel door',
       required: false,
     },
   ],
@@ -271,6 +285,13 @@ export const tradeQuestionnaires: TradeQuestions = {
       required: false,
       followUp: 'Temperature affects service difficulty',
     },
+    {
+      id: 'system_brand',
+      type: 'short-text',
+      label: 'Brand/model of your system, if known',
+      description: 'e.g. Trane, Carrier, Lennox, Goodman — usually on a sticker on the outdoor unit',
+      required: false,
+    },
   ],
 
   appliance: [
@@ -296,6 +317,13 @@ export const tradeQuestionnaires: TradeQuestions = {
       label: 'What\'s the problem?',
       description: 'E.g., "won\'t turn on", "leaking", "making noise"',
       required: true,
+    },
+    {
+      id: 'brand_model',
+      type: 'short-text',
+      label: 'Brand and model number, if you can find it',
+      description: 'Usually a sticker inside the door, on the back, or under a lid — this gets you the exact right part',
+      required: false,
     },
     {
       id: 'appliance_age',
@@ -412,6 +440,92 @@ export const tradeQuestionnaires: TradeQuestions = {
     },
   ],
 
+  'auto mechanic': [
+    {
+      id: 'vehicle_year',
+      type: 'short-text',
+      label: 'Vehicle year',
+      description: 'e.g. 2018 — needed to find the exact part',
+      required: true,
+    },
+    {
+      id: 'vehicle_make',
+      type: 'short-text',
+      label: 'Make',
+      description: 'e.g. Toyota, Ford, Honda',
+      required: true,
+    },
+    {
+      id: 'vehicle_model',
+      type: 'short-text',
+      label: 'Model',
+      description: 'e.g. Camry, F-150, Civic',
+      required: true,
+    },
+    {
+      id: 'vehicle_trim',
+      type: 'short-text',
+      label: 'Trim or engine size, if known',
+      description: 'e.g. LE, 2.5L 4-cyl — some parts differ by engine',
+      required: false,
+    },
+    {
+      id: 'issue_type',
+      type: 'single-select',
+      label: 'What area is affected?',
+      options: [
+        { label: 'Engine', value: 'engine' },
+        { label: 'Brakes', value: 'brakes' },
+        { label: 'Suspension / steering', value: 'suspension_steering' },
+        { label: 'Transmission', value: 'transmission' },
+        { label: 'Electrical / battery', value: 'electrical' },
+        { label: 'AC / heating', value: 'ac_heating' },
+        { label: 'Exhaust', value: 'exhaust' },
+        { label: 'Other / not sure', value: 'other' },
+      ],
+      required: true,
+    },
+    {
+      id: 'symptom_description',
+      type: 'short-text',
+      label: 'What are you noticing?',
+      description: 'e.g. "clicking noise when turning", "grinding when braking"',
+      required: true,
+    },
+    {
+      id: 'warning_light',
+      type: 'yes-no',
+      label: 'Is a dashboard warning light on?',
+      required: false,
+      followUp: 'Tells the contractor whether a code scan is needed first',
+    },
+    {
+      id: 'drivable',
+      type: 'yes-no',
+      label: 'Is the car currently drivable?',
+      required: true,
+      followUp: 'Affects whether you need mobile service or a tow',
+    },
+    {
+      id: 'mileage',
+      type: 'number',
+      label: 'Current mileage, if known',
+      required: false,
+    },
+    {
+      id: 'started_when',
+      type: 'single-select',
+      label: 'When did this start?',
+      options: [
+        { label: 'Today', value: 'today' },
+        { label: 'This week', value: 'this_week' },
+        { label: 'This month', value: 'this_month' },
+        { label: 'Longer ago', value: 'longer' },
+      ],
+      required: false,
+    },
+  ],
+
   general: [
     {
       id: 'service_type',
@@ -443,9 +557,18 @@ export const tradeQuestionnaires: TradeQuestions = {
 /**
  * Get questions for a specific trade
  */
+/** Trades that share another trade's questionnaire instead of falling back to 'general' */
+const TRADE_ALIASES: Record<string, string> = {
+  'auto body & paint': 'auto mechanic',
+  'auto detailing':    'auto mechanic',
+  'tire & wheels':     'auto mechanic',
+  'auto glass':        'auto mechanic',
+};
+
 export function getQuestionsForTrade(trade: string): Question[] {
   const normalized = trade.toLowerCase().trim();
-  return tradeQuestionnaires[normalized] || tradeQuestionnaires.general;
+  const key = TRADE_ALIASES[normalized] ?? normalized;
+  return tradeQuestionnaires[key] || tradeQuestionnaires.general;
 }
 
 /**

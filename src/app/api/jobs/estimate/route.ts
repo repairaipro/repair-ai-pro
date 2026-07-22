@@ -102,6 +102,7 @@ export async function POST(request: NextRequest) {
 
         const response = await openaiClient.chat.completions.create({
           model: 'gpt-4o-mini',
+          response_format: { type: 'json_object' },
           messages: [
             {
               role: 'user' as const,
@@ -121,26 +122,24 @@ Based on the complexity factors indicated by their answers, should we adjust the
 2. Are there any factors that would decrease cost?
 3. What is the most likely price range?
 
-Respond with:
-1. Refined estimate (single number)
-2. Brief explanation of adjustment (1-2 sentences)
-3. One thing they should know before scheduling`,
+Return ONLY a JSON object with this exact shape, no markdown:
+{
+  "refinedEstimate": number,   // your adjusted single-number estimate in USD, e.g. 275
+  "explanation": string,       // 1-2 sentences on why you adjusted (or didn't) it
+  "thingToKnow": string        // one thing the homeowner should know before scheduling
+}`,
             },
           ],
-          max_tokens: 200,
+          max_tokens: 300,
         });
 
-        const aiResponse = response.choices[0]?.message?.content || '';
-        const lines = aiResponse.split('\n');
+        const raw = response.choices[0]?.message?.content ?? '{}';
+        const parsed = JSON.parse(raw) as { refinedEstimate?: number; explanation?: string; thingToKnow?: string };
 
-        // Parse refined estimate from first line
-        const firstLine = lines[0] || '';
-        const priceMatch = firstLine.match(/\$?([\d,]+)/);
-        if (priceMatch) {
-          refinedEstimate = parseInt(priceMatch[1].replace(/,/g, ''), 10);
+        if (typeof parsed.refinedEstimate === 'number' && parsed.refinedEstimate > 0) {
+          refinedEstimate = Math.round(parsed.refinedEstimate);
         }
-
-        aiInsights = aiResponse;
+        aiInsights = [parsed.explanation, parsed.thingToKnow].filter(Boolean).join('\n');
       }
     } catch (aiError) {
       console.error('OpenAI refinement failed, using base estimate:', aiError);

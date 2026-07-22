@@ -18,6 +18,12 @@ const TYPE_TO_TRADE: Record<string, string> = {
   flooring_store:             "Flooring",
   locksmith:                  "Locksmith",
   moving_company:             "Moving & Hauling",
+  // Automotive
+  car_repair:                 "Auto Mechanic",
+  auto_repair:                "Auto Mechanic",
+  car_dealer:                 "Auto Mechanic",
+  car_wash:                   "Auto Detailing",
+  auto_body_shop:             "Auto Body & Paint",
   // Tech & Security
   electronics_store:          "IT & Tech Support",
   computer_store:             "IT & Tech Support",
