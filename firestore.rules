@@ -367,6 +367,27 @@ service cloud.firestore {
         allow update, delete: if false;
       }
 
+      /* ================= LIVE LOCATION (real-time GPS pin) ================= */
+      // Written server-side only (admin SDK via /api/contractors/location,
+      // which bypasses rules) — this subcollection previously had NO rule at
+      // all, which meant every client read of it was denied by the default
+      // deny-all at the bottom of this file. The write always succeeded
+      // (admin SDK), so contractor location was recorded but the live map
+      // could never actually read it back — "Missing or insufficient
+      // permissions" on every homeowner and contractor session.
+      match /liveLocation/{locId} {
+        allow write: if false; // server only
+
+        allow read: if signedIn()
+          && uid() == job(jobId).data.userId
+          && job(jobId).data.claimedBy != null
+          && job(jobId).data.status in ["accepted", "in_progress"];
+
+        allow read: if signedIn()
+          && job(jobId).data.claimedBy == uid()
+          && job(jobId).data.status in ["accepted", "in_progress"];
+      }
+
       /* ================= CONTRACTOR LOCATION (Real-time tracking) ================= */
       // Update: Allow contractors to update their location on the job document
       // Also allow location history tracking in subcollection

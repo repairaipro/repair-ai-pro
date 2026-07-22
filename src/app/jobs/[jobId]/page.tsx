@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { db } from '@/lib/db';
 import { doc, onSnapshot, collection, query, orderBy, updateDoc } from 'firebase/firestore';
 import { useAuth } from '@/lib/auth';
+import { useIsContractor } from '@/lib/useRole';
 import {
   ChevronLeft, MessageSquare, CheckCircle2, Clock, AlertTriangle,
   DollarSign, Star, Briefcase, FileText, Loader2, ChevronRight,
@@ -254,6 +255,7 @@ export default function JobDetailPage() {
   const params   = useParams();
   const router   = useRouter();
   const { user } = useAuth();
+  const { isContractor: viewerIsContractor } = useIsContractor();
   const jobId    = params?.jobId as string;
 
   const [job,              setJob]              = useState<Job | null>(null);
@@ -265,6 +267,11 @@ export default function JobDetailPage() {
   const [confirmError,     setConfirmError]     = useState('');
   const [selectingBid,     setSelectingBid]     = useState<string | null>(null);
   const [selectBidError,   setSelectBidError]   = useState('');
+  const [bidAmount,        setBidAmount]        = useState('');
+  const [bidMessage,       setBidMessage]       = useState('');
+  const [bidEtaDays,       setBidEtaDays]       = useState('3');
+  const [bidSubmitting,    setBidSubmitting]    = useState(false);
+  const [bidSubmitError,   setBidSubmitError]   = useState('');
   const [showInsurance,    setShowInsurance]    = useState(false);
   const [showReview,       setShowReview]       = useState(false);
   const [showDisputeModal, setShowDisputeModal] = useState(false);
@@ -421,6 +428,43 @@ export default function JobDetailPage() {
     setConfirming(false);
   }
 
+  async function handleSubmitBid() {
+    if (!user) return;
+    const amount = parseFloat(bidAmount);
+    if (isNaN(amount) || amount <= 0) {
+      setBidSubmitError('Enter a valid bid amount.');
+      return;
+    }
+    if (!bidMessage.trim()) {
+      setBidSubmitError('Add a short message for the homeowner.');
+      return;
+    }
+    setBidSubmitting(true);
+    setBidSubmitError('');
+    try {
+      const token = await user.getIdToken();
+      const res   = await fetch(`/api/jobs/${jobId}/bid`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body:    JSON.stringify({ amount, message: bidMessage.trim(), etaDays: parseInt(bidEtaDays, 10) || 3 }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setBidSubmitError(data.error ?? 'Could not submit your bid. Please try again.');
+      } else {
+        // Reflect locally right away — the bids list only refetches on
+        // job.status change, which submitting a bid doesn't trigger.
+        setBids((prev) => [
+          ...prev,
+          { contractorId: user.uid, amount, message: bidMessage.trim(), etaDays: parseInt(bidEtaDays, 10) || 3, status: 'pending' },
+        ]);
+      }
+    } catch {
+      setBidSubmitError('Network error submitting your bid. Please try again.');
+    }
+    setBidSubmitting(false);
+  }
+
   async function handleSelectBid(contractorId: string) {
     if (!user) return;
     setSelectingBid(contractorId);
@@ -527,6 +571,13 @@ export default function JobDetailPage() {
   const pendingBids  = bids.filter((b) => b.status === 'pending');
   const selectedBid  = bids.find((b) => b.status === 'selected');
   const trade        = job.aiDetectedTrade ?? job.trade ?? 'General';
+
+  // A contractor browsing in from the public marketplace (not via an
+  // invitation) previously had no way to bid at all — the bid API never
+  // required an invitation record, only this UI was missing. canBid covers
+  // any signed-in contractor who isn't the job owner and hasn't already won it.
+  const myBid  = user ? bids.find((b) => b.contractorId === user.uid) : undefined;
+  const canBid = viewerIsContractor && !isHomeowner && !job.claimedBy && ['open', 'triaged'].includes(job.status);
 
   // Tabs only exist once a contractor is on the job — that's when the page
   // gets dense. inTab() renders a section when tabs are off OR it belongs
@@ -1026,7 +1077,7 @@ export default function JobDetailPage() {
         )}
 
         {/* ── Bids section ── */}
-        {inTab('overview') && (hasBids || (isHomeowner && ['triaged', 'open'].includes(job.status))) && (
+        {inTab('overview') && (hasBids || canBid || (isHomeowner && ['triaged', 'open'].includes(job.status))) && (
           <section>
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-4)' }}>
@@ -1038,6 +1089,69 @@ export default function JobDetailPage() {
                 </span>
               )}
             </div>
+
+            {/* ── Contractor: submit or view your own bid ── */}
+            {canBid && (
+              myBid ? (
+                <div
+                  className="rounded-2xl p-4 mb-3 flex items-center gap-3"
+                  style={{ background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.25)' }}
+                >
+                  <CheckCircle2 size={18} style={{ color: '#34d399', flexShrink: 0 }} />
+                  <div>
+                    <p className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>
+                      Your bid: ${myBid.amount} — {myBid.etaDays ?? 3} day ETA
+                    </p>
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-4)' }}>
+                      Waiting on the homeowner to review offers.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-2xl p-4 mb-3 space-y-3" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+                  <p className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>Submit a bid</p>
+                  {bidSubmitError && (
+                    <div className="rounded-xl px-3 py-2 text-xs" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: '#f87171' }}>
+                      {bidSubmitError}
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-text-3)' }}>Your price ($)</label>
+                      <input
+                        type="number" min="1" value={bidAmount}
+                        onChange={(e) => setBidAmount(e.target.value)}
+                        placeholder="e.g. 200"
+                        className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                        style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-text-3)' }}>ETA (days)</label>
+                      <input
+                        type="number" min="0" value={bidEtaDays}
+                        onChange={(e) => setBidEtaDays(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                        style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-text-3)' }}>Message to homeowner</label>
+                    <textarea
+                      rows={2} value={bidMessage}
+                      onChange={(e) => setBidMessage(e.target.value)}
+                      placeholder="Briefly explain your approach and why you're a good fit…"
+                      className="w-full px-3 py-2 rounded-lg text-sm outline-none resize-none"
+                      style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
+                    />
+                  </div>
+                  <button onClick={handleSubmitBid} disabled={bidSubmitting} className="btn btn-primary btn-sm w-full">
+                    {bidSubmitting ? <><Loader2 size={14} className="animate-spin" /> Submitting…</> : 'Submit Bid'}
+                  </button>
+                </div>
+              )
+            )}
 
             {bidsLoading ? (
               <div className="space-y-3">
@@ -1075,7 +1189,7 @@ export default function JobDetailPage() {
                     onSelect={handleSelectBid} selecting={selectingBid} />
                 ))}
               </div>
-            ) : (
+            ) : !canBid ? (
               <div
                 className="rounded-2xl p-6 text-center"
                 style={{ background: 'var(--color-surface)', border: '2px dashed var(--color-border)' }}
@@ -1088,7 +1202,7 @@ export default function JobDetailPage() {
                   Contractors are reviewing your job. You'll be notified when bids come in.
                 </p>
               </div>
-            )}
+            ) : null}
           </section>
         )}
 

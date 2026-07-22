@@ -198,7 +198,7 @@ export default function SignInPage() {
       <div className="mt-8 flex items-center gap-6 text-xs" style={{ color: 'var(--color-text-4)' }}>
         <span>🔒 Secure sign-in</span>
         <span>•</span>
-        <span>🏆 Trusted by 1,000+ pros</span>
+        <span>🛡️ Payments held in escrow</span>
         <span>•</span>
         <span>⚡ Free to join</span>
       </div>
