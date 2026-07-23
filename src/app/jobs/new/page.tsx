@@ -95,6 +95,49 @@ const SEVERITY_STYLES: Record<string, { bg: string; border: string; text: string
 
 const EMERGENCY_FEE = 35;
 
+/**
+ * Turns the trade-questionnaire answers into a readable "Label: value" block
+ * (single-selects mapped back to their option labels, yes/no humanized) so the
+ * parts-finder can use identifying details like vehicle year/make/model or an
+ * appliance brand/model to pin down the exact part. Empty answers are skipped.
+ */
+function buildDetailString(questions: Question[], answers: Record<string, any>): string {
+  const lines: string[] = [];
+  for (const q of questions) {
+    const v = answers[q.id];
+    if (v === undefined || v === "" || (Array.isArray(v) && v.length === 0)) continue;
+    let display: string;
+    if (q.type === "single-select" || q.type === "multi-select") {
+      const vals = Array.isArray(v) ? v : [v];
+      display = vals.map((val) => q.options?.find((o) => o.value === val)?.label ?? String(val)).join(", ");
+    } else if (q.type === "yes-no") {
+      display = v ? "Yes" : "No";
+    } else {
+      display = String(v);
+    }
+    lines.push(`${q.label}: ${display}`);
+  }
+  return lines.join("\n");
+}
+
+/**
+ * A short, human label for what the parts are matched to — the vehicle for
+ * automotive jobs, otherwise a brand/model if one was given. Used to make the
+ * diagnosis→parts tie-in visible in the Parts section. Returns "" when nothing
+ * identifying has been entered yet.
+ */
+function partsMatchLabel(answers: Record<string, any>): string {
+  const yr = (answers.vehicle_year ?? "").toString().trim();
+  const mk = (answers.vehicle_make ?? "").toString().trim();
+  const md = (answers.vehicle_model ?? "").toString().trim();
+  const vehicle = [yr, mk, md].filter(Boolean).join(" ");
+  if (vehicle) return vehicle;
+  const brand = (answers.brand_model ?? answers.system_brand ?? answers.panel_brand ?? answers.fixture_brand ?? "")
+    .toString()
+    .trim();
+  return brand;
+}
+
 // ─── Mode card ───────────────────────────────────────────────────────────────
 
 function ModeCard({
@@ -380,7 +423,14 @@ CRITICAL: If you're not confident, ask clarifying questions rather than guessing
       setQuestionnaireSubmitted(false);
       setSmartEstimate(null);
       if (hasLocation) fetchEstimate(result.trade, location);
-      fetchParts(result.trade, description.trim());
+      // First pass: tie parts to the confirmed diagnosis + the photo it came
+      // from. Refined again after the questionnaire adds year/make/model, etc.
+      fetchParts({
+        trade: result.trade,
+        description: description.trim(),
+        diagnosis: result.summary,
+        imageUrl: imagePreview,
+      });
       setStep(2);
     } catch {
       setError("AI analysis failed. You can still post the job manually.");
@@ -408,13 +458,30 @@ CRITICAL: If you're not confident, ask clarifying questions rather than guessing
     finally { setEstimateLoading(false); }
   }
 
-  async function fetchParts(trade: string, desc: string) {
+  // Parts must tie to the CONFIRMED diagnosis, the photo it was made from, and
+  // (once known) the identifying details — vehicle year/make/model, appliance
+  // brand/model — so the suggested part actually fits. Everything is passed
+  // explicitly to avoid stale-closure reads (e.g. right after setAnalysis).
+  async function fetchParts(opts: {
+    trade: string;
+    description: string;
+    diagnosis?: string | null;
+    details?: string | null;
+    imageUrl?: string | null;
+  }) {
+    if (!opts.trade) return;
     setPartsLoading(true);
     try {
       const res = await fetch("/api/parts-finder", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ trade, description: desc }),
+        body: JSON.stringify({
+          trade: opts.trade,
+          description: opts.description,
+          diagnosis: opts.diagnosis ?? undefined,
+          details: opts.details ?? undefined,
+          imageUrl: opts.imageUrl ?? undefined,
+        }),
       });
       const data = await res.json();
       if (Array.isArray(data.parts)) setParts(data.parts as Part[]);
@@ -453,6 +520,19 @@ CRITICAL: If you're not confident, ask clarifying questions rather than guessing
     finally {
       setSmartEstimateLoading(false);
       setQuestionnaireSubmitted(true);
+      // Now that identifying details (vehicle year/make/model, appliance brand/
+      // model, etc.) are known, re-fetch parts so they're fitment-exact rather
+      // than the generic first pass from analyze-time.
+      const details = buildDetailString(tradeQuestions, answers);
+      if (details) {
+        fetchParts({
+          trade: detectedTrade,
+          description: description.trim(),
+          diagnosis: analysis?.summary,
+          details,
+          imageUrl: imagePreview,
+        });
+      }
     }
   }
 
@@ -969,7 +1049,14 @@ CRITICAL: If you're not confident, ask clarifying questions rather than guessing
                     setSmartEstimate(null);
                     const hasLocation = location.zipcode || (location.city && location.state) || location.address;
                     if (hasLocation) fetchEstimate(newTrade, location);
-                    fetchParts(newTrade, description.trim());
+                    // Answers were just reset for the new trade — refine again
+                    // once the new questionnaire is filled in.
+                    fetchParts({
+                      trade: newTrade,
+                      description: description.trim(),
+                      diagnosis: analysis?.summary,
+                      imageUrl: imagePreview,
+                    });
                   }}
                   className="input"
                 >
@@ -1218,7 +1305,14 @@ CRITICAL: If you're not confident, ask clarifying questions rather than guessing
                 </div>
                 <div className="flex-1">
                   <h2 className="font-semibold text-sm" style={{ color: 'var(--color-text)' }}>Parts You May Need</h2>
-                  <p className="text-xs" style={{ color: 'var(--color-text-4)' }}>Shop ahead to save time and money</p>
+                  {(() => {
+                    const match = partsMatchLabel(questionnaireAnswers);
+                    return match ? (
+                      <p className="text-xs" style={{ color: '#34d399' }}>✓ Matched to your {match}</p>
+                    ) : (
+                      <p className="text-xs" style={{ color: 'var(--color-text-4)' }}>Shop ahead to save time and money</p>
+                    );
+                  })()}
                 </div>
                 {partsLoading && (
                   <span className="text-xs animate-pulse" style={{ color: 'var(--color-text-4)' }}>Finding parts…</span>
@@ -1280,7 +1374,13 @@ CRITICAL: If you're not confident, ask clarifying questions rather than guessing
                 <p className="text-sm" style={{ color: 'var(--color-text-4)' }}>
                   No parts suggestions available.{" "}
                   <button
-                    onClick={() => fetchParts(detectedTrade, description.trim())}
+                    onClick={() => fetchParts({
+                      trade: detectedTrade,
+                      description: description.trim(),
+                      diagnosis: analysis?.summary,
+                      details: buildDetailString(tradeQuestions, questionnaireAnswers),
+                      imageUrl: imagePreview,
+                    })}
                     className="underline hover:opacity-70 transition-opacity"
                     style={{ color: '#818cf8' }}
                   >
