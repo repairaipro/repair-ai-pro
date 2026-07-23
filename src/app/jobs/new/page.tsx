@@ -86,6 +86,14 @@ type SmartEstimate = {
   highRange: number;
   complexity: number;
   sampleSize: number;
+  /** How confident the data-driven estimate is, 0-100 (scales with sample size). */
+  confidence?: number;
+  /** Typical share of the total that is labor vs. parts, 0-100. */
+  laborPercent?: number;
+  /** Cost-driving risks inferred from the answers (e.g. old wiring, active leak). */
+  riskFactors?: string[];
+  /** Possible add-ons (permits, emergency/same-day fees). */
+  additionalCosts?: string[];
   aiInsights?: string;
 };
 
@@ -541,6 +549,10 @@ Rules: 1-3 likelyCauses, ordered most-likely first. 2-3 checkFirst items. Keep e
           highRange:       data.estimate.highRange,
           complexity:      data.estimate.complexity ?? 50,
           sampleSize:      data.estimate.sampleSize ?? 0,
+          confidence:      data.estimate.confidence,
+          laborPercent:    data.estimate.laborPercent,
+          riskFactors:     Array.isArray(data.estimate.riskFactors) ? data.estimate.riskFactors : [],
+          additionalCosts: Array.isArray(data.estimate.additionalCosts) ? data.estimate.additionalCosts : [],
           aiInsights:      data.aiInsights ?? '',
         });
       }
@@ -1203,40 +1215,68 @@ Rules: 1-3 likelyCauses, ordered most-likely first. 2-3 checkFirst items. Keep e
                   >
                     <TrendingUp className="w-4 h-4" style={{ color: '#34d399' }} />
                   </div>
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <h2 className="font-semibold text-sm" style={{ color: 'var(--color-text)' }}>
                       Smart Estimate
                     </h2>
-                    {smartEstimate.sampleSize > 0 && (
-                      <p className="text-xs" style={{ color: '#34d399' }}>
-                        Based on {smartEstimate.sampleSize.toLocaleString()} similar jobs in your area
-                      </p>
-                    )}
+                    {/* Honest basis: real comparables when we have them, otherwise say so. */}
+                    <p className="text-xs" style={{ color: 'var(--color-text-4)' }}>
+                      {smartEstimate.sampleSize > 0
+                        ? `Based on ${smartEstimate.sampleSize.toLocaleString()} comparable ${smartEstimate.sampleSize === 1 ? 'job' : 'jobs'} in your area`
+                        : 'AI-estimated for your area — sharpens as local jobs complete'}
+                    </p>
+                  </div>
+                  {typeof smartEstimate.confidence === 'number' && smartEstimate.sampleSize > 0 && (
+                    <span
+                      className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
+                      style={{
+                        background: smartEstimate.confidence >= 50 ? 'rgba(52,211,153,0.15)' : 'rgba(148,163,184,0.12)',
+                        color: smartEstimate.confidence >= 50 ? '#34d399' : '#94a3b8',
+                      }}
+                    >
+                      {smartEstimate.confidence >= 50 ? 'High' : 'Building'} confidence
+                    </span>
+                  )}
+                </div>
+
+                {/* Hero price + range */}
+                <div
+                  className="rounded-xl p-4 mb-4 text-center"
+                  style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border)' }}
+                >
+                  <div className="text-3xl font-extrabold" style={{ color: '#34d399' }}>
+                    ${smartEstimate.estimatedPrice.toLocaleString()}
+                  </div>
+                  <div className="text-xs mt-1" style={{ color: 'var(--color-text-4)' }}>
+                    typical · range ${smartEstimate.lowRange.toLocaleString()}–${smartEstimate.highRange.toLocaleString()}
                   </div>
                 </div>
 
-                {/* Price range */}
-                <div className="grid grid-cols-3 gap-3 mb-4">
-                  {[
-                    { label: 'Low',     value: smartEstimate.lowRange,        color: '#34d399' },
-                    { label: 'Typical', value: smartEstimate.estimatedPrice,  color: '#fbbf24' },
-                    { label: 'High',    value: smartEstimate.highRange,       color: '#f87171' },
-                  ].map((r) => (
-                    <div
-                      key={r.label}
-                      className="rounded-xl p-3 text-center"
-                      style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border)' }}
-                    >
-                      <div className="text-lg font-bold" style={{ color: r.color }}>
-                        ${r.value.toLocaleString()}
+                {/* Labor vs parts split */}
+                {(() => {
+                  const labor = Math.max(0, Math.min(100, smartEstimate.laborPercent ?? 60));
+                  const parts = 100 - labor;
+                  const laborUsd = Math.round(smartEstimate.estimatedPrice * (labor / 100));
+                  const partsUsd = smartEstimate.estimatedPrice - laborUsd;
+                  return (
+                    <div className="mb-4">
+                      <div className="flex justify-between text-xs mb-1.5">
+                        <span style={{ color: '#818cf8' }}>Labor ~${laborUsd.toLocaleString()}</span>
+                        <span style={{ color: '#34d399' }}>Parts ~${partsUsd.toLocaleString()}</span>
                       </div>
-                      <div className="text-xs mt-0.5" style={{ color: 'var(--color-text-4)' }}>{r.label}</div>
+                      <div className="flex" style={{ height: 6, borderRadius: 3, overflow: 'hidden', background: 'rgba(255,255,255,0.08)' }}>
+                        <div style={{ width: `${labor}%`, background: '#6366f1' }} />
+                        <div style={{ width: `${parts}%`, background: '#34d399' }} />
+                      </div>
+                      <p className="text-[10px] mt-1" style={{ color: 'var(--color-text-4)' }}>
+                        Typical labor/parts split — actual split varies by contractor
+                      </p>
                     </div>
-                  ))}
-                </div>
+                  );
+                })()}
 
                 {/* Complexity bar */}
-                <div className="mb-3">
+                <div className="mb-4">
                   <div className="flex justify-between text-xs mb-1.5" style={{ color: 'var(--color-text-4)' }}>
                     <span>Job Complexity</span>
                     <span style={{ color: smartEstimate.complexity > 70 ? '#f87171' : smartEstimate.complexity > 40 ? '#fbbf24' : '#34d399' }}>
@@ -1258,10 +1298,44 @@ Rules: 1-3 likelyCauses, ordered most-likely first. 2-3 checkFirst items. Keep e
                   </div>
                 </div>
 
+                {/* Cost-driving risks (surfaced from the estimate — previously dropped) */}
+                {smartEstimate.riskFactors && smartEstimate.riskFactors.length > 0 && (
+                  <div className="mb-3 space-y-1.5">
+                    <p className="text-xs font-semibold" style={{ color: 'var(--color-text-3)' }}>What could push it higher</p>
+                    {smartEstimate.riskFactors.map((rf, i) => (
+                      <div key={i} className="flex items-start gap-2 text-xs" style={{ color: 'var(--color-text-4)' }}>
+                        <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-0.5" style={{ color: '#fbbf24' }} />
+                        <span className="leading-relaxed">{rf}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Possible add-ons */}
+                {smartEstimate.additionalCosts && smartEstimate.additionalCosts.length > 0 && (
+                  <div className="mb-3 flex flex-wrap gap-1.5">
+                    {smartEstimate.additionalCosts.map((ac, i) => (
+                      <span
+                        key={i}
+                        className="text-[11px] px-2 py-0.5 rounded-lg"
+                        style={{ background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.2)', color: '#fbbf24' }}
+                      >
+                        {ac}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* AI insights — show all lines (explanation + thing to know), not just the first */}
                 {smartEstimate.aiInsights && (
-                  <p className="text-xs leading-relaxed" style={{ color: 'var(--color-text-4)' }}>
-                    {smartEstimate.aiInsights.split('\n')[0]}
-                  </p>
+                  <div className="space-y-1.5">
+                    {smartEstimate.aiInsights.split('\n').filter((l) => l.trim()).map((line, i) => (
+                      <p key={i} className="text-xs leading-relaxed flex items-start gap-1.5" style={{ color: 'var(--color-text-4)' }}>
+                        <span style={{ color: '#34d399' }}>{i === 0 ? '💡' : 'ℹ️'}</span>
+                        <span>{line}</span>
+                      </p>
+                    ))}
+                  </div>
                 )}
               </div>
             )}

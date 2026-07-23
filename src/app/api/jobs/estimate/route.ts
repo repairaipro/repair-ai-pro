@@ -93,6 +93,9 @@ export async function POST(request: NextRequest) {
     // Use OpenAI to refine estimate with context
     let refinedEstimate = estimate.estimatedPrice;
     let aiInsights = '';
+    // Typical share of the total that is labor (vs. parts/materials). Defaults
+    // to 60% labor — a reasonable service-trade average — until the AI refines it.
+    let laborPercent = 60;
 
     try {
       if (openaiClient) {
@@ -125,6 +128,7 @@ Based on the complexity factors indicated by their answers, should we adjust the
 Return ONLY a JSON object with this exact shape, no markdown:
 {
   "refinedEstimate": number,   // your adjusted single-number estimate in USD, e.g. 275
+  "laborPercent": number,      // typical share of the total that is labor vs parts, 0-100 (most service jobs are 50-75)
   "explanation": string,       // 1-2 sentences on why you adjusted (or didn't) it
   "thingToKnow": string        // one thing the homeowner should know before scheduling
 }`,
@@ -134,10 +138,13 @@ Return ONLY a JSON object with this exact shape, no markdown:
         });
 
         const raw = response.choices[0]?.message?.content ?? '{}';
-        const parsed = JSON.parse(raw) as { refinedEstimate?: number; explanation?: string; thingToKnow?: string };
+        const parsed = JSON.parse(raw) as { refinedEstimate?: number; laborPercent?: number; explanation?: string; thingToKnow?: string };
 
         if (typeof parsed.refinedEstimate === 'number' && parsed.refinedEstimate > 0) {
           refinedEstimate = Math.round(parsed.refinedEstimate);
+        }
+        if (typeof parsed.laborPercent === 'number' && parsed.laborPercent >= 0 && parsed.laborPercent <= 100) {
+          laborPercent = Math.round(parsed.laborPercent);
         }
         aiInsights = [parsed.explanation, parsed.thingToKnow].filter(Boolean).join('\n');
       }
@@ -153,6 +160,7 @@ Return ONLY a JSON object with this exact shape, no markdown:
         estimatedPrice: refinedEstimate,
         lowRange: Math.round(refinedEstimate * 0.85),
         highRange: Math.round(refinedEstimate * 1.15),
+        laborPercent,
       },
       aiInsights,
     });
