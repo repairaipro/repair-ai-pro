@@ -55,6 +55,14 @@ const AUTOMOTIVE_TRADES = new Set([
   "auto glass",
 ]);
 
+/** Normalizes a price into a display string. The model may hand back "$60–$150",
+ *  a bare number (150), or nothing — none of which should drop the part. */
+function coercePrice(v: any): string {
+  if (typeof v === "string") return v.trim();
+  if (typeof v === "number" && Number.isFinite(v)) return `$${Math.round(v)}`;
+  return "";
+}
+
 function sourcingFor(trade: string): string {
   const t = trade.toLowerCase().trim();
   if (AUTOMOTIVE_TRADES.has(t)) return TRADE_SOURCING.automotive;
@@ -110,70 +118,80 @@ export async function POST(req: Request) {
       `"searchQuery": "string optimized so a retailer search lands on the exact fitment/model", ` +
       `"partNumber": "string OEM/standard part number, or empty string if none" }`;
 
-    // Vision-capable message when a photo exists so the model can literally
-    // see the failed component; plain text otherwise.
-    const userContent: any = imageUrl
-      ? [
-          { type: "text", text: textInstruction },
-          { type: "image_url", image_url: { url: imageUrl } },
-        ]
-      : textInstruction;
+    const systemContent =
+      "You are a master parts specialist for the skilled trades. You are given a CONFIRMED diagnosis and must " +
+      "list the specific parts required to fix THAT problem — every part must tie back to the diagnosis, never " +
+      "generic filler for the trade. Be specific: name the dominant brand and model, include sizes/specs/fitment " +
+      "when inferable, and give an OEM or standard part number when one exists. " +
+      "NEVER fabricate identifying details (a vehicle year/make/model, an appliance model number, a specific brand) " +
+      "that are not present in the input — if they're missing, keep the part generic and say what's needed to " +
+      "confirm exact fitment. " +
+      "If a photo is attached it is only a refinement aid: use it to confirm the failed component when it clearly " +
+      "shows one, but if it is blurry, partial, or does not clearly show the part, IGNORE it and rely on the " +
+      "diagnosis. ALWAYS return 4-6 parts based on the diagnosis and details — never return fewer parts or an empty " +
+      "list because of the photo. " +
+      sourcingFor(trade) +
+      " The searchQuery field is what gets typed into that retailer's search — make it land on the exact product, " +
+      'not a category page. Respond with a JSON object of the form { "parts": [ ... ] } and nothing else.';
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
-      temperature: 0.3,
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are a master parts specialist for the skilled trades. You are given a CONFIRMED diagnosis and must " +
-            "list the specific parts required to fix THAT problem — every part must tie back to the diagnosis, never " +
-            "generic filler for the trade. Be specific: name the dominant brand and model, include sizes/specs/fitment " +
-            "when inferable, and give an OEM or standard part number when one exists. " +
-            "NEVER fabricate identifying details (a vehicle year/make/model, an appliance model number, a specific brand) " +
-            "that are not present in the input — if they're missing, keep the part generic and say what's needed to " +
-            "confirm exact fitment. " +
-            sourcingFor(trade) +
-            " The searchQuery field is what gets typed into that retailer's search — make it land on the exact product, " +
-            'not a category page. Respond with a JSON object of the form { "parts": [ ... ] } and nothing else.',
-        },
-        { role: "user", content: userContent },
-      ],
-    });
+    // One completion → parsed, coerced, validated parts. `useImage` toggles the
+    // vision path so we can retry text-only if a photo yields nothing.
+    async function runParts(useImage: boolean): Promise<Part[]> {
+      const userContent: any = useImage && imageUrl
+        ? [
+            { type: "text", text: textInstruction },
+            { type: "image_url", image_url: { url: imageUrl } },
+          ]
+        : textInstruction;
 
-    const raw = completion.choices[0]?.message?.content ?? "{}";
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        temperature: 0.3,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: systemContent },
+          { role: "user", content: userContent },
+        ],
+      });
 
-    // Model is pinned to JSON-object output; read the parts array from it, with
-    // a bare-array fallback in case a stray response slips through.
-    let parts: Part[] = [];
-    try {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) parts = parsed;
-      else if (Array.isArray(parsed?.parts)) parts = parsed.parts;
-    } catch {
-      const match = raw.match(/\[[\s\S]*\]/);
-      if (match) { try { parts = JSON.parse(match[0]); } catch { parts = []; } }
+      const raw = completion.choices[0]?.message?.content ?? "{}";
+
+      // Model is pinned to JSON-object output; read the parts array from it,
+      // with a bare-array fallback in case a stray response slips through.
+      let parsedParts: any[] = [];
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) parsedParts = parsed;
+        else if (Array.isArray(parsed?.parts)) parsedParts = parsed.parts;
+      } catch {
+        const match = raw.match(/\[[\s\S]*\]/);
+        if (match) { try { parsedParts = JSON.parse(match[0]); } catch { parsedParts = []; } }
+      }
+
+      // Validate + COERCE. Only a usable name is required; everything else is
+      // normalized rather than used to drop the part. The model sometimes
+      // returns a bare number for estimatedPrice (e.g. 150) — especially in
+      // vision mode — which used to silently filter every part out. Now a
+      // number becomes "$150" instead.
+      return parsedParts
+        .filter((p) => !!p && typeof p === "object" && typeof p.name === "string" && p.name.trim().length > 0)
+        .map((p) => ({
+          name: p.name.trim(),
+          estimatedPrice: coercePrice(p.estimatedPrice),
+          why: typeof p.why === "string" ? p.why : "",
+          searchQuery: typeof p.searchQuery === "string" && p.searchQuery.trim() ? p.searchQuery : undefined,
+          partNumber: typeof p.partNumber === "string" && p.partNumber.trim() ? p.partNumber : undefined,
+        }))
+        .slice(0, 6);
     }
 
-    // Validate shape (searchQuery/partNumber are optional enrichments)
-    const validated: Part[] = parts
-      .filter(
-        (p): p is Part =>
-          typeof p === "object" &&
-          p !== null &&
-          typeof p.name === "string" &&
-          typeof p.estimatedPrice === "string" &&
-          typeof p.why === "string"
-      )
-      .map((p) => ({
-        name: p.name,
-        estimatedPrice: p.estimatedPrice,
-        why: p.why,
-        searchQuery: typeof p.searchQuery === "string" && p.searchQuery.trim() ? p.searchQuery : undefined,
-        partNumber: typeof p.partNumber === "string" && p.partNumber.trim() ? p.partNumber : undefined,
-      }))
-      .slice(0, 6);
+    // Try the vision path first when a photo exists. If an unhelpful photo
+    // yields nothing, fall back to a text-only run so we never show an empty
+    // parts list just because the picture was bad.
+    let validated = await runParts(Boolean(imageUrl));
+    if (validated.length === 0 && imageUrl) {
+      validated = await runParts(false);
+    }
 
     return NextResponse.json({ parts: validated });
   } catch (e: any) {
