@@ -41,10 +41,21 @@ import { getRetailersForTrade } from "@/lib/partsRetailers";
 type UrgencyLevel = "emergency" | "soon" | "flexible";
 type InputMode = "speak" | "photo" | "type";
 
+type LikelyCause = {
+  cause: string;
+  likelihood: "most likely" | "possible" | "less likely";
+};
+
 type AIAnalysis = {
   trade: string;
   severity: "low" | "moderate" | "high" | "emergency";
   summary: string;
+  /** Ranked differential: the primary suspect plus alternatives worth ruling out. */
+  likelyCauses?: LikelyCause[];
+  /** What a pro inspects first to confirm the diagnosis. */
+  checkFirst?: string[];
+  /** A short safety/urgency warning (gas, water, electrical, drivability), or null. */
+  safetyFlag?: string | null;
   clarifyingQuestions?: string[];
   confidence?: "high" | "medium" | "low";
 };
@@ -91,6 +102,18 @@ const SEVERITY_STYLES: Record<string, { bg: string; border: string; text: string
   moderate:  { bg: "rgba(245,158,11,0.08)", border: "rgba(245,158,11,0.25)", text: "#fbbf24", icon: <AlertTriangle className="w-3.5 h-3.5" /> },
   high:      { bg: "rgba(249,115,22,0.08)", border: "rgba(249,115,22,0.25)", text: "#fb923c", icon: <AlertTriangle className="w-3.5 h-3.5" /> },
   emergency: { bg: "rgba(239,68,68,0.08)",  border: "rgba(239,68,68,0.25)",  text: "#f87171", icon: <AlertTriangle className="w-3.5 h-3.5" /> },
+};
+
+const CONFIDENCE_STYLES: Record<string, { label: string; bg: string; border: string; text: string }> = {
+  high:   { label: "High confidence",   bg: "rgba(16,185,129,0.08)", border: "rgba(16,185,129,0.25)", text: "#34d399" },
+  medium: { label: "Medium confidence", bg: "rgba(245,158,11,0.08)", border: "rgba(245,158,11,0.25)", text: "#fbbf24" },
+  low:    { label: "Low confidence",    bg: "rgba(148,163,184,0.1)", border: "rgba(148,163,184,0.25)", text: "#94a3b8" },
+};
+
+const LIKELIHOOD_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
+  "most likely": { bg: "rgba(99,102,241,0.15)",  text: "#a5b4fc", dot: "#6366f1" },
+  "possible":    { bg: "rgba(148,163,184,0.12)", text: "#cbd5e1", dot: "#94a3b8" },
+  "less likely": { bg: "rgba(148,163,184,0.08)", text: "#94a3b8", dot: "#64748b" },
 };
 
 const EMERGENCY_FEE = 35;
@@ -367,21 +390,26 @@ export default function NewJobPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: `You are diagnosing a home repair problem. The customer describes: "${description.trim()}".
+          message: `You are an expert tradesperson diagnosing a repair problem for a homeowner. The customer describes: "${description.trim()}".${imagePreview ? ' A photo is attached — use it.' : ''}
 
-First, identify the trade. Then assess if you have enough information to diagnose accurately.
-If uncertain about the diagnosis (could be multiple issues), ask 2-3 clarifying questions.
+Diagnose it the way a seasoned pro would: identify the trade, give your best diagnosis, then the ranked likely causes (the primary suspect plus alternatives worth ruling out), what a pro would physically check first to confirm, and any safety or urgency warning. If you genuinely can't tell between distinct problems, ask 2-3 clarifying questions.
 
 Respond with ONLY a JSON object:
 {
   "trade": "<best matching trade from: ${TRADES_FOR_PROMPT}>",
   "severity": "<low|moderate|high|emergency>",
-  "summary": "<1-2 sentence diagnosis>",
+  "summary": "<1-2 sentence plain-language diagnosis>",
+  "likelyCauses": [
+    { "cause": "<short cause>", "likelihood": "most likely" },
+    { "cause": "<alternative cause>", "likelihood": "possible" }
+  ],
+  "checkFirst": ["<thing a pro inspects first>", "<second thing>"],
+  "safetyFlag": "<one short safety/urgency warning if relevant (gas, live electrical, water damage, unsafe to drive), else null>",
   "clarifyingQuestions": ["<question 1>", "<question 2>"],
   "confidence": "<high|medium|low>"
 }
 
-CRITICAL: If you're not confident, ask clarifying questions rather than guessing. Better to ask than to misdiagnose.`,
+Rules: 1-3 likelyCauses, ordered most-likely first. 2-3 checkFirst items. Keep every string short and jargon-light. Set safetyFlag to null when nothing is unsafe. If you're not confident, still give your best likelyCauses AND ask clarifying questions — never fabricate certainty.`,
           imageUrl: imagePreview,
           mode: "homeowner",
         }),
@@ -932,13 +960,90 @@ CRITICAL: If you're not confident, ask clarifying questions rather than guessing
 
               <p className="text-sm leading-relaxed" style={{ color: 'var(--color-text-2)' }}>{analysis.summary}</p>
 
-              {sev && (
+              {/* Severity + confidence badges */}
+              <div className="flex flex-wrap items-center gap-2">
+                {sev && (
+                  <div
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold"
+                    style={{ background: sev.bg, border: `1px solid ${sev.border}`, color: sev.text }}
+                  >
+                    {sev.icon}
+                    {analysis.severity.charAt(0).toUpperCase() + analysis.severity.slice(1)} Severity
+                  </div>
+                )}
+                {analysis.confidence && CONFIDENCE_STYLES[analysis.confidence] && (
+                  <div
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold"
+                    style={{
+                      background: CONFIDENCE_STYLES[analysis.confidence].bg,
+                      border: `1px solid ${CONFIDENCE_STYLES[analysis.confidence].border}`,
+                      color: CONFIDENCE_STYLES[analysis.confidence].text,
+                    }}
+                  >
+                    <Brain className="w-3.5 h-3.5" />
+                    {CONFIDENCE_STYLES[analysis.confidence].label}
+                  </div>
+                )}
+              </div>
+
+              {/* Safety / urgency flag */}
+              {analysis.safetyFlag && (
                 <div
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold"
-                  style={{ background: sev.bg, border: `1px solid ${sev.border}`, color: sev.text }}
+                  className="flex items-start gap-2 rounded-lg p-3"
+                  style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)' }}
                 >
-                  {sev.icon}
-                  {analysis.severity.charAt(0).toUpperCase() + analysis.severity.slice(1)} Severity
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#f87171' }} />
+                  <p className="text-xs leading-relaxed" style={{ color: '#fca5a5' }}>
+                    <span className="font-semibold">Safety:</span> {analysis.safetyFlag}
+                  </p>
+                </div>
+              )}
+
+              {/* Ranked likely causes */}
+              {analysis.likelyCauses && analysis.likelyCauses.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold" style={{ color: 'var(--color-text-3)' }}>Likely causes</p>
+                  <div className="space-y-1.5">
+                    {analysis.likelyCauses.map((lc, i) => {
+                      const ls = LIKELIHOOD_STYLES[lc.likelihood] ?? LIKELIHOOD_STYLES.possible;
+                      return (
+                        <div
+                          key={i}
+                          className="flex items-center justify-between gap-3 rounded-lg px-3 py-2"
+                          style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border)' }}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: ls.dot }} />
+                            <span className="text-sm truncate" style={{ color: 'var(--color-text-2)' }}>{lc.cause}</span>
+                          </div>
+                          <span
+                            className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 whitespace-nowrap"
+                            style={{ background: ls.bg, color: ls.text }}
+                          >
+                            {lc.likelihood}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* What a pro checks first */}
+              {analysis.checkFirst && analysis.checkFirst.length > 0 && (
+                <div
+                  className="rounded-lg p-3 space-y-2"
+                  style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)' }}
+                >
+                  <p className="text-xs font-semibold" style={{ color: '#a5b4fc' }}>🔍 What a pro checks first</p>
+                  <ul className="space-y-1">
+                    {analysis.checkFirst.map((c, i) => (
+                      <li key={i} className="flex items-start gap-2 text-xs" style={{ color: 'var(--color-text-3)' }}>
+                        <span style={{ color: '#818cf8' }}>{i + 1}.</span>
+                        <span className="leading-relaxed">{c}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               )}
 
