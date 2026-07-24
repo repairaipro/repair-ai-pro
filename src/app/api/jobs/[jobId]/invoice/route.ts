@@ -5,6 +5,9 @@ import { getStripe } from '@/lib/stripe';
 import { FieldValue } from 'firebase-admin/firestore';
 import { sendInvoiceEmail, APP_URL } from '@/lib/email';
 
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { jobId: string } }

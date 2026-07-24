@@ -150,5 +150,8 @@ async function run(req: Request) {
 }
 
 // Vercel Cron sends GET; manual/CI triggers may POST
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function GET(req: Request)  { return run(req); }
 export async function POST(req: Request) { return run(req); }

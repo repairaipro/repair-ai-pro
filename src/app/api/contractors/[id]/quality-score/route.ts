@@ -7,6 +7,9 @@ import { adminAuth } from '@/lib/firebaseAdmin';
  * Get quality score for a contractor
  * If not cached, calculates on the fly
  */
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }

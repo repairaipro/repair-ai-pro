@@ -9,6 +9,9 @@ import type { WorkPhoto } from '@/types/firestore';
  * Contractor: see own photos + homeowner's dispute photos
  * Homeowner: see all photos after job completion
  */
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { jobId: string } }

@@ -62,5 +62,8 @@ async function run(req: Request) {
   return NextResponse.json({ success: true, scanned: snap.size, synced, failed });
 }
 
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function GET(req: Request)  { return run(req); }
 export async function POST(req: Request) { return run(req); }

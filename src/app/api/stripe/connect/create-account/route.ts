@@ -12,6 +12,9 @@ import { FieldValue } from "firebase-admin/firestore";
  * Contractor visits this endpoint, gets redirected to Stripe's hosted onboarding form.
  * After completing KYC, Stripe redirects back to the return URL with account setup.
  */
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function POST(req: Request) {
   try {
     // Auth check

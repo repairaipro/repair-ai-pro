@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth, adminDb } from '@/lib/firebaseAdmin';
 import { FieldValue } from 'firebase-admin/firestore';
 
+// Reads the Authorization header per-request, so it can't be statically
+// prerendered — declaring it dynamic silences the build-time warning.
+export const dynamic = "force-dynamic";
+
 const PLATFORM_FEE = 0.10; // 10% platform cut
 
 type MonthBucket = {

@@ -25,6 +25,9 @@ const MAX_QUEUE_SIZE = 5;
  *   subscription tier: pro=15, elite=20, free=0
  *   jobsCompleted:     min(jobs/10, 10) = max 10 pts (caps at 100 jobs)
  */
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function POST(
   req: Request,
   { params }: { params: { jobId: string } }

@@ -10,6 +10,9 @@ interface OnboardingTask {
   reward?: number; // Credits awarded on completion
 }
 
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function GET(req: Request) {
   try {
     const header = req.headers.get("authorization") ?? "";

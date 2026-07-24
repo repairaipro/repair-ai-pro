@@ -18,6 +18,9 @@ import { rateLimit, rateLimitResponse } from '@/lib/rateLimit';
  * Body: { jobId: string }
  * Returns: { amount, etaDays, message, reasoning, priceRange, confidence }
  */
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function POST(req: Request) {
   const rl = rateLimit(req, 'bid-writer', 15, 60_000);
   if (!rl.ok) return rateLimitResponse(rl);

@@ -11,6 +11,9 @@ interface AvailabilityBlock {
  * GET /api/contractors/[contractorId]/availability
  * Returns contractor's availability blocks for the next 90 days
  */
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function GET(
   req: Request,
   { params }: { params: { id: string } }

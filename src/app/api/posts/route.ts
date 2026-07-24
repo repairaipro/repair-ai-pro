@@ -17,6 +17,9 @@ import { rateLimit, rateLimitResponse } from "@/lib/rateLimit";
  * Body: { caption, trade, photos: string[] (1-4 urls), beforeAfter?: boolean }
  * Auth: contractor (must have a contractor profile)
  */
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function POST(req: Request) {
   try {
     const header = req.headers.get("authorization") ?? "";

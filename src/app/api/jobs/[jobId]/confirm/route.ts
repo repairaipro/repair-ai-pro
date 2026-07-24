@@ -36,6 +36,9 @@ async function recordPricingHistory(
  * Equivalent to calling /progress with nextStatus=confirmed —
  * this endpoint exists as a convenience alias used by older components.
  */
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function POST(
   req: Request,
   { params }: { params: { jobId: string } }

@@ -11,6 +11,9 @@ const CREDIT_AMOUNT = 20;
  * Body: { code: string }
  * Auth: Bearer token (the NEW user who was referred)
  */
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function POST(req: Request) {
   try {
     // 1. Verify Bearer auth

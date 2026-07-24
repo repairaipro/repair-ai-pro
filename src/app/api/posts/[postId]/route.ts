@@ -5,6 +5,9 @@ import { adminDb, adminAuth } from "@/lib/firebaseAdmin";
  * GET /api/posts/[postId] — single post (public).
  * Optional auth → likedByMe. Used by the /work/[postId] permalink page.
  */
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function GET(
   req: Request,
   { params }: { params: { postId: string } }

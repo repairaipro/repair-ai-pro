@@ -22,6 +22,9 @@ async function getUid(req: Request): Promise<string | null> {
   }
 }
 
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function POST(req: Request) {
   const uid = await getUid(req);
   if (!uid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

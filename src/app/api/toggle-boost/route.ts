@@ -11,6 +11,9 @@ async function getUid(req: Request) {
   return decoded.uid;
 }
 
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function POST(req: Request) {
   try {
     const uid = await getUid(req);

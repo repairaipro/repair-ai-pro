@@ -30,6 +30,9 @@ import { openai as openaiClient } from '@/lib/openaiClient';
  * - Affiliate links with commission tracking
  * - Liability disclaimers
  */
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { jobId: string } }

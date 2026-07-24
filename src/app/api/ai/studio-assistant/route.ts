@@ -13,6 +13,9 @@ type Message = { role: 'user' | 'assistant'; content: string };
  *
  * Body: { messages: Message[], refreshContext?: boolean }
  */
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function POST(req: Request) {
   const rl = rateLimit(req, 'studio-assistant', 20, 60_000);
   if (!rl.ok) return rateLimitResponse(rl);

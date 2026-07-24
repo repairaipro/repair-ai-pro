@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth, adminDb } from '@/lib/firebaseAdmin';
 
 // GET /api/invoices — list all invoices for the authenticated contractor
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('Authorization');

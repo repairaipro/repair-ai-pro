@@ -9,6 +9,9 @@ const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
  * POST /api/contractors/[contractorId]/working-hours
  * Body: { workingHours, bufferMinutes, defaultJobDurationMinutes, autoAcceptBookings }
  */
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function POST(
   req: Request,
   { params }: { params: { id: string } }

@@ -5,6 +5,9 @@ import { FieldValue } from 'firebase-admin/firestore';
 const ADMIN_UIDS = (process.env.ADMIN_UIDS || '').split(',').map((s) => s.trim()).filter(Boolean);
 
 // POST — admin approves or rejects a contractor's verification
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get('Authorization');

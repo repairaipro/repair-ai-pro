@@ -8,6 +8,9 @@ import { FieldValue } from "firebase-admin/firestore";
  * Creates or retrieves a referral code for the authenticated user.
  * Auth: Bearer token (any authenticated user)
  */
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function GET(req: Request) {
   try {
     // 1. Verify Bearer auth

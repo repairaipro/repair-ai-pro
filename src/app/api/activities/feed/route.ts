@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { adminDb, adminAuth } from "@/lib/firebaseAdmin";
 
+// Reads the Authorization header per-request, so it can't be statically
+// prerendered — declaring it dynamic silences the build-time warning.
+export const dynamic = "force-dynamic";
+
 export async function GET(req: Request) {
   try {
     const header = req.headers.get("authorization") ?? "";

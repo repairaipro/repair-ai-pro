@@ -24,6 +24,9 @@ async function displayName(uid: string, fallbackEmail?: string): Promise<string>
  * GET — current state for the signed-in viewer (or just the count anonymously)
  */
 
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function POST(
   req: Request,
   { params }: { params: { id: string } }

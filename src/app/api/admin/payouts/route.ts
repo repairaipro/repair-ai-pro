@@ -24,6 +24,9 @@ async function isAdmin(req: Request): Promise<boolean> {
  *
  * Also computes platform fee revenue (total released minus total payouts).
  */
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function GET(req: Request) {
   if (!(await isAdmin(req))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });

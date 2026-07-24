@@ -38,6 +38,9 @@ async function resolveAuthor(uid: string, cache: Map<string, AuthorInfo>): Promi
 /** GET /api/posts/[postId]/comments
  * ?parentId=  → fetch replies for a specific comment (pagination)
  */
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function GET(
   req: Request,
   { params }: { params: { postId: string } }

@@ -10,6 +10,9 @@ import { createNotification } from '@/lib/notif';
  *  - accept/decline: only the OTHER participant (not the proposer) on a "proposed" appointment
  *  - cancel: either participant, only on an "accepted" appointment
  */
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function PATCH(
   req: Request,
   { params }: { params: { jobId: string; appointmentId: string } }

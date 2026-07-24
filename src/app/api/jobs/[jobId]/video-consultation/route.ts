@@ -14,6 +14,9 @@ import { FieldValue } from 'firebase-admin/firestore';
  * GET  — fetch all consultations for a job
  */
 
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { jobId: string } }

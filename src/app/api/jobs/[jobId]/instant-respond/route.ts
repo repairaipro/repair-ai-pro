@@ -16,6 +16,9 @@ const OFFER_TIMEOUT_MINUTES = 15;
  * Decline (or expired) → try next contractor in queue
  * Queue exhausted → job falls back to regular marketplace bidding
  */
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function POST(
   req: Request,
   { params }: { params: { jobId: string } }

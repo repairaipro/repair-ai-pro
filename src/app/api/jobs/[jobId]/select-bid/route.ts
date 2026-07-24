@@ -4,6 +4,9 @@ import { adminDb, adminAuth } from "@/lib/firebaseAdmin";
 import { sendSMS } from "@/lib/sms";
 import { createNotification } from "@/lib/notif";
 
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function POST(
   req: Request,
   { params }: { params: { jobId: string } }

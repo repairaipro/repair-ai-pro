@@ -3,6 +3,9 @@ import { adminDb, adminAuth } from "@/lib/firebaseAdmin";
 
 const GOOGLE_API_KEY = process.env.GOOGLE_PLACES_API_KEY!;
 
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function GET(req: Request) {
   try {
     // Admin-only: this endpoint makes paid Google Places calls + mass Firestore writes

@@ -3,6 +3,9 @@ import { adminDb, verifyAuthToken } from "@/lib/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
 import { trackEvent } from "@/lib/funnel";
 
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function POST(req: Request) {
   try {
     const decoded = await verifyAuthToken(req).catch(() => null);

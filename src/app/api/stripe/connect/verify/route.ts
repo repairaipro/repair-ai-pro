@@ -10,6 +10,9 @@ import { FieldValue } from "firebase-admin/firestore";
  * Checks if the contractor's Stripe Connect account is fully set up.
  * Updates contractor profile with verification status.
  */
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function GET(req: Request) {
   try {
     // Auth check

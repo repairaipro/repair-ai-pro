@@ -8,6 +8,9 @@ import { adminDb, adminAuth } from "@/lib/firebaseAdmin";
  * pipeline, reputation, and audience so the command center renders fast.
  * Auth: Bearer token (the contractor).
  */
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function GET(req: Request) {
   try {
     const header = req.headers.get("authorization") ?? "";

@@ -11,6 +11,9 @@ import { fetchIcalBusyBlocks } from '@/lib/icalSync';
  * fresh cache of busy blocks. The slots API reads the cache directly
  * (fast); a cron job refreshes it periodically in the background.
  */
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function POST(
   req: Request,
   { params }: { params: { id: string } }

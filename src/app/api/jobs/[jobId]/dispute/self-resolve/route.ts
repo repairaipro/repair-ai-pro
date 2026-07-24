@@ -6,6 +6,9 @@ import { FieldValue } from 'firebase-admin/firestore';
 type ResolutionAction = 'request_redo' | 'accept_partial' | 'accept_full_refund' | 'escalate_admin' | 'release_payment';
 
 // POST — homeowner or contractor self-resolves without waiting for admin
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { jobId: string } }

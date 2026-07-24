@@ -4,6 +4,9 @@ import { openai } from '@/lib/openaiClient';
 import { FieldValue } from 'firebase-admin/firestore';
 
 // POST — run GPT-4o Vision comparison between completion photos and dispute evidence
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { jobId: string } }

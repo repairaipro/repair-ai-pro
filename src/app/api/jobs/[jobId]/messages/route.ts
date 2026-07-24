@@ -7,6 +7,9 @@ import { rateLimit, rateLimitResponse } from '@/lib/rateLimit';
  * GET /api/jobs/[jobId]/messages
  * Fetch all messages for a job (paginated, last 50)
  */
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function GET(
   req: Request,
   { params }: { params: { jobId: string } }

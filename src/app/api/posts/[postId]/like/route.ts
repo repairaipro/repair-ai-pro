@@ -7,6 +7,9 @@ import { notifyPostLiked } from "@/lib/notif";
  * POST /api/posts/[postId]/like — toggle like (auth required)
  * Returns { liked, likeCount }
  */
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function POST(
   req: Request,
   { params }: { params: { postId: string } }

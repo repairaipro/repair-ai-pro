@@ -12,6 +12,9 @@ import { generateRtcToken, uidFromFirebaseUid, AGORA_APP_ID } from '@/lib/agora'
  * Both the homeowner and contractor call this endpoint.
  * The token is scoped to the consultation's channel (consultId) and expires in 1h.
  */
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get('Authorization');

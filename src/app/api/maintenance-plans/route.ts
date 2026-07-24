@@ -11,6 +11,9 @@ const FREQUENCY_MAP: Record<string, { interval: 'month' | 'year'; interval_count
 };
 
 // GET — list all maintenance plans for the authenticated homeowner
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('Authorization');

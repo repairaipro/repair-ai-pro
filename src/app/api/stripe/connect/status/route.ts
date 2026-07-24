@@ -7,6 +7,9 @@ import { adminDb, adminAuth } from "@/lib/firebaseAdmin";
  * Check if a contractor has a verified Stripe Connect account.
  * Returns: { verified: boolean, onboardingUrl?: string }
  */
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function GET(req: Request) {
   try {
     // Auth check

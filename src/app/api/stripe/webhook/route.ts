@@ -37,6 +37,9 @@ import { notifyPayoutFailed } from "@/lib/notif";
  *
  * In development (without STRIPE_WEBHOOK_SECRET), webhook will accept unsigned events.
  */
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function POST(req: Request) {
   const sig     = req.headers.get("stripe-signature") ?? "";
   const secret  = process.env.STRIPE_WEBHOOK_SECRET;

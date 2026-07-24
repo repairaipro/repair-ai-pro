@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { adminDb, adminAuth } from '@/lib/firebaseAdmin';
 
 /** GET — returns public social handles for a contractor */
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const snap = await adminDb.collection('contractors').doc(params.id).get();
   if (!snap.exists) return NextResponse.json({ error: 'Not found' }, { status: 404 });

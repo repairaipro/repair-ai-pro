@@ -8,6 +8,9 @@ import { FieldValue } from "firebase-admin/firestore";
  * Called by the homeowner when they're ready to secure payment.
  * Funds are captured but not transferred until job is confirmed.
  */
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function POST(req: Request) {
   try {
     // ── Auth ──────────────────────────────────────────────────────────────

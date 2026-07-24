@@ -131,6 +131,9 @@ const HOMEOWNER_PLANS: SubscriptionPlan[] = [
   },
 ];
 
+// Reads request.url per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);

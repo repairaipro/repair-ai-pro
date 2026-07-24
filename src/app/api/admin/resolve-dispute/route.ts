@@ -22,6 +22,9 @@ async function isAdmin(req: Request): Promise<boolean> {
  * mutual           → 50/50 or custom handling — mark disputed, notify both
  * invalid          → dismiss dispute, restore previous status
  */
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function POST(req: Request) {
   if (!(await isAdmin(req))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });

@@ -12,6 +12,9 @@ import { rateLimit, rateLimitResponse } from '@/lib/rateLimit';
  *   - Videos: /v2/post/publish/video/init/ → upload → /v2/post/publish/status/fetch/
  *   - Photos: /v2/post/publish/content/init/ (PHOTO type)
  */
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function POST(req: Request) {
   const rl = rateLimit(req, 'tt-publish', 10, 60_000);
   if (!rl.ok) return rateLimitResponse(rl);

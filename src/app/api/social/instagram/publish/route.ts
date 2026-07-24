@@ -13,6 +13,9 @@ import { rateLimit, rateLimitResponse } from '@/lib/rateLimit';
  *   2. Wait for container to be ready (video only)
  *   3. Publish the container
  */
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function POST(req: Request) {
   const rl = rateLimit(req, 'ig-publish', 10, 60_000);
   if (!rl.ok) return rateLimitResponse(rl);

@@ -20,6 +20,9 @@ async function verifyAuth(request: NextRequest): Promise<string | null> {
  * GET /api/jobs/estimate?trade=plumbing
  * Get questionnaire questions for a trade
  */
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;

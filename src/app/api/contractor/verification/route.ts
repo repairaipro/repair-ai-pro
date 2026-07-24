@@ -3,6 +3,9 @@ import { adminAuth, adminDb } from '@/lib/firebaseAdmin';
 import { FieldValue } from 'firebase-admin/firestore';
 
 // GET — contractor checks their own verification status
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('Authorization');

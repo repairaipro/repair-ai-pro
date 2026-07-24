@@ -15,6 +15,9 @@ import { FieldValue } from "firebase-admin/firestore";
  * Neither can cancel once in_progress — must open a dispute instead.
  * Neither can cancel a disputed, confirmed, verified, or already cancelled job.
  */
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function POST(
   req: Request,
   { params }: { params: { jobId: string } }

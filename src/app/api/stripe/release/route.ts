@@ -16,6 +16,9 @@ import { sendPayoutSentEmail } from "@/lib/email";
  * - Transfers to contractor's Connect account
  * - If STRIPE_INSTANT_PAYOUT=true, uses Stripe's instant payout feature
  */
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function POST(req: Request) {
   try {
     const header = req.headers.get("authorization") ?? "";

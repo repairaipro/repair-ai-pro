@@ -16,6 +16,9 @@ const REPORT_FEE_CENTS = 4900; // $49.00
  *
  * Auth: Bearer token (homeowner who owns the job)
  */
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function POST(
   req: Request,
   { params }: { params: { jobId: string } }

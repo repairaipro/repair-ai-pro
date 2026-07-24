@@ -29,6 +29,9 @@ const PLANS = {
   },
 } as const;
 
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function POST(req: Request) {
   try {
     const header = req.headers.get("authorization") ?? "";

@@ -19,6 +19,9 @@ const MAX_BASE64_LENGTH = 2_000_000;
  * diagnoses the likely cause — same pattern as /analyze-photos, but for
  * audio via GPT-4o's audio-input model instead of its vision model.
  */
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { jobId: string } }

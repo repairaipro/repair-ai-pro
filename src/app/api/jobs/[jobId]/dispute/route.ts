@@ -9,6 +9,9 @@ import { FieldValue } from "firebase-admin/firestore";
  * - Notifies both the homeowner and contractor via in-app + email
  * - Payment stays frozen (held but not captured) until admin resolves
  */
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function POST(
   req: Request,
   { params }: { params: { jobId: string } }

@@ -6,6 +6,9 @@ import { adminDb, adminAuth } from '@/lib/firebaseAdmin';
  * Returns aggregated social + marketplace analytics for the signed-in contractor.
  * Used by /studio/analytics page.
  */
+// Reads request headers per-request — declare dynamic so Next does not try to prerender it.
+export const dynamic = "force-dynamic";
+
 export async function GET(req: Request) {
   const token = (req.headers.get('authorization') ?? '').replace('Bearer ', '');
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
