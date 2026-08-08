@@ -79,3 +79,63 @@ export function setIsContractorCache(uid: string, value: boolean) {
     window.dispatchEvent(new CustomEvent(ROLE_CHANGED_EVENT, { detail: { uid, value } }));
   } catch { /* private browsing etc. — worst case, next reload picks it up */ }
 }
+
+export type ViewMode = 'homeowner' | 'contractor';
+const MODE_CHANGED_EVENT = 'repairai:active-mode-changed';
+const modeKey = (uid: string) => `active-mode:${uid}`;
+
+/**
+ * A single account can be BOTH a homeowner and a contractor — that's the
+ * intended design (the onboarding chooser literally says "you can always do
+ * both later"), not a bug. What was missing was a way to tell the UI which
+ * side you want to see *right now*.
+ *
+ * `isContractor` (above) is a CAPABILITY — does contractors/{uid} exist.
+ * This hook is the VIEW — which nav/dashboard the person is currently in.
+ * They only diverge for dual-role users; a homeowner-only account has no
+ * contractor view to switch to, and the toggle stays hidden for them.
+ *
+ * Persisted in localStorage (survives reloads/new tabs, unlike the
+ * sessionStorage capability cache) so picking "Contractor" sticks until you
+ * switch back, instead of resetting every time you navigate.
+ */
+export function useActiveMode(hasContractor: boolean): { mode: ViewMode; setMode: (m: ViewMode) => void } {
+  const { user } = useAuth();
+  const [mode, setModeState] = useState<ViewMode>('homeowner');
+
+  useEffect(() => {
+    if (!user) return;
+    const key = modeKey(user.uid);
+    const stored = localStorage.getItem(key) as ViewMode | null;
+    if (stored === 'contractor' && hasContractor) {
+      setModeState('contractor');
+    } else if (stored === 'homeowner') {
+      setModeState('homeowner');
+    } else {
+      // No explicit preference recorded yet. Default to whatever a
+      // contractor-only account was already seeing before this toggle
+      // existed — contractor nav — rather than surprising them with a
+      // homeowner nav on their next visit. A dual-role user who wants
+      // homeowner-first just has to switch once; after that it sticks.
+      setModeState(hasContractor ? 'contractor' : 'homeowner');
+    }
+
+    function onModeChanged(e: Event) {
+      const detail = (e as CustomEvent<{ uid: string; mode: ViewMode }>).detail;
+      if (detail?.uid === user.uid) setModeState(detail.mode);
+    }
+    window.addEventListener(MODE_CHANGED_EVENT, onModeChanged);
+    return () => window.removeEventListener(MODE_CHANGED_EVENT, onModeChanged);
+  }, [user, hasContractor]);
+
+  function setMode(m: ViewMode) {
+    if (!user) return;
+    try {
+      localStorage.setItem(modeKey(user.uid), m);
+      window.dispatchEvent(new CustomEvent(MODE_CHANGED_EVENT, { detail: { uid: user.uid, mode: m } }));
+    } catch { /* private browsing etc. */ }
+    setModeState(m);
+  }
+
+  return { mode, setMode };
+}

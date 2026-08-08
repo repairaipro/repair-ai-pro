@@ -5,17 +5,62 @@ import { useAuth } from '@/lib/auth';
 import { useEffect, useRef, useState } from 'react';
 import { collection, onSnapshot, query, where, orderBy, limit } from 'firebase/firestore';
 import { db } from '@/lib/db';
-import { useIsContractor } from '@/lib/useRole';
-import { Bell, LayoutDashboard, Briefcase, Users, LogOut, Plus, Menu, X, Inbox, Calendar, Clapperboard } from 'lucide-react';
+import { useIsContractor, useActiveMode } from '@/lib/useRole';
+import { Bell, LayoutDashboard, Briefcase, Users, LogOut, Plus, Menu, X, Inbox, Calendar, Clapperboard, HardHat, Home } from 'lucide-react';
 import NotificationCenter from '@/components/NotificationCenter';
 import ChatBubbleIcon from '@/components/ChatBubbleIcon';
 import ProfileMenu from '@/components/ProfileMenu.client';
 
 const ADMIN_UIDS = (process.env.NEXT_PUBLIC_ADMIN_UIDS ?? "").split(",").map(s => s.trim()).filter(Boolean);
 
+/** Compact two-way switch for dual-role accounts — the explicit "which side
+ * am I on right now" control that was missing entirely before. */
+function ModeToggle({ mode, setMode }: { mode: 'homeowner' | 'contractor'; setMode: (m: 'homeowner' | 'contractor') => void }) {
+  const options: { value: 'homeowner' | 'contractor'; label: string; icon: React.ReactNode }[] = [
+    { value: 'homeowner', label: 'Homeowner', icon: <Home className="w-3 h-3" /> },
+    { value: 'contractor', label: 'Contractor', icon: <HardHat className="w-3 h-3" /> },
+  ];
+  return (
+    <div
+      className="flex items-center p-0.5 rounded-full ml-1"
+      style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border)' }}
+      role="tablist"
+      aria-label="View as"
+    >
+      {options.map((o) => {
+        const active = mode === o.value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => setMode(o.value)}
+            title={`Switch to ${o.label} view`}
+            className="flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-semibold transition-all"
+            style={active
+              ? { background: o.value === 'contractor' ? 'rgba(52,211,153,0.15)' : 'rgba(99,102,241,0.15)', color: o.value === 'contractor' ? '#34d399' : '#a5b4fc' }
+              : { color: 'var(--color-text-4)' }}
+          >
+            {o.icon}
+            <span className="hidden lg:inline">{o.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function Header() {
   const { user, logout } = useAuth();
-  const { isContractor } = useIsContractor();
+  const { isContractor: hasContractor } = useIsContractor();
+  const { mode, setMode } = useActiveMode(hasContractor);
+  // The nav shows whichever side the person is currently viewing, not just
+  // whichever role they happen to hold — see useActiveMode for why those
+  // are different. `hasContractor` is the underlying capability (does a
+  // contractors/{uid} doc exist); `mode` is "homeowner" for everyone until
+  // a dual-role user explicitly switches, via the toggle below.
+  const isContractor = hasContractor && mode === 'contractor';
   const [unreadCount, setUnreadCount] = useState(0);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -162,6 +207,11 @@ export default function Header() {
                 {/* Notifications */}
                 <NotificationCenter />
 
+                {/* Homeowner/Contractor mode toggle — only shown once someone
+                    actually has both roles; a single-role account has nothing
+                    to switch to, so this stays out of their way entirely. */}
+                {hasContractor && <ModeToggle mode={mode} setMode={setMode} />}
+
                 {/* Profile menu — avatar, role badge, primary links, sign out */}
                 <div className="ml-1 pl-1.5" style={{ borderLeft: '1px solid var(--color-border)' }}>
                   <ProfileMenu isAdmin={isAdmin} />
@@ -249,6 +299,11 @@ export default function Header() {
                     {isContractor ? 'Contractor' : 'Homeowner'}
                   </span>
                 </div>
+              </div>
+            )}
+            {hasContractor && (
+              <div className="px-4 pb-2">
+                <ModeToggle mode={mode} setMode={setMode} />
               </div>
             )}
             {navLinks.map(({ href, label, icon: Icon, highlight }) => (

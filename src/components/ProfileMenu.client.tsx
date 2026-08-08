@@ -1,12 +1,13 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/lib/auth';
-import { useIsContractor } from '@/lib/useRole';
+import { useIsContractor, useActiveMode } from '@/lib/useRole';
 import {
   ChevronDown, LayoutDashboard, Briefcase, Plus, HardHat,
-  UserCircle2, LogOut, ShieldCheck,
+  UserCircle2, LogOut, ShieldCheck, Repeat,
 } from 'lucide-react';
 
 /**
@@ -20,7 +21,15 @@ import {
  */
 export default function ProfileMenu({ isAdmin }: { isAdmin: boolean }) {
   const { user, logout } = useAuth();
-  const { isContractor, roleLoaded } = useIsContractor();
+  const router = useRouter();
+  // hasContractor = capability (does contractors/{uid} exist). mode = which
+  // side is currently being viewed. They match for single-role accounts;
+  // for dual-role accounts the badge/links below must follow `mode` (what
+  // the header nav is showing right now), not the raw capability, or this
+  // menu would contradict the nav it's sitting right next to.
+  const { isContractor: hasContractor, roleLoaded } = useIsContractor();
+  const { mode, setMode } = useActiveMode(hasContractor);
+  const isContractor = hasContractor && mode === 'contractor';
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -105,23 +114,38 @@ export default function ProfileMenu({ isAdmin }: { isAdmin: boolean }) {
               Dashboard
             </MenuLink>
             {isContractor ? (
-              <>
-                <MenuLink href="/studio" icon={<Briefcase className="w-4 h-4" />} onClick={() => setOpen(false)}>
-                  Studio
-                </MenuLink>
-                <MenuLink href="/jobs/new" icon={<Plus className="w-4 h-4" />} onClick={() => setOpen(false)}>
-                  Post a job as homeowner
-                </MenuLink>
-              </>
+              <MenuLink href="/studio" icon={<Briefcase className="w-4 h-4" />} onClick={() => setOpen(false)}>
+                Studio
+              </MenuLink>
             ) : (
-              <>
-                <MenuLink href="/my-jobs" icon={<Briefcase className="w-4 h-4" />} onClick={() => setOpen(false)}>
-                  My Jobs
-                </MenuLink>
-                <MenuLink href="/onboarding/contractor" icon={<HardHat className="w-4 h-4" />} onClick={() => setOpen(false)}>
-                  Become a pro
-                </MenuLink>
-              </>
+              <MenuLink href="/my-jobs" icon={<Briefcase className="w-4 h-4" />} onClick={() => setOpen(false)}>
+                My Jobs
+              </MenuLink>
+            )}
+
+            {hasContractor ? (
+              // Already both — switch which side you're viewing, in place,
+              // instead of a link that would just navigate without telling
+              // the header nav to follow along.
+              <button
+                type="button"
+                onClick={() => {
+                  setMode(isContractor ? 'homeowner' : 'contractor');
+                  setOpen(false);
+                  router.push(isContractor ? '/jobs/new' : '/contractor-inbox');
+                }}
+                className="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-left transition-colors"
+                style={{ color: 'var(--color-text-2)' }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--color-surface-2)'; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+              >
+                <Repeat className="w-4 h-4" />
+                Switch to {isContractor ? 'homeowner' : 'contractor'} view
+              </button>
+            ) : (
+              <MenuLink href="/onboarding/contractor" icon={<HardHat className="w-4 h-4" />} onClick={() => setOpen(false)}>
+                Become a pro
+              </MenuLink>
             )}
             {isAdmin && (
               <MenuLink href="/admin" icon={<ShieldCheck className="w-4 h-4" />} onClick={() => setOpen(false)} accent="#fb923c">

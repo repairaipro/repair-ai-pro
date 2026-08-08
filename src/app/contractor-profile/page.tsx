@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { db } from "@/lib/db";
 import { useAuth } from "@/lib/auth";
+import { setIsContractorCache, useActiveMode, useIsContractor } from "@/lib/useRole";
 import { getTrustScore, getTrustTier } from "@/lib/matching";
 import BusinessImportWidget, { type ImportedBusiness } from "@/components/BusinessImportWidget";
 import { PortfolioManager } from "@/components/PortfolioManager";
@@ -109,7 +110,9 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 }
 
 export default function ContractorProfilePage() {
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
+  const { isContractor: hasContractor } = useIsContractor();
+  const { setMode } = useActiveMode(hasContractor);
   const [form, setForm] = useState<ProfileForm>(DEFAULT_FORM);
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saved" | "error">("idle");
@@ -117,6 +120,11 @@ export default function ContractorProfilePage() {
   const [photoUploading, setPhotoUploading] = useState(false);
   const [stats, setStats] = useState({ rating: 0, reviewCount: 0, jobsCompleted: 0, invitationAcceptCount: 0, invitationDeclineCount: 0 });
   const [authToken, setAuthToken] = useState('');
+  // Whether contractors/{uid} existed the moment this page loaded — distinguishes
+  // "editing your existing contractor profile" from "this save is about to turn
+  // a homeowner-only account into a dual-role account," which deserves a heads-up
+  // (see the banner below) rather than silently happening on any signed-in visit.
+  const [docExisted, setDocExisted] = useState<boolean | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -124,6 +132,7 @@ export default function ContractorProfilePage() {
     user.getIdToken().then((t: string) => setAuthToken(t));
     (async () => {
       const snap = await getDoc(doc(db, "contractors", user.uid));
+      setDocExisted(snap.exists());
       if (snap.exists()) {
         const d = snap.data() as any;
         setForm({
@@ -208,6 +217,18 @@ export default function ContractorProfilePage() {
         images: form.images, certifications: form.certifications,
         updatedAt: serverTimestamp(), lastActiveAt: serverTimestamp(),
       }, { merge: true });
+
+      // This is the first save that gives this account a contractor
+      // identity — sync every place role state is cached so the header,
+      // profile menu, and dashboard guard all recognize it immediately,
+      // instead of still calling this account "Homeowner" until reload.
+      if (docExisted === false) {
+        setIsContractorCache(user.uid, true);
+        setMode('contractor');
+        setUser((u: any) => ({ ...u, onboardingComplete: true }));
+        setDocExisted(true);
+      }
+
       setSaveStatus("saved");
       setTimeout(() => setSaveStatus("idle"), 3000);
     } catch (err: any) {
@@ -238,6 +259,24 @@ export default function ContractorProfilePage() {
   return (
     <div className="min-h-screen animate-fade-in" style={{ background: 'var(--color-bg)' }}>
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
+
+        {/* First-time framing: this page can also CREATE a contractor
+            identity, not just edit one. Anyone signed in can land here, so
+            when no contractors/{uid} doc exists yet, say plainly what
+            saving is about to do instead of letting it happen silently. */}
+        {docExisted === false && (
+          <div
+            className="flex items-start gap-3 rounded-xl p-4"
+            style={{ background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.2)' }}
+          >
+            <span className="text-lg leading-none">🛠️</span>
+            <p className="text-sm leading-relaxed" style={{ color: 'var(--color-text-2)' }}>
+              <span className="font-semibold" style={{ color: '#34d399' }}>You don't have a contractor profile yet.</span>{' '}
+              Saving this form creates one — you'll start showing up in job matches, and your account keeps
+              working as a homeowner too. You can switch between the two anytime from the header.
+            </p>
+          </div>
+        )}
 
         {/* Header */}
         <div className="flex flex-wrap justify-between items-start gap-4">
