@@ -4,13 +4,14 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { doc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '@/lib/auth';
+import { setIsContractorCache } from '@/lib/useRole';
 import { db } from '@/lib/db';
 import { TRADES } from '@/lib/constants';
 import OnboardingStep from '@/components/OnboardingStep';
 import PhotoUpload from '@/components/PhotoUpload';
 
 export default function ContractorOnboardingPage() {
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
   const router = useRouter();
   const [step, setStep] = useState(1);
 
@@ -96,6 +97,14 @@ export default function ContractorOnboardingPage() {
       await updateDoc(doc(db, 'users', user.uid), {
         onboardingComplete: true,
       });
+
+      // Sync both places that cache role/onboarding state locally so the
+      // header, dashboard guard, and role badge all reflect "contractor"
+      // immediately — without these the app would keep showing homeowner
+      // nav (stale sessionStorage cache) and bounce back to /onboarding
+      // (stale AuthContext user object) for the rest of the tab's session.
+      setUser((u: any) => ({ ...u, onboardingComplete: true }));
+      setIsContractorCache(user.uid, true);
 
       router.push('/contractor-inbox');
     } catch (err: any) {

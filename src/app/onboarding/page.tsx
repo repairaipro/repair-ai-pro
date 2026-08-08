@@ -20,7 +20,7 @@ import { Home, HardHat, ArrowRight } from 'lucide-react';
  * else explicitly picks a side.
  */
 export default function OnboardingPage() {
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
   const router = useRouter();
   const [checking, setChecking] = useState(true);
 
@@ -58,6 +58,12 @@ export default function OnboardingPage() {
   const startAsHomeowner = async () => {
     try {
       await setDoc(doc(db, 'users', user!.uid), { onboardingComplete: true }, { merge: true });
+      // Firestore is updated, but the `user` object cached in AuthContext is
+      // not re-fetched on navigation — only on sign-in. Without this, the
+      // dashboard's isOnboardingComplete(user) check keeps reading the stale
+      // pre-write value for the rest of the session and bounces back here
+      // in a loop, even though onboarding just succeeded.
+      setUser((u: any) => ({ ...u, onboardingComplete: true }));
     } catch { /* non-blocking — worst case they see this chooser once more */ }
     router.push('/jobs/new');
   };

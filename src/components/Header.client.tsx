@@ -9,6 +9,7 @@ import { useIsContractor } from '@/lib/useRole';
 import { Bell, LayoutDashboard, Briefcase, Users, LogOut, Plus, Menu, X, Inbox, Calendar, Clapperboard } from 'lucide-react';
 import NotificationCenter from '@/components/NotificationCenter';
 import ChatBubbleIcon from '@/components/ChatBubbleIcon';
+import ProfileMenu from '@/components/ProfileMenu.client';
 
 const ADMIN_UIDS = (process.env.NEXT_PUBLIC_ADMIN_UIDS ?? "").split(",").map(s => s.trim()).filter(Boolean);
 
@@ -161,39 +162,9 @@ export default function Header() {
                 {/* Notifications */}
                 <NotificationCenter />
 
-                {/* Admin */}
-                {isAdmin && (
-                  <Link
-                    href="/admin"
-                    className="px-2.5 py-1 rounded-md text-xs font-semibold transition-all"
-                    style={{
-                      color: '#fb923c',
-                      background: 'rgba(249,115,22,0.1)',
-                      border: '1px solid rgba(249,115,22,0.25)',
-                    }}
-                  >
-                    Admin
-                  </Link>
-                )}
-
-                {/* User avatar + sign out */}
-                <div className="flex items-center gap-1.5 ml-1 pl-1.5" style={{ borderLeft: '1px solid var(--color-border)' }}>
-                  {user.photoURL && (
-                    <img
-                      src={user.photoURL}
-                      alt={user.displayName || 'User'}
-                      className="w-7 h-7 rounded-full ring-1"
-                      style={{ outline: '1px solid var(--color-border)' }}
-                    />
-                  )}
-                  <button
-                    onClick={logout}
-                    className="p-1.5 rounded-lg transition-all"
-                    style={{ color: 'var(--color-text-4)' }}
-                    title="Sign out"
-                  >
-                    <LogOut className="w-4 h-4" />
-                  </button>
+                {/* Profile menu — avatar, role badge, primary links, sign out */}
+                <div className="ml-1 pl-1.5" style={{ borderLeft: '1px solid var(--color-border)' }}>
+                  <ProfileMenu isAdmin={isAdmin} />
                 </div>
               </>
             ) : (
@@ -257,6 +228,29 @@ export default function Header() {
             }}
             onClick={e => e.stopPropagation()}
           >
+            {user && (
+              <div className="flex items-center gap-2.5 px-4 py-2.5 mb-1">
+                {user.photoURL ? (
+                  <img src={user.photoURL} alt="" className="w-8 h-8 rounded-full" style={{ outline: '1px solid var(--color-border)' }} />
+                ) : (
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                    style={{ background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff' }}>
+                    {(user.displayName || user.email || '?').trim().charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold truncate" style={{ color: 'var(--color-text)' }}>{user.displayName || user.email}</p>
+                  <span
+                    className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-full mt-0.5"
+                    style={isContractor
+                      ? { color: '#34d399', background: 'rgba(52,211,153,0.12)' }
+                      : { color: '#818cf8', background: 'rgba(99,102,241,0.12)' }}
+                  >
+                    {isContractor ? 'Contractor' : 'Homeowner'}
+                  </span>
+                </div>
+              </div>
+            )}
             {navLinks.map(({ href, label, icon: Icon, highlight }) => (
               <Link
                 key={href}
