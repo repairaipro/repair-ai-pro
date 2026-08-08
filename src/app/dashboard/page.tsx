@@ -7,7 +7,7 @@ import { db } from "@/lib/db";
 import { collection, query, where, onSnapshot, orderBy, doc, getDoc, limit } from "firebase/firestore";
 import { useAuth, isOnboardingComplete } from "@/lib/auth";
 import { useIsContractor } from "@/lib/useRole";
-import { Plus, Inbox, MessageSquare, Briefcase, Users, User, ChevronRight, Zap, TrendingUp, Clock, CheckCircle, Shield, Heart } from "lucide-react";
+import { Plus, Inbox, MessageSquare, Briefcase, Users, User, ChevronRight, Zap, TrendingUp, Clock, CheckCircle, Shield, Heart, HardHat } from "lucide-react";
 import { motion } from "framer-motion";
 
 type Job = {
@@ -496,7 +496,15 @@ export default function DashboardPage() {
               { icon: <Clock className="w-4 h-4" />,        label: "Job History",      href: "/history" },
               { icon: <Heart className="w-4 h-4" />,        label: "Home Health",      href: "/home-health" },
               { icon: <Users className="w-4 h-4" />,        label: "Find Contractors", href: "/contractor" },
-              { icon: <User className="w-4 h-4" />,         label: "My Profile",       href: "/contractor-profile" },
+              // /contractor-profile is pro-only tooling (Google Business
+              // import, service area, portfolio) — a homeowner clicking a
+              // tile labeled "My Profile" here would land on gear meant for
+              // an entirely different account type. Contractors get the
+              // real edit link; homeowners get an honest, well-labeled
+              // invitation into the actual onboarding flow instead.
+              isContractor
+                ? { icon: <User className="w-4 h-4" />,    label: "My Profile",       href: "/contractor-profile" }
+                : { icon: <HardHat className="w-4 h-4" />, label: "Become a Pro",     href: "/onboarding/contractor" },
             ].map((item) => (
               <Link
                 key={item.href}

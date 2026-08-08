@@ -11,7 +11,7 @@ import { PortfolioManager } from "@/components/PortfolioManager";
 import { CertificationBadges, type Certification } from "@/components/CertificationBadges";
 import Link from "next/link";
 import { TRADES } from "@/lib/constants";
-import { Camera, Save, CheckCircle, AlertTriangle, ChevronLeft, Star, Briefcase, Trophy, TrendingUp, X } from "lucide-react";
+import { Camera, Save, CheckCircle, AlertTriangle, ChevronLeft, Star, Briefcase, Trophy, TrendingUp, X, ArrowRight } from "lucide-react";
 import InsuranceVerificationUpload from "@/components/InsuranceVerificationUpload";
 
 interface PortfolioImage {
@@ -218,10 +218,12 @@ export default function ContractorProfilePage() {
         updatedAt: serverTimestamp(), lastActiveAt: serverTimestamp(),
       }, { merge: true });
 
-      // This is the first save that gives this account a contractor
-      // identity — sync every place role state is cached so the header,
-      // profile menu, and dashboard guard all recognize it immediately,
-      // instead of still calling this account "Homeowner" until reload.
+      // Normally unreachable — the form itself only renders once hasContractor
+      // is already true (see the gate below) — but kept as a defensive sync in
+      // case that ever changes out from under an open tab (e.g. the doc gets
+      // deleted elsewhere mid-session). Syncs every place role state is
+      // cached so the header, profile menu, and dashboard guard all pick it
+      // up immediately instead of still calling the account "Homeowner".
       if (docExisted === false) {
         setIsContractorCache(user.uid, true);
         setMode('contractor');
@@ -250,33 +252,64 @@ export default function ContractorProfilePage() {
     );
   }
 
+  // Still checking whether contractors/{uid} exists — avoid flashing either
+  // the full pro-editing form or the "become a pro" CTA before we know which
+  // one is actually correct for this account.
+  if (docExisted === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--color-bg)' }}>
+        <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: '#6366f1', borderTopColor: 'transparent' }} />
+      </div>
+    );
+  }
+
+  // No contractors/{uid} doc yet. This page used to show the full pro-editing
+  // form (Google Business import, portfolio manager, insurance upload — none
+  // of which mean anything to someone who isn't a contractor) to ANY signed-in
+  // visitor who landed here, homeowner or not, with only a banner explaining
+  // what was about to happen. That's backwards: real two-sided marketplaces
+  // (Uber driver signup, Airbnb host signup) put a deliberate application/
+  // onboarding step BEFORE the edit-my-profile screen, not after. So this page
+  // is now gated the same way: without a contractor identity yet, it points
+  // at the actual onboarding wizard instead of dropping you into pro tooling.
+  if (!hasContractor) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4" style={{ background: 'var(--color-bg)' }}>
+        <div className="card p-8 max-w-md w-full text-center space-y-4">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto text-2xl"
+            style={{ background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.25)' }}>
+            🛠️
+          </div>
+          <div>
+            <h1 className="text-xl font-bold mb-1.5" style={{ color: 'var(--color-text)' }}>Set up your contractor profile</h1>
+            <p className="text-sm leading-relaxed" style={{ color: 'var(--color-text-4)' }}>
+              You don't have a contractor profile yet — this page is for editing an existing one. Setting one up
+              takes about 2 minutes: pick your trade, service area, and contact info. Your account keeps working
+              as a homeowner too; you can switch between the two anytime from the header.
+            </p>
+          </div>
+          <Link href="/onboarding/contractor" className="btn btn-primary btn-full">
+            Get Started <ArrowRight className="w-4 h-4" />
+          </Link>
+          <Link href="/dashboard" className="block text-xs" style={{ color: 'var(--color-text-4)' }}>
+            ← Back to Dashboard
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   const { pct, missing } = getCompleteness(form);
   const trustScore = getTrustScore({ rating: stats.rating, reviewCount: stats.reviewCount, jobsCompleted: stats.jobsCompleted, invitationAcceptCount: stats.invitationAcceptCount, invitationDeclineCount: stats.invitationDeclineCount });
   const trustTier = getTrustTier(trustScore);
   const pctColor = pct >= 80 ? '#34d399' : pct >= 50 ? '#fbbf24' : '#f87171';
   const pctBarColor = pct >= 80 ? '#22c55e' : pct >= 50 ? '#f59e0b' : '#ef4444';
 
+  // Reaching here means hasContractor is true, so this is always a genuine
+  // edit of an existing profile — no "first-time creation" framing needed.
   return (
     <div className="min-h-screen animate-fade-in" style={{ background: 'var(--color-bg)' }}>
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
-
-        {/* First-time framing: this page can also CREATE a contractor
-            identity, not just edit one. Anyone signed in can land here, so
-            when no contractors/{uid} doc exists yet, say plainly what
-            saving is about to do instead of letting it happen silently. */}
-        {docExisted === false && (
-          <div
-            className="flex items-start gap-3 rounded-xl p-4"
-            style={{ background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.2)' }}
-          >
-            <span className="text-lg leading-none">🛠️</span>
-            <p className="text-sm leading-relaxed" style={{ color: 'var(--color-text-2)' }}>
-              <span className="font-semibold" style={{ color: '#34d399' }}>You don't have a contractor profile yet.</span>{' '}
-              Saving this form creates one — you'll start showing up in job matches, and your account keeps
-              working as a homeowner too. You can switch between the two anytime from the header.
-            </p>
-          </div>
-        )}
 
         {/* Header */}
         <div className="flex flex-wrap justify-between items-start gap-4">

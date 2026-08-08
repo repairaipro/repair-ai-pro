@@ -413,7 +413,11 @@ export default function LandingPage() {
                   </li>
                 ))}
               </ul>
-              <Link href="/contractor-profile" className="btn btn-primary">
+              {/* /onboarding/contractor is the deliberate application/setup
+                  flow (matches how Uber/Airbnb gate becoming a driver/host);
+                  /contractor-profile is the edit screen for someone who's
+                  already been through it. */}
+              <Link href="/onboarding/contractor" className="btn btn-primary">
                 Set Up Your Profile <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
@@ -553,7 +557,7 @@ export default function LandingPage() {
                       </li>
                     ))}
                   </ul>
-                  <Link href="/contractor-profile" className="btn btn-secondary w-full text-center">Join as a Pro</Link>
+                  <Link href="/onboarding/contractor" className="btn btn-secondary w-full text-center">Join as a Pro</Link>
                 </div>
 
                 {/* Pro */}
