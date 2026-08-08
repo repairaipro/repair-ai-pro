@@ -94,8 +94,8 @@ export function PortfolioManager({
     }
   }
 
-  const handleAddImage = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAddImage = (e?: React.FormEvent) => {
+    e?.preventDefault();
     setFormError('');
 
     if (!newImage.url || !newImage.serviceType) {
@@ -126,7 +126,12 @@ export function PortfolioManager({
       <div className="rounded-xl p-4" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border)' }}>
         <h4 className="text-sm font-semibold mb-3" style={{ color: 'var(--color-text)' }}>Add a photo</h4>
 
-        <form onSubmit={handleAddImage} className="space-y-3">
+        {/*
+          Plain div, not a <form> — like BusinessImportWidget, this is meant
+          to sit inside the page's own profile-save <form>, and a nested
+          <form> is invalid HTML that triggers a React hydration error.
+        */}
+        <div className="space-y-3">
           {/* Photo picker */}
           <div>
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFilePick} disabled={isUploading} />
@@ -197,6 +202,7 @@ export function PortfolioManager({
               placeholder="e.g. Kitchen renovation with new tile backsplash"
               value={newImage.caption || ''}
               onChange={(e) => setNewImage({ ...newImage, caption: e.target.value })}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddImage(); } }}
               className="w-full px-3 py-2 rounded-lg text-sm outline-none"
               style={inputStyle}
               disabled={isUploading}
@@ -209,10 +215,10 @@ export function PortfolioManager({
             </div>
           )}
 
-          <button type="submit" disabled={isUploading || isLoading} className="btn btn-primary btn-full btn-sm">
+          <button type="button" onClick={() => handleAddImage()} disabled={isUploading || isLoading} className="btn btn-primary btn-full btn-sm">
             <Plus className="w-4 h-4" /> Add to Portfolio
           </button>
-        </form>
+        </div>
       </div>
 
       {/* Image Grid */}

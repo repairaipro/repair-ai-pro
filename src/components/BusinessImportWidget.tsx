@@ -65,8 +65,8 @@ export default function BusinessImportWidget({ onImport }: Props) {
 
   const inputRef = useRef<HTMLInputElement>(null);
 
-  async function search(e: React.FormEvent) {
-    e.preventDefault();
+  async function search(e?: React.FormEvent) {
+    e?.preventDefault();
     if (!query.trim() || !user) return;
     setSearching(true);
     setResults([]);
@@ -235,22 +235,31 @@ export default function BusinessImportWidget({ onImport }: Props) {
   /* ── Search UI ────────────────────────────────────────────────────────── */
   return (
     <div className="space-y-3">
-      <form onSubmit={search} className="flex gap-2">
+      {/*
+        Plain div, not a <form> — this widget is meant to be embedded inside
+        the page's own profile-save <form> (see contractor-profile/page.tsx),
+        and a <form> nested inside another <form> is invalid HTML that React
+        flags as a hydration error. Enter-to-search and click-to-search are
+        wired directly instead of relying on form submission.
+      */}
+      <div className="flex gap-2">
         <input
           ref={inputRef}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); search(); } }}
           placeholder="Search your business name + city, e.g. 'Joe's Plumbing Austin'"
           className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-500 placeholder-gray-600"
         />
         <button
-          type="submit"
+          type="button"
+          onClick={() => search()}
           disabled={!query.trim() || searching}
           className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-800 disabled:text-gray-500 px-4 py-2.5 rounded-lg text-sm font-medium transition flex-shrink-0"
         >
           {searching ? <span className="animate-spin inline-block">⏳</span> : "Search"}
         </button>
-      </form>
+      </div>
 
       {searchError && (
         <p className="text-xs text-red-400">{searchError}</p>

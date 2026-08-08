@@ -98,8 +98,8 @@ export default function InsuranceVerificationUpload({ authToken }: Props) {
     }
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit(e?: React.FormEvent) {
+    e?.preventDefault();
     if (!licenseFile && !insuranceFile) {
       setError('Please upload at least one document.');
       return;
@@ -233,7 +233,23 @@ export default function InsuranceVerificationUpload({ authToken }: Props) {
             transition={{ duration: 0.2 }}
             style={{ overflow: 'hidden' }}
           >
-            <form onSubmit={handleSubmit} style={{ borderTop: '1px solid rgba(255,255,255,0.07)', padding: '20px' }}>
+            {/*
+              Plain div, not a <form> — this is embedded inside the
+              contractor-profile page's own save <form>, and a nested <form>
+              is invalid HTML that triggers a React hydration error. The
+              onKeyDown replicates a real <form>'s Enter-to-submit behavior
+              for the text inputs inside (license number, policy number,
+              etc.) without needing to wire each one individually.
+            */}
+            <div
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT') {
+                  e.preventDefault();
+                  handleSubmit();
+                }
+              }}
+              style={{ borderTop: '1px solid rgba(255,255,255,0.07)', padding: '20px' }}
+            >
               {error && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 10, color: '#f87171', fontSize: 13, marginBottom: 16 }}>
                   <AlertTriangle size={14} /> {error}
@@ -332,7 +348,8 @@ export default function InsuranceVerificationUpload({ authToken }: Props) {
                   Cancel
                 </button>
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={() => handleSubmit()}
                   disabled={submitting}
                   style={{ flex: 2, padding: '11px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', border: 'none', borderRadius: 10, color: '#fff', fontSize: 13, fontWeight: 700, cursor: submitting ? 'not-allowed' : 'pointer', opacity: submitting ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
                 >
@@ -343,7 +360,7 @@ export default function InsuranceVerificationUpload({ authToken }: Props) {
               <p style={{ fontSize: 11, color: '#4b5563', margin: '12px 0 0', lineHeight: 1.5, textAlign: 'center' }}>
                 Documents are securely stored and only viewed by our verification team. Review takes 1–2 business days.
               </p>
-            </form>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
