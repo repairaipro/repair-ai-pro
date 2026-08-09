@@ -14,19 +14,24 @@ AI-powered home repair marketplace (Next.js App Router + Firebase + Stripe + Ope
 
 Sequencing: **tool first → identity/social → AI-refereed marketplace → OS/fintech later.** One-city wedge (Houston). North-star metric: **time-to-first-bid** after a job is posted (tracked in `/admin/funnel`, target ≤15min median). Free `/diagnose` tool is the demand magnet; contractor profiles are the supply magnet; `/work` feed is the social layer on top.
 
-## Current state (as of 2026-07-24)
+## Current state (as of 2026-08-08)
 
-Production build is green (`npx next build` exits 0, zero warnings). All 4 strategy layers are built: tools / identity+social / marketplace / financing.
+Production build is green (`npx next build` exits 0, zero warnings, `tsc --noEmit` clean). All 4 strategy layers are built: tools / identity+social / marketplace / financing.
+
+**⭐ See `HANDOFF.md` (repo root) for a full feature-by-feature testing checklist and open strategic questions** — written 2026-08-08 for a systematic testing pass. Delete/fold it in once acted on.
 
 **Core platform**: marketplace (post/bid/claim), homeowner + contractor dashboards, Stripe Connect payouts, milestone payments, $49 insurance reports, notifications (Email/Resend, Push/FCM, SMS/Twilio), quality scores, verified specializations, video consultations (Agora), PWA, 64 SEO landing pages (`/services/[trade]/[city]`), social layer (posts/likes/follows/feed), consumer financing, retention engine (seasonal maintenance suggestions).
 
-**AI pipeline (`/jobs/new`), reworked this session — this is the most actively-developed area:**
-- Diagnosis (`/api/ai-chat`): now returns ranked likely causes, "what a pro checks first", confidence, and a safety/urgency flag — not just a one-line summary.
-- Smart Estimate (`/api/jobs/estimate`): labor/parts split, risk factors and additional-cost chips (previously computed server-side then silently dropped on the client), honest basis line (real comparables vs. AI-estimated).
-- Parts-finder (`/api/parts-finder`): rewritten to tie every recommended part to the **confirmed diagnosis** + **uploaded photo** (GPT-4o vision) + **identifying details** (vehicle year/make/model, appliance brand/model — asked via `TradeQuestionnaire`). Trade-aware sourcing (automotive → AutoZone/O'Reilly/RockAuto, not Home Depot). Two-pass: generic parts right after diagnosis, refined to fitment-exact once the questionnaire is answered. Hard rule: never fabricate a vehicle/model that wasn't given.
-- Fixed bugs found while verifying live: numeric `estimatedPrice` silently dropping all parts (now coerced), an unhelpful photo zeroing out the parts list (now falls back to text-only), JSON-array parsing → pinned `json_object` output.
+**AI pipeline (`/jobs/new`)** — diagnosis (`/api/ai-chat`): ranked likely causes, "what a pro checks first", confidence, safety/urgency flag. Smart Estimate (`/api/jobs/estimate`): labor/parts split, risk factors, additional-cost chips, honest basis (real comparables vs. AI-estimated). Parts-finder (`/api/parts-finder`): ties every part to the confirmed diagnosis + uploaded photo (GPT-4o vision) + identifying details (vehicle/appliance specifics), trade-aware retailer sourcing, two-pass refinement, never fabricates a vehicle/model that wasn't given.
 
-**All ~100 auth'd API routes** now declare `export const dynamic = "force-dynamic"` (they read headers/url per-request; this silences build-time "Dynamic server usage" warnings with no runtime change).
+**Dual-role identity system (2026-08-08)**: one account can be both homeowner and contractor (matches Uber driver/rider, Airbnb host/guest — not a bug to eliminate). Key pieces:
+- `useIsContractor()` (`src/lib/useRole.ts`) — the CAPABILITY signal (does `contractors/{uid}` exist). This is the only source of truth for role; the legacy `users/{uid}.role` field is stuck at `"guest"` for every account and must never be used.
+- `useActiveMode()` (same file) — the VIEW signal (which nav a dual-role account is currently browsing as), localStorage-persisted per-uid, with a live event so an already-mounted header updates instantly.
+- Header shows a Homeowner/Contractor toggle **only once an account actually has both roles**.
+- `ProfileMenu.client.tsx` — the account dropdown (avatar click). Shows role badge + "Switch to X view" once dual-role, or "Become a pro" if not yet a contractor.
+- **Becoming a contractor requires `/onboarding/contractor`** (the 4-step wizard) — `/contractor-profile` (the raw edit form: Google Business import, portfolio, insurance upload) is gated behind already having a contractor identity, matching how Uber/Airbnb gate driver/host signup before showing profile-management tooling. Every homeowner-facing link that used to point at `/contractor-profile` (dashboard Quick Links, homepage CTAs) now points at the wizard instead.
+
+**All ~100 auth'd API routes** declare `export const dynamic = "force-dynamic"` (they read headers/url per-request; silences build-time "Dynamic server usage" warnings with no runtime change).
 
 ## Gotchas (verified painful — don't rediscover these)
 
@@ -37,6 +42,9 @@ Production build is green (`npx next build` exits 0, zero warnings). All 4 strat
 - Firestore/Storage security rules and indexes are **not** deployed by `git push` — they need explicit `firebase deploy --only firestore:rules`, `firestore:indexes`, or `storage` after any rule/index change. Easy to forget and ship a feature that 403s in prod.
 - `pricingEstimate.ts`, `qualityScore`, `specializations` libs are **server-only** (Firebase Admin SDK) — never import from a client component.
 - Worktrees don't carry untracked files (like `.env.local`) — if a worktree build fails with an auth/invalid-api-key error, copy `.env.local` from the main repo root.
+- **Vercel CLI is pinned to `vercel@57.0.0` for deploys** — v58.9.0 added a stricter Root Directory validation that fails this project with "must be a relative path not starting with `./`" even though nothing is misconfigured. Always deploy with `npx vercel@57.0.0 --prod --yes`, not bare `vercel`.
+- **Always test/share `https://repair-ai-pro-eight.vercel.app`**, never a `repair-ai-<random>-repairaipro...vercel.app` link — every `vercel --prod` mints one of those as a disposable snapshot, and it's NOT in Firebase's Google-OAuth authorized domains (shows `auth/unauthorized-domain`). The Vercel dashboard's "Visit" button on an old/stale deployment row leads to one of these — go through the project Overview instead, or just type the stable URL.
+- A long-lived browser tab's console-message history can accumulate across an entire session; a "persistent" error that survives a clean dev-server restart with cache cleared may just be stale buffer — verify with a **brand-new tab** and/or `next build`/`tsc --noEmit` before trusting it's real.
 
 ## Pending / user action needed
 
@@ -46,6 +54,8 @@ Production build is green (`npx next build` exits 0, zero warnings). All 4 strat
 
 ## Next candidates (not yet started, no strong ordering commitment)
 
+- Systematic feature-by-feature testing pass — see `HANDOFF.md`.
 - Affiliate revenue on parts retailer links (AutoZone/O'Reilly/etc. links are currently plain search links, no tracking params — needs enrollment in each program first).
 - Redis/Upstash rate limiting once traffic justifies it (currently in-memory, per-route+IP).
 - Wire the funnel dashboard data into the admin overview page.
+- `/dashboard/contractor` is an orphaned route (not linked from anywhere reachable) — decide whether to finish or delete it.
