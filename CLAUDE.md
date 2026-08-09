@@ -14,11 +14,13 @@ AI-powered home repair marketplace (Next.js App Router + Firebase + Stripe + Ope
 
 Sequencing: **tool first → identity/social → AI-refereed marketplace → OS/fintech later.** One-city wedge (Houston). North-star metric: **time-to-first-bid** after a job is posted (tracked in `/admin/funnel`, target ≤15min median). Free `/diagnose` tool is the demand magnet; contractor profiles are the supply magnet; `/work` feed is the social layer on top.
 
-## Current state (as of 2026-08-08)
+## Current state (as of 2026-08-09)
 
 Production build is green (`npx next build` exits 0, zero warnings, `tsc --noEmit` clean). All 4 strategy layers are built: tools / identity+social / marketplace / financing.
 
-**⭐ See `HANDOFF.md` (repo root) for a full feature-by-feature testing checklist and open strategic questions** — written 2026-08-08 for a systematic testing pass. Delete/fold it in once acted on.
+**⭐ See `HANDOFF.md` (repo root) for a full feature-by-feature testing checklist and open strategic questions** — written 2026-08-08 for a systematic testing pass. First pass completed 2026-08-09 (see below); delete/fold it in once fully acted on.
+
+**QA pass round 1 (2026-08-09)**: drove the app live end-to-end as two real accounts — signup → AI diagnosis → Smart Estimate → parts → job posting → contractor bidding → homeowner bid selection → job assigned. All of it worked. One real bug found and fixed: an **uncaught Firestore `permission-denied` console error** on job detail pages (any contractor viewing an open job before bidding/being selected triggered it) — the security rules were correct (non-participants shouldn't read reviews/attachments/messages), but `ReviewCard`, `JobTimeline`, `ChatAttachmentsBar`, and `chat/[id]`'s message listener were the only `onSnapshot()` calls in the codebase with no error callback, which is what makes Firestore log to console instead of failing silently. Fixed those + swept for and fixed 7 more instances of the same missing-callback pattern elsewhere (lower risk, same fix). **Convention going forward: every `onSnapshot()` call must pass an error callback**, even a no-op one — that's the established pattern everywhere else in this codebase.
 
 **Core platform**: marketplace (post/bid/claim), homeowner + contractor dashboards, Stripe Connect payouts, milestone payments, $49 insurance reports, notifications (Email/Resend, Push/FCM, SMS/Twilio), quality scores, verified specializations, video consultations (Agora), PWA, 64 SEO landing pages (`/services/[trade]/[city]`), social layer (posts/likes/follows/feed), consumer financing, retention engine (seasonal maintenance suggestions).
 
