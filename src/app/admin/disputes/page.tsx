@@ -188,6 +188,8 @@ export default function AdminDisputesPage() {
         jobId: d.ref.parent.parent?.id ?? "",
         ...(d.data() as any),
       })));
+    }, () => {
+      // Defensive — avoids an uncaught console error on any transient read failure.
     });
     return () => unsub();
   }, []);

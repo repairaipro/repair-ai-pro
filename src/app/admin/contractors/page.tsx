@@ -33,6 +33,8 @@ export default function AdminContractorsPage() {
   useEffect(() => {
     return onSnapshot(collection(db, "contractors"), (snap) => {
       setContractors(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })));
+    }, () => {
+      // Defensive — avoids an uncaught console error on any transient read failure.
     });
   }, []);
 

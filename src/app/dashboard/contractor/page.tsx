@@ -157,7 +157,7 @@ export default function ContractorDashboard() {
     );
     return onSnapshot(q, (snap) => {
       setActiveJobs(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })));
-    });
+    }, () => {});
   }, [user]);
 
   /* Load pending inbox invitations (real-time) */
@@ -171,7 +171,7 @@ export default function ContractorDashboard() {
     );
     return onSnapshot(q, (snap) => {
       setInvites(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })));
-    });
+    }, () => {});
   }, [user]);
 
   /* Load earnings via API */

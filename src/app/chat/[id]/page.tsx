@@ -216,6 +216,10 @@ export default function JobChat() {
       const msgs: Msg[] = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
       setMessages(msgs);
       setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+    }, () => {
+      // Firestore rules restrict reads to job participants — a contractor
+      // just browsing/bidding on an open job isn't one yet. Expected, not
+      // an error: swallow it instead of leaving an uncaught console error.
     });
     return () => unsub();
   }, [id]);

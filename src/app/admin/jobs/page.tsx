@@ -60,6 +60,8 @@ export default function AdminJobsPage() {
     const q = query(collection(db, "jobs"), orderBy("createdAt", "desc"), limit(100));
     return onSnapshot(q, (snap) => {
       setJobs(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })));
+    }, () => {
+      // Defensive — avoids an uncaught console error on any transient read failure.
     });
   }, []);
 

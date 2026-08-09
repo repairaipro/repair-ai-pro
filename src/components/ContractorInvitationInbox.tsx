@@ -258,6 +258,14 @@ export default function ContractorInvitationInbox() {
 
       setEntries(hydrated);
       setLoading(false);
+    }, (err) => {
+      // Defensive — this reads the signed-in contractor's own inbox, which
+      // Firestore rules always permit, but an uncaught error callback still
+      // logs a scary console error on any transient failure (e.g. an
+      // in-flight auth token refresh). Matches the error-handling pattern
+      // used by every other listener in the codebase.
+      console.error('Contractor inbox listener error:', err);
+      setLoading(false);
     });
 
     return () => unsub();

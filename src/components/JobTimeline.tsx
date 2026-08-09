@@ -27,6 +27,11 @@ export default function JobTimeline({ jobId }: { jobId: string }) {
       const data: TimelineItem[] = [];
       snap.forEach((d) => data.push({ id: d.id, ...(d.data() as any) }));
       setItems(data);
+    }, () => {
+      // Firestore rules restrict reads to job participants (owner/claimed
+      // contractor) — a contractor just browsing/bidding on an open job
+      // isn't one yet, so this denies until they're selected. Expected, not
+      // an error: swallow it instead of leaving an uncaught console error.
     });
 
     return () => unsub();

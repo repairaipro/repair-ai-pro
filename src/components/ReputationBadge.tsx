@@ -33,6 +33,9 @@ export default function ReputationBadge({ contractorId }: Props) {
       }
 
       setProfile(snap.data() as ContractorProfile);
+    }, () => {
+      // Defensive — matches the error-handling pattern used elsewhere;
+      // avoids an uncaught console error on any transient read failure.
     });
 
     return () => unsub();

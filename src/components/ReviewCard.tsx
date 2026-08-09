@@ -43,6 +43,11 @@ export default function ReviewCard({ jobId, jobOwnerId, contractorId, jobStatus 
         const d = snap.docs[0];
         setExistingReview({ id: d.id, ...(d.data() as any) });
       }
+    }, () => {
+      // Firestore rules restrict reads to job participants (owner/claimed
+      // contractor) — a contractor just browsing/bidding on an open job
+      // isn't one yet, so this denies until they're selected. Expected, not
+      // an error: swallow it instead of leaving an uncaught console error.
     });
     return () => unsub();
   }, [jobId]);

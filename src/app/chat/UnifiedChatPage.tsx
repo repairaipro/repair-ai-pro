@@ -173,11 +173,13 @@ export default function UnifiedChatPage() {
       (snap) => {
         setJobs((p) => mergeJobs(p, snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }))));
         if (first) { setJobsLoading(false); first = false; }
-      }
+      },
+      () => { if (first) { setJobsLoading(false); first = false; } }
     );
     const unsub2 = onSnapshot(
       query(collection(db, "jobs"), where("claimedBy", "==", user.uid)),
-      (snap) => setJobs((p) => mergeJobs(p, snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }))))
+      (snap) => setJobs((p) => mergeJobs(p, snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })))),
+      () => {}
     );
     return () => { unsub1(); unsub2(); };
   }, [user]);
@@ -207,7 +209,8 @@ export default function UnifiedChatPage() {
       (snap) => {
         setMessages(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })));
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
-      }
+      },
+      () => {}
     );
     return () => unsub();
   }, [selectedJob?.id]);
@@ -217,7 +220,8 @@ export default function UnifiedChatPage() {
     if (!selectedJob) { setEvents([]); return; }
     const unsub = onSnapshot(
       query(collection(db, "jobs", selectedJob.id, "events"), orderBy("createdAt", "asc")),
-      (snap) => setEvents(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })))
+      (snap) => setEvents(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }))),
+      () => {}
     );
     return () => unsub();
   }, [selectedJob?.id]);
