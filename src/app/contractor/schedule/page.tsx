@@ -1,6 +1,7 @@
 'use client';
 
 import { useAuth } from '@/lib/auth';
+import { useIsContractor } from '@/lib/useRole';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import ContractorCalendar from '@/components/ContractorCalendar';
@@ -11,7 +12,12 @@ import { AlertCircle, Info } from 'lucide-react';
 export default function SchedulePage() {
   const { user } = useAuth();
   const router = useRouter();
-  const [isContractor, setIsContractor] = useState(false);
+  // Was a homegrown check that GET-fetched /api/contractors/${uid} — a route
+  // that was never built (only nested subpaths like .../[id]/availability
+  // exist), so it always 404'd and bounced every contractor, even
+  // legitimate ones, straight back to the public /contractor directory.
+  // useIsContractor() is the app's one real source of truth for this.
+  const { isContractor, roleLoaded } = useIsContractor();
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
@@ -19,26 +25,11 @@ export default function SchedulePage() {
   }, []);
 
   useEffect(() => {
-    if (!hydrated || !user) return;
+    if (!hydrated || !user || !roleLoaded) return;
+    if (!isContractor) router.push('/contractor');
+  }, [hydrated, user, roleLoaded, isContractor, router]);
 
-    // Check if user is a contractor
-    const checkContractor = async () => {
-      try {
-        const res = await fetch(`/api/contractors/${user.uid}`);
-        if (res.ok) {
-          setIsContractor(true);
-        } else {
-          router.push('/contractor');
-        }
-      } catch {
-        router.push('/contractor');
-      }
-    };
-
-    checkContractor();
-  }, [hydrated, user, router]);
-
-  if (!hydrated || !user) {
+  if (!hydrated || !user || !roleLoaded) {
     return <div className="min-h-screen" style={{ background: 'var(--color-bg)' }} />;
   }
 

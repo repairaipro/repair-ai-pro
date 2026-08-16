@@ -30,7 +30,11 @@ export default function WorkingHoursSettings({ contractorId }: Props) {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(`/api/contractors/${contractorId}`);
+        const { auth } = await import('@/lib/db');
+        const token = await auth.currentUser?.getIdToken();
+        const res = await fetch(`/api/contractors/${contractorId}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        });
         if (res.ok) {
           const data = await res.json();
           if (data.workingHours) setHours(data.workingHours);
