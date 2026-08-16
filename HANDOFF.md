@@ -89,6 +89,8 @@ Start your next conversation by pointing Claude at this file plus `CLAUDE.md` (w
 
 **Fixed 2026-08-09**: uncaught Firestore permission-denied console errors from `onSnapshot()` calls missing error callbacks (11 files) — see `CLAUDE.md` "QA pass round 1."
 
+**Fixed 2026-08-09 (round 2)**: `/contractor-inbox/bids` showed "0 Total Bids" for every contractor, even ones with real, won bids — there was no Firestore security rule at all for the `bids` subcollection, so the page's direct client-side `collectionGroup('bids')` read was silently default-denied (every other bid read went through server API routes, which bypass rules, so this was invisible until now). Fixed by adding the missing rule — see `CLAUDE.md` "QA pass round 2" for the two non-obvious Firestore rules constraints this surfaced (collection-group queries can't use a nested match's rule at all, and the rule has to check the same field the query filters on, not the document ID).
+
 **Still open:**
 - **Affiliate revenue**: parts-retailer links (AutoZone/O'Reilly/etc.) are plain search links, no tracking params — needs enrollment in each affiliate program first.
 - **Rate limiting**: in-memory per-route+IP; fine for now, needs Redis/Upstash before real traffic.
