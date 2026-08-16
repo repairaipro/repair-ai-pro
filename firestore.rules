@@ -153,6 +153,23 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    /* ================= BIDS: collection-group read ================= */
+    // Lives at the top level (the `{path=**}` wildcard form), NOT nested
+    // inside `match /jobs/{jobId}`, and does not depend on any value
+    // resolved from the wildcard path — only on the requester's uid and the
+    // document's own contractorId field. That's required for a
+    // collectionGroup('bids') query to be permitted at all: a query with no
+    // single concrete parent can't have its safety checked against a rule
+    // that needs a specific jobId binding (a nested match, even a fully
+    // permissive one, was empirically confirmed to still deny the query —
+    // see the long comment under `match /jobs/{jobId}/bids/{bidId}` below).
+    // Write operations don't have this constraint (they always target one
+    // concrete job) and stay in the nested block where `job(jobId)` lookups
+    // for validation are actually possible.
+    match /{path=**}/bids/{bidId} {
+      allow read: if signedIn() && resource.data.contractorId == uid();
+    }
+
     /* ================= JOBS ================= */
 
     match /jobs/{jobId} {
@@ -252,6 +269,41 @@ service cloud.firestore {
       );
 
       allow delete: if false;
+
+      /* ================= BIDS ================= */
+      // Bid docs are keyed by the bidding contractor's uid (see
+      // /api/jobs/[jobId]/bid). Nothing previously matched this path, so
+      // every direct client read/write was default-denied — including the
+      // collectionGroup('bids') listener on /contractor-inbox/bids, which
+      // silently showed "0 bids" for contractors with real bid history.
+      // Reads via the job detail page and select-bid worked anyway because
+      // those go through server API routes (Admin SDK, bypasses rules).
+      //
+      // READ is intentionally NOT declared here. A nested match like this
+      // one is scoped to a concrete jobId bound from the request path — for
+      // a *direct* subcollection read (collection(db,'jobs',ID,'bids')) that
+      // binding is known, so a nested `allow read` would work fine, but for
+      // a *collectionGroup* query (no specific parent, spans every job) that
+      // binding can't be resolved, so Firestore's list-safety check can't
+      // use a nested rule at all — confirmed empirically: a nested `allow
+      // read: if true` still denied the exact collectionGroup('bids') query
+      // /contractor-inbox/bids relies on. The read rule lives in the
+      // top-level `match /{path=**}/bids/{bidId}` block above (near the top
+      // of this file) instead.
+      match /bids/{bidId} {
+        // Normally written by the .../bid API route (admin SDK, bypasses
+        // rules). This rule covers any direct client writes.
+        allow create: if signedIn()
+          && uid() == bidId
+          && request.resource.data.contractorId == uid()
+          && request.resource.data.status == "pending"
+          && job(jobId).data.status in ["open", "triaged"];
+
+        // Status transitions (selected/declined) happen inside a Firestore
+        // transaction in the select-bid API route (admin SDK) — never allow
+        // a direct client update, same as messages/reviews below.
+        allow update, delete: if false;
+      }
 
       /* ================= MESSAGES ================= */
 
