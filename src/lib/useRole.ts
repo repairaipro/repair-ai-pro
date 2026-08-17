@@ -35,7 +35,22 @@ export function useIsContractor(): { isContractor: boolean; roleLoaded: boolean 
     }
     window.addEventListener(ROLE_CHANGED_EVENT, onRoleChanged);
 
-    if (!user) {
+    if (user === undefined) {
+      // Firebase auth state genuinely hasn't resolved yet — not the same as
+      // "signed out". Leave roleLoaded false so callers that redirect on
+      // `!isContractor` (e.g. gating /contractor/schedule) don't fire on
+      // this transient "don't know yet" tick and bounce a real contractor
+      // away before the corrected value arrives one render later. This was
+      // a real bug: user starts as `undefined` in AuthContext until
+      // onAuthStateChanged fires, and treating that the same as `null`
+      // (actually signed out) meant `roleLoaded` went true with
+      // `isContractor: false` for one render on every fresh page load,
+      // which any redirect-on-mount effect could act on before the
+      // follow-up render corrected it.
+      return;
+    }
+
+    if (user === null) {
       setState({ isContractor: false, roleLoaded: true });
     } else {
       const cacheKey = `is-contractor:${user.uid}`;
