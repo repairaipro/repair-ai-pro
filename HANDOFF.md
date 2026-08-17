@@ -4,7 +4,7 @@ Start your next conversation by pointing Claude at this file plus `CLAUDE.md` (w
 
 **How to use this**: Go through each row of the checklist below on the live app (`https://repair-ai-pro-eight.vercel.app` — not any `repair-ai-<random>-...vercel.app` link, those are throwaway deploy snapshots). For anything broken, confusing, or missing, jot a one-line note in the "Notes" column or just tell Claude directly. Bring this file (or a copy with your notes filled in) to the next session and say "here's my testing pass, let's fix these" — that's a clean, scoped way to start.
 
-**Round 1 status (2026-08-09)**: an automated pass already drove the rows marked ✅ below live, end to end, with two real accounts (a homeowner posting a job through the full AI pipeline, and a contractor bidding and getting selected). One real bug was found and fixed (uncaught Firestore permission errors on job pages — see `CLAUDE.md`). Rows marked ⬜ still need a human pass — most need real payment methods, phone numbers, or device permissions an automated session can't provide.
+**Round 1-3 status (2026-08-09)**: an automated pass already drove nearly every ✅ row below live against production, with real accounts — a homeowner posting a job through the full AI pipeline, a contractor bidding/getting selected/messaging, and a broad sweep of Studio, marketing, and settings pages. **Four real, previously-undiscovered bugs were found and fixed** (all deployed): uncaught Firestore permission errors on job pages, a missing Firestore rule that made `/contractor-inbox/bids` always show "0 bids," `/contractor/schedule` redirecting every real contractor away (a missing API route), and a React race condition in the app's role-check hook that caused it. Full writeups in `CLAUDE.md`. Remaining ⬜ rows need real payment methods, phone numbers, admin credentials, or device permissions an automated session can't provide.
 
 ---
 
@@ -56,24 +56,24 @@ Start your next conversation by pointing Claude at this file plus `CLAUDE.md` (w
 | 4.1 | Become a Pro | Dashboard tile or homepage CTA → `/onboarding/contractor` wizard (4 steps) | ✅ verified |
 | 4.2 | `/contractor-profile` | Full edit form once you're a contractor: trade, service area, Google Business import, portfolio, insurance verification | ✅ verified (gate + form both) |
 | 4.3 | Dual-role toggle | Header Homeowner/Contractor switch appears only once you have both — flips nav, persists across reload | ✅ verified |
-| 4.4 | `/contractor-inbox` | Job invitations, accept/decline | ⬜ page loads, invitation flow not driven |
-| 4.5 | Bidding | Submit a bid on an open job | ✅ verified — includes the AI fair-price comparison ("Above market" etc.) |
+| 4.4 | `/contractor-inbox` | Job invitations, accept/decline | ✅ page loads correctly; invitation accept/decline flow not driven (needs a live matched invite) |
+| 4.5 | Bidding | Submit a bid on an open job | ✅ verified — includes the AI fair-price comparison ("Above market" etc.); bid history at `/contractor-inbox/bids` also now fixed (was showing 0 — see Round 2) |
 | 4.6 | `/studio` | Contractor command center — money/pipeline/reputation | ✅ verified loads correctly and reflects assigned jobs |
-| 4.7 | `/studio/analytics`, `/studio/wrapped` | | ⬜ not yet driven |
-| 4.8 | `/contractor/schedule` | Calendar, iCal sync | ⬜ not yet driven |
-| 4.9 | `/contractor/pro` | Pro subscription plans | ⬜ not yet driven |
+| 4.7 | `/studio/analytics`, `/studio/wrapped` | | ✅ verified — both load cleanly with correct data |
+| 4.8 | `/contractor/schedule` | Calendar, iCal sync | ✅ verified — was completely broken (always redirected away), fixed in Round 3, now loads and both settings widgets hydrate correctly |
+| 4.9 | `/contractor/pro` | Pro subscription plans | ✅ verified — page loads, plan tiers render |
 | 4.10 | Stripe Connect payout | Bank verification, receiving a payout | ⬜ needs real Stripe test flow |
-| 4.11 | Quality score / trust tier | Visible and sensible | ⬜ not yet driven |
-| 4.12 | `/work` social feed | Post before/after photos, likes, follows, Discover/Following toggle | ⬜ not yet driven |
+| 4.11 | Quality score / trust tier | Visible and sensible | ✅ verified (via `/contractor-profile` and `/studio/wrapped`, both render Trust Score/Tier correctly) |
+| 4.12 | `/work` social feed | Post before/after photos, likes, follows, Discover/Following toggle | ✅ page verified (loads, Discover/Following toggle present, correct empty state); posting/liking/following not driven |
 
 ### Growth / SEO / retention surfaces
 | # | Flow | Steps | Notes |
 |---|------|-------|-------|
 | 5.1 | `/diagnose` | Free no-signup AI tool, hands off to `/jobs/new` | ✅ verified |
 | 5.2 | `/services/[trade]/[city]` | Spot-check a few of the 64 SEO pages | ✅ verified (1 of 64 spot-checked) |
-| 5.3 | `/financing` | Consumer financing option | ⬜ not yet driven |
-| 5.4 | `/guarantee` | Trust page | ⬜ not yet driven |
-| 5.5 | Referral | `/referral` flow | ⬜ not yet driven |
+| 5.3 | `/financing` | Consumer financing option | ✅ verified — pre-qualify flow UI loads correctly |
+| 5.4 | `/guarantee` | Trust page | ✅ verified |
+| 5.5 | Referral | `/referral` flow | ✅ verified — code + share link generate correctly, uses the stable domain |
 | 5.6 | Notifications | Email, push (FCM), SMS actually arrive | ⬜ needs real email/phone/device |
 | 5.7 | PWA install | Add to home screen, offline shell | ⬜ needs a real device |
 
